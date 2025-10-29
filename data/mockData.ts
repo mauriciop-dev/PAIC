@@ -1,0 +1,38 @@
+
+import { ChartData, Resident } from "../types";
+
+export const accountStatusData: ChartData[] = [
+    { name: 'Al día', value: 120, fill: '#34d399' },
+    { name: 'En mora', value: 30, fill: '#f87171' },
+];
+
+export const monthlyCollectionData: ChartData[] = [
+    { name: 'Ene', value: 45000, fill: '#60a5fa' },
+    { name: 'Feb', value: 48000, fill: '#60a5fa' },
+    { name: 'Mar', value: 52000, fill: '#60a5fa' },
+    { name: 'Abr', value: 47000, fill: '#60a5fa' },
+    { name: 'May', value: 55000, fill: '#60a5fa' },
+    { name: 'Jun', value: 53000, fill: '#60a5fa' },
+];
+
+export const pendingPaymentsData: ChartData[] = [
+    { name: 'Vigilancia', value: 25000, fill: '#fb923c' },
+    { name: 'Aseo', value: 12000, fill: '#fbbf24' },
+    { name: 'Servicios', value: 8000, fill: '#a78bfa' },
+    { name: 'Otros', value: 5000, fill: '#f472b6' },
+];
+
+export const overdueInstallmentsData: ChartData[] = [
+    { name: '1 cuota', value: 15, fill: '#fde047' },
+    { name: '2 cuotas', value: 10, fill: '#f59e0b' },
+    { name: '3+ cuotas', value: 5, fill: '#ef4444' },
+];
+
+
+export const residentsData: Resident[] = [
+    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543', status: 'En mora', balance: 50, overdue_installments: 1 },
+    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677', status: 'En mora', balance: 150, overdue_installments: 3 },
+     { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
+];

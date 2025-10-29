@@ -1,0 +1,5 @@
+{
+  "name": "PAIC - Plataforma de Administración Inteligente de Conjuntos",
+  "description": "An intelligent platform for managing residential complexes. PAIC provides an AI-powered assistant to help with tasks like managing finances, booking common areas, communicating with residents and providers, and more, all through a user-friendly web interface and chatbot.",
+  "requestFramePermissions": []
+}
