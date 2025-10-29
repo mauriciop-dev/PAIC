@@ -1,9 +1,30 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { residentsData } from '../../data/mockData';
 import { Resident } from '../../types';
+import EditResidentModal from '../EditResidentModal';
 
 const DatabaseView: React.FC = () => {
+  const [residents, setResidents] = useState<Resident[]>(residentsData);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+
+  const handleEditClick = (resident: Resident) => {
+    setSelectedResident(resident);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedResident(null);
+  };
+
+  const handleSaveChanges = (updatedResident: Resident) => {
+    setResidents(residents.map(r => r.apartment === updatedResident.apartment ? updatedResident : r));
+    handleCloseModal();
+  };
+
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Base de Datos de Residentes</h2>
@@ -42,7 +63,7 @@ const DatabaseView: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {residentsData.map((resident: Resident) => (
+                    {residents.map((resident: Resident) => (
                         <tr key={resident.apartment} className="bg-white border-b hover:bg-gray-50">
                             <td className="px-6 py-4 font-medium text-gray-900">{resident.apartment}</td>
                             <td className="px-6 py-4">{resident.name}</td>
@@ -56,7 +77,7 @@ const DatabaseView: React.FC = () => {
                                 </span>
                             </td>
                             <td className="px-6 py-4">
-                                <a href="#" className="font-medium text-blue-600 hover:underline">Editar</a>
+                                <button onClick={() => handleEditClick(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
                             </td>
                         </tr>
                     ))}
@@ -64,6 +85,14 @@ const DatabaseView: React.FC = () => {
             </table>
         </div>
       </div>
+      
+      {isEditModalOpen && (
+        <EditResidentModal
+          resident={selectedResident}
+          onClose={handleCloseModal}
+          onSave={handleSaveChanges}
+        />
+      )}
     </div>
   );
 };
