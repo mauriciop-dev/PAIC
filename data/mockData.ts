@@ -1,5 +1,5 @@
 
-import { ChartData, Resident } from "../types";
+import { ChartData, Resident, AccountStatus } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -35,4 +35,12 @@ export const residentsData: Resident[] = [
     { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233', status: 'Al día', balance: 0, overdue_installments: 0 },
     { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677', status: 'En mora', balance: 150, overdue_installments: 3 },
      { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
+];
+
+export const accountStatusDetailsData: AccountStatus[] = [
+    { apartment: '101', lastPaymentDate: '2024-06-05', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '102', lastPaymentDate: '2024-05-04', pendingInstallments: 1, outstandingBalance: 50 },
+    { apartment: '201', lastPaymentDate: '2024-06-02', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '202', lastPaymentDate: '2024-03-05', pendingInstallments: 3, outstandingBalance: 150 },
+    { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
 ];

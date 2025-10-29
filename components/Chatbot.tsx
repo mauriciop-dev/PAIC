@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { getChatResponse } from '../services/geminiService';
 import { Message } from '../types';
@@ -43,7 +42,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
     setIsLoading(true);
 
     try {
-      const aiResponseText = await getChatResponse(input);
+      const aiResponseText = await getChatResponse(input, [...messages, userMessage]);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {

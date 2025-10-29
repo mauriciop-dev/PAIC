@@ -5,6 +5,7 @@ export enum Tab {
   CommonAreas = 'Áreas comunes',
   DueDates = 'Vencimientos',
   PendingTasks = 'Tareas pendientes',
+  Status = 'Estado',
 }
 
 export interface Message {
@@ -26,4 +27,11 @@ export interface Resident {
     status: 'Al día' | 'En mora';
     balance: number;
     overdue_installments: number;
+}
+
+export interface AccountStatus {
+    apartment: string;
+    lastPaymentDate: string;
+    pendingInstallments: number;
+    outstandingBalance: number;
 }
