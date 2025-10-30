@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PAIC - Plataforma de Administración Inteligente de Conjuntos</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <style>
       @keyframes subtle-pulse {
         0%, 100% {
@@ -22,7 +22,16 @@
         animation: subtle-pulse 3s infinite;
         animation-delay: 15s;
       }
+      /* Hide default summary marker */
+      details > summary { list-style: none; }
+      details > summary::-webkit-details-marker { display: none; }
+      /* Animate chevron on details open */
+      details[open] > summary .chevron-rotate {
+        transform: rotate(180deg);
+      }
     </style>
+    <!-- Babel Standalone for in-browser TSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="importmap">
 {
   "imports": {
@@ -37,6 +46,6 @@
 </head>
   <body class="bg-gray-50">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./index.tsx"></script>
   </body>
 </html>

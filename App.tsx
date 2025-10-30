@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Footer from './components/Footer';
@@ -31,8 +31,12 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLoginSuccess = (credentialResponse: any) => {
+  const handleLoginSuccess = useCallback((credentialResponse: any) => {
     const profileObject: any = jwtDecode(credentialResponse.credential);
+    if (!profileObject) {
+      console.error("Failed to decode profile from credential response.");
+      return;
+    }
     const newUserProfile: UserProfile = {
       name: profileObject.name,
       email: profileObject.email,
@@ -47,16 +51,16 @@ const App: React.FC = () => {
       setIsInitialSetupModalOpen(true);
       localStorage.setItem('paic_visited', 'true');
     }
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setUserProfile(null);
     localStorage.removeItem('paic_userProfile');
     // It's good practice to also disable one-tap sign-in for a while after logout
-    if (window.google) {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
         window.google.accounts.id.disableAutoSelect();
     }
-  };
+  }, []);
 
   if (!userProfile) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />;
