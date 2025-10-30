@@ -1,9 +1,18 @@
-
-import React from 'react';
-import { accountStatusDetailsData } from '../../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { dataStore } from '../../data/dataStore';
 import { AccountStatus } from '../../types';
 
 const StatusView: React.FC = () => {
+  const [accountStatus, setAccountStatus] = useState<AccountStatus[]>(dataStore.getAccountStatus());
+
+  useEffect(() => {
+    const handleStoreChange = () => {
+      setAccountStatus(dataStore.getAccountStatus());
+    };
+    const unsubscribe = dataStore.subscribe(handleStoreChange);
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Estado de Cuentas</h2>
@@ -23,7 +32,7 @@ const StatusView: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {accountStatusDetailsData.map((account: AccountStatus) => (
+                    {accountStatus.map((account: AccountStatus) => (
                         <tr key={account.apartment} className="bg-white border-b hover:bg-gray-50">
                             <td className="px-6 py-4 font-medium text-gray-900">{account.apartment}</td>
                             <td className="px-6 py-4">{account.lastPaymentDate}</td>

@@ -35,3 +35,10 @@ export interface AccountStatus {
     pendingInstallments: number;
     outstandingBalance: number;
 }
+
+export interface Booking {
+    day: number;
+    time: string;
+    event: string; // e.g., 'BBQ', 'Gimnasio'
+    user: string; // e.g., 'Apt 101'
+}

@@ -1,4 +1,5 @@
-import { Message } from "../types";
+import { Message, Resident, AccountStatus, Booking } from "../types";
+import { dataStore } from '../data/dataStore';
 
 // This is a mock service to simulate a stateful Gemini API response based on the new, detailed rules.
 
@@ -13,27 +14,52 @@ const initialGreeting = `¡Hola! Soy PAIC, tu asistente virtual. Puedo ayudarte 
 
 ¿En qué te puedo ayudar?`;
 
+
+const createMailtoLink = (to: string, subject: string, body: string): string => {
+    // Replace markdown bold with plain text for email body
+    const plainBody = body.replace(/\*\*(.*?)\*\*/g, '$1');
+    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plainBody)}`;
+};
+
 // Helper to simulate a formatted email body for the chat response
-const formatEmailResponse = (subject: string, body: string): string => {
-    return `He preparado el siguiente correo electrónico para ser enviado:
+const formatEmailResponse = (subject: string, body: string, recipientEmail: string): string => {
+    const mailtoLink = createMailtoLink(recipientEmail, subject, body);
+    
+    const intro = `He preparado el siguiente correo electrónico para ser enviado a **${recipientEmail}**:`;
+
+    return `${intro}
 ---
 **Asunto:** ${subject}
 
 **Cuerpo:**
 ${body}
 ---
-El correo ha sido enviado exitosamente. ¿Hay algo más en lo que pueda ayudar?`;
+[Haz clic aquí para abrir y enviar el correo desde tu aplicación de email.](${mailtoLink})
+
+¿Hay algo más en lo que pueda ayudar?`;
+};
+
+const findDataByApartment = (aptNumber: string): { resident: Resident | undefined, account: AccountStatus | undefined } => {
+    const residents = dataStore.getResidents();
+    const accounts = dataStore.getAccountStatus();
+    const resident = residents.find(r => r.apartment === aptNumber);
+    const account = accounts.find(a => a.apartment === aptNumber);
+    return { resident, account };
+};
+
+const extractApartmentNumber = (text: string): string | null => {
+    const match = text.match(/\d{3,}/); // Find 3 or more digits
+    return match ? match[0] : null;
 };
 
 
 export const getChatResponse = async (prompt: string, messages: Message[]): Promise<string> => {
-    console.log("Sending to mock Gemini with updated prompt logic:", prompt);
+    console.log("Sending to mock Gemini with data-driven logic:", prompt);
     
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const lowerCasePrompt = prompt.toLowerCase().trim();
-    // Getting the last AI message (in lowercase) is key for context
     const lastAiMessage = messages.filter(m => m.sender === 'ai').pop()?.text.toLowerCase() || '';
 
     // --- GENERAL CANCELLATION & HELP ---
@@ -41,72 +67,76 @@ export const getChatResponse = async (prompt: string, messages: Message[]): Prom
         return `Proceso cancelado. ¿En qué más puedo ayudarte?\n\n${initialGreeting.split('\n\n')[1]}`;
     }
     
-    // --- CONTEXT-AWARE RESPONSES ---
-    // By checking the last AI message, we can create conversational flows.
-    // All checks are now case-insensitive and target key phrases.
+    // --- CONTEXT-AWARE RESPONSES (PRIORITY) ---
+    
+    // --- FLOW 1: ESTADO DE CUENTA (REFACTORED & FIXED) ---
+    // Step 3: User chose to email or view in chat
+    if (lastAiMessage.includes('por correo al residente o verla aquí en el chat')) {
+        const aptMatch = lastAiMessage.match(/apto \*\*(\d+)\*\*/);
+        const aptNumber = aptMatch ? aptMatch[1] : null;
 
-    // --- FLOW 1: ESTADO DE CUENTA ---
-    if (lastAiMessage.includes('1. residente o 2. quiere verlo el como administrador')) {
-        if (lowerCasePrompt === '1' || lowerCasePrompt.includes('residente')) {
-            return "Entendido, se enviará al residente. Por favor, indique el número de apartamento.";
+        if (!aptNumber) {
+            return "Parece que hubo un error y perdí el número de apartamento. ¿Podría indicármelo de nuevo, por favor?";
         }
-        if (lowerCasePrompt === '2' || lowerCasePrompt.includes('administrador')) {
-            return "Entendido, se mostrará en el chat. Por favor, indique el número de apartamento.";
-        }
-        return "Respuesta no válida. Por favor, indique '1' para enviar al residente o '2' para verlo en el chat.";
-    }
-    if (lastAiMessage.includes('indique el número de apartamento')) {
-        const prevAiMessage = messages.filter(m => m.sender === 'ai').slice(-2)[0]?.text.toLowerCase() || '';
-        
-        // Context: Estado de cuenta
-        if (prevAiMessage.includes('1. residente o 2. quiere verlo el como administrador')) {
-            const userChoiceForDestination = messages.filter(m => m.sender === 'user').slice(-1)[0]?.text.toLowerCase();
-            
-            if (userChoiceForDestination.includes('1') || userChoiceForDestination.includes('residente')) { // Send to resident
-                const emailBody = `Señor **Juan Perez**
 
-De acuerdo a su solicitud a continuación presentamos la información relacionada al estado de cuenta de pago de administración para el apartamento **${prompt}**.
+        const { resident, account } = findDataByApartment(aptNumber);
+        if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
 
-- Apartamento: **${prompt}**
-- Nombre: **Juan Perez**
-- Ultimo pago: **2024-06-05**
-- Estado: **Al día**
-- Saldo: **$0**
+        if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('correo')) {
+            const emailBody = `Señor(a) **${resident.name}**,
+
+De acuerdo a su solicitud a continuación presentamos la información relacionada al estado de cuenta de pago de administración para el apartamento **${aptNumber}**.
+
+- Apartamento: **${aptNumber}**
+- Nombre: **${resident.name}**
+- Ultimo pago: **${account.lastPaymentDate}**
+- Estado: **${resident.status}**
+- Saldo: **$${account.outstandingBalance.toLocaleString()}**
 
 Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se ve reflejado en bienestar para todos quienes residimos en el conjunto.`;
-                return formatEmailResponse(`Estado de cuenta Administración - Apto ${prompt}`, emailBody);
-            }
-            if (userChoiceForDestination.includes('2') || userChoiceForDestination.includes('administrador')) { // Show to admin
-                return `Aquí está el estado de cuenta del apartamento **${prompt}**:
-- Saldo pendiente: $150.000
-- Cuotas en mora: 3
-- Fecha último pago: 2024-03-05
+            return formatEmailResponse(`Estado de cuenta Administración - Apto ${aptNumber}`, emailBody, resident.email);
+        }
+        if (lowerCasePrompt.includes('2') || lowerCasePrompt.includes('ver aquí') || lowerCasePrompt.includes('chat')) {
+             return `Aquí está el estado de cuenta del apartamento **${aptNumber}**:
+- Saldo pendiente: $${account.outstandingBalance.toLocaleString()}
+- Cuotas en mora: ${account.pendingInstallments}
+- Fecha último pago: ${account.lastPaymentDate}
 
-¿Desea que también le envíe esta información a su correo electrónico?`;
-            }
+¿Hay algo más en lo que pueda ayudar?`;
         }
-        // Context: Zonas Comunes
-        if (prevAiMessage.includes('número de apartamento que realiza la solicitud')){
-             return `Entendido, apartamento **${prompt}**. ¿Qué espacio van a requerir? (Ej. BBQ, Gimnasio, Salón Comunal, etc.)`;
-        }
-        // Context: DB Update
-        if (prevAiMessage.includes('cuál base de datos quiere modificar')) {
-             return `La información actual para el apartamento **${prompt}** es:
-- Propietario: Juan Perez
-- Teléfono: 3001234567
-- Correo: juan.perez@email.com
-
-¿Iniciamos la actualización? 1. si 2. no`;
-        }
+        return "Opción no válida. Por favor, elija '1' para enviar correo o '2' para ver en el chat.";
     }
-    if (lastAiMessage.includes('envíe esta información a su correo electrónico')) {
+
+    // Step 2: User provided an apartment number
+    if (lastAiMessage.includes('indíqueme el número de apartamento')) {
+        const aptNumber = extractApartmentNumber(prompt);
+        if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
+        
+        const { resident, account } = findDataByApartment(aptNumber);
+        if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
+        
+        return `Encontré la información para el apto **${aptNumber}**. ¿Desea que se la envíe por correo al residente o verla aquí en el chat?\n1. Enviar correo\n2. Ver aquí`;
+    }
+
+    // Step 1: User chose between "residente" or "administrador"
+    if (lastAiMessage.includes('residente o 2. quiere verlo el como administrador')) {
+        if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('residente')) {
+            return "Entendido. Para enviarle la información al residente, por favor, indíqueme el número de apartamento que desea consultar.";
+        }
+        if (lowerCasePrompt.includes('2') || lowerCasePrompt.includes('administrador')) {
+            return "Entendido. Para mostrarle la información, por favor, indíqueme el número de apartamento que desea consultar.";
+        }
+        return "Opción no válida. Por favor, responde '1' para residente o '2' para administrador.";
+    }
+
+    if (lastAiMessage.includes('envíe esta información al correo del administrador')) {
         if (lowerCasePrompt.includes('sí') || lowerCasePrompt.includes('si')) {
             return "Entendido. Le he enviado el resumen a su correo. ¿Puedo ayudarle en algo más?";
         }
         return "De acuerdo. ¿Hay algo más en lo que pueda ayudarle?";
     }
 
-    // --- FLOW 2: MANTENIMIENTO ---
+    // --- FLOW 2: MANTENIMIENTO (No changes, as it doesn't depend on resident data yet) ---
     if (lastAiMessage.includes('especialidad quieres enviar el correo')) {
         return `Gracias. Ahora, por favor, describa brevemente la situación (Ej. 'arreglo eléctrico en el 305' o 'presentarse en administración').`;
     }
@@ -134,23 +164,81 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return "Proceso cancelado. Puede iniciar una nueva solicitud de mantenimiento cuando lo desee.";
     }
 
-    // --- FLOW 3: ZONAS COMUNES ---
-    if (lastAiMessage.includes('qué espacio van a requerir')) {
-        return `Perfecto, **${prompt}**. Ahora, por favor, indique el día, la hora de inicio y la hora de finalización.`;
+    // --- FLOW 3: ZONAS COMUNES (NOW FUNCTIONAL) ---
+     if (lastAiMessage.includes('número de apartamento que realiza la solicitud')){
+         const aptNumber = extractApartmentNumber(prompt);
+         if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
+         const { resident } = findDataByApartment(aptNumber);
+         if (!resident) return `El apartamento **${aptNumber}** no parece existir en la base de datos. Por favor verifique.`;
+         return `Entendido, apartamento **${aptNumber}**. ¿Qué espacio van a requerir? (Ej. BBQ, Gimnasio, Salón Comunal, etc.)`;
     }
-    if (lastAiMessage.includes('indique el día, la hora de inicio y la hora de finalización')) {
-        return `He verificado la disponibilidad y el espacio está libre. He creado el evento en el calendario con los detalles proporcionados. Se ha enviado una confirmación por correo al residente y al administrador. ¿Necesita algo más?`;
+    if (lastAiMessage.includes('qué espacio van a requerir')) {
+        return `Perfecto, **${prompt}**. Ahora, por favor, indique el día (solo el número), la hora de inicio y la hora de finalización. (Ej: 25, 2pm a 6pm)`;
+    }
+    if (lastAiMessage.includes('indique el día (solo el número), la hora de inicio y la hora de finalización')) {
+        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
+        const aptNumber = aptMatch ? aptMatch[1] : 'N/A';
+        
+        const spaceMatch = lastAiMessage.match(/perfecto, \*\*(.*?)\*\*/);
+        const space = spaceMatch ? spaceMatch[1] : 'Área Común';
+
+        const parts = prompt.split(',');
+        const day = parseInt(parts[0]?.trim(), 10);
+        const time = parts[1]?.trim() || 'hora no especificada';
+
+        if (isNaN(day)) {
+            return "No pude entender el día. Por favor, indique solo el número del día. (Ej: 25, 2pm a 6pm)";
+        }
+        
+        const newBooking: Booking = {
+            day: day,
+            time: time,
+            event: space.charAt(0).toUpperCase() + space.slice(1),
+            user: `Apt ${aptNumber}`
+        };
+
+        dataStore.addBooking(newBooking);
+
+        return `He verificado la disponibilidad y el espacio está libre. He creado el evento en el calendario con los detalles proporcionados. El cambio se reflejará en la pestaña 'Áreas comunes'. ¿Necesita algo más?`;
     }
 
     // --- FLOW 4: COMUNICACIONES ---
+    if (lastAiMessage.includes('indíqueme el número de apartamento al que desea enviar la comunicación')) {
+        const aptNumber = extractApartmentNumber(prompt);
+        if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
+        const { resident } = findDataByApartment(aptNumber);
+        if (!resident) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
+        return `Perfecto, se enviará la comunicación al apartamento **${aptNumber}**. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
+    }
     if (lastAiMessage.includes('a quién quiere enviar la comunicación')) {
         if (lowerCasePrompt.includes('residentes')) {
             return `¿Desea enviar a todos los residentes o aplicar una **Segmentación Inteligente** (ej. 'los que están al día' o 'los que deben 2 cuotas')?`;
         }
+        if (lowerCasePrompt.includes('alguien en particular') || lowerCasePrompt.includes('un apartamento') || lowerCasePrompt.includes('apartamento específico')) {
+            return "Entendido. Por favor, indíqueme el número de apartamento al que desea enviar la comunicación.";
+        }
         return `Entendido. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
     }
     if (lastAiMessage.includes('segmentación inteligente')) {
-        return `Aplicando filtro para: **${prompt}**. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
+        let filteredResidents: Resident[] = [];
+        const allResidents = dataStore.getResidents();
+        if (lowerCasePrompt.includes('al día')) {
+            filteredResidents = allResidents.filter(r => r.status === 'Al día');
+        } else if (lowerCasePrompt.includes('en mora') || lowerCasePrompt.includes('deben')) {
+            const match = lowerCasePrompt.match(/(\d+)\s*cuota/);
+            if (match) {
+                const numCuotas = parseInt(match[1], 10);
+                filteredResidents = allResidents.filter(r => r.overdue_installments >= numCuotas);
+            } else {
+                filteredResidents = allResidents.filter(r => r.status === 'En mora');
+            }
+        }
+        
+        if (filteredResidents.length > 0) {
+            return `Aplicando filtro para: **${prompt}**. Se enviará a **${filteredResidents.length}** residentes. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
+        } else {
+             return `No encontré residentes que coincidan con el filtro: **${prompt}**. Por favor, intente con otro criterio o escriba 'todos' para enviar a todos los residentes.`;
+        }
     }
     if (lastAiMessage.includes('cuál es la comunicación que desea enviar')) {
         return `Este es el mensaje que redactó:\n\n_"${prompt}"_\n\n¿Desea enviarlo tal cual lo escribió o prefiere que le haga unos ajustes de redacción?`;
@@ -165,7 +253,7 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return `Mensaje enviado con la versión ajustada. He copiado al administrador. ¿Algo más en lo que pueda ayudar?`;
     }
 
-    // --- FLOW 5: REVISAR DOCUMENTACION ---
+    // --- FLOW 5: REVISAR DOCUMENTACION (No changes) ---
     if (lastAiMessage.includes('listado de los archivos que hay dentro de la carpeta')) {
         return `Entendido. He encontrado que el "Reglamento de Propiedad Horizontal.pdf" trata sobre las normas de convivencia, el uso de áreas comunes y las responsabilidades de los propietarios. ¿Desea un resumen de alguna sección en particular o el enlace para abrir el documento?`;
     }
@@ -173,8 +261,8 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return `Claro, aquí tienes el enlace para que puedas revisarlo en detalle: [link_al_documento.pdf]. ¿Hay algo más que necesites?`;
     }
 
-    // --- FLOW 6: ACTUALIZAR BASE DE DATOS ---
-    if (lastAiMessage.includes('1. proceder 2. detener')) {
+    // --- FLOW 6: ACTUALIZAR BASE DE DATOS (NOW FUNCTIONAL) ---
+    if (lastAiMessage.includes('confirma si deseas continuar')) {
         if (lowerCasePrompt === '1' || lowerCasePrompt.includes('proceder')) {
             return "¿Cuál base de datos quiere modificar? 1. Residentes, 2. Proveedores, o 3. Internos.";
         }
@@ -183,21 +271,54 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         }
         return "Opción no válida. Por favor, indique '1' para proceder o '2' para detener."
     }
-   
+     if (lastAiMessage.includes('cuál base de datos quiere modificar')) {
+         if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('residentes')) {
+             return "Entendido. ¿Para qué número de apartamento desea actualizar la información?";
+         }
+        return "Esa funcionalidad aún está en desarrollo. Por ahora solo puedo actualizar la base de datos de Residentes.";
+    }
+    if (lastAiMessage.includes('qué número de apartamento desea actualizar la información')) {
+         const aptNumber = extractApartmentNumber(prompt);
+         if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
+         const { resident } = findDataByApartment(aptNumber);
+         if (!resident) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
+         
+         return `La información actual para el apartamento **${aptNumber}** es:
+- Propietario: **${resident.name}**
+- Teléfono: **${resident.phone}**
+- Correo: **${resident.email}**
+
+¿Iniciamos la actualización? 1. si 2. no`;
+    }
     if (lastAiMessage.includes('iniciamos la actualización? 1. si 2. no')) {
         if (lowerCasePrompt === '1' || lowerCasePrompt.includes('si')) {
-            return "Perfecto. Por favor, indíqueme únicamente el nombre del nuevo propietario.";
+            return "Perfecto. Por favor, indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas. (Ej: Ana García, 3001112233, ana.g@email.com)";
         }
         return "Actualización cancelada. Aquí tiene un video tutorial por si lo necesita más adelante: https://www.youtube.com/watch?v=aQ9mIPAAjjU&t=2s";
     }
-    if (lastAiMessage.includes('nombre del nuevo propietario')) {
-        return "Nombre actualizado. Ahora, el número de teléfono.";
-    }
-    if (lastAiMessage.includes('ahora, el número de teléfono')) {
-        return "Teléfono actualizado. Finalmente, el correo electrónico.";
-    }
-    if (lastAiMessage.includes('finalmente, el correo electrónico')) {
-        return `Correo actualizado. La información del apartamento ha sido modificada exitosamente. ¿Puedo ayudarle en algo más?`;
+    if (lastAiMessage.includes('indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas')) {
+        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
+        const aptNumber = aptMatch ? aptMatch[1] : null;
+
+        if (!aptNumber) {
+            return "Hubo un error. No pude recordar el número de apartamento. Por favor, empecemos de nuevo el proceso de actualización.";
+        }
+
+        const parts = prompt.split(',').map(p => p.trim());
+        if (parts.length !== 3) {
+            return "La información no parece estar en el formato correcto. Por favor, asegúrese de proveer nombre, teléfono y correo, separados por comas.";
+        }
+        
+        const [name, phone, email] = parts;
+        
+        const residentToUpdate = dataStore.getResidents().find(r => r.apartment === aptNumber);
+        if (residentToUpdate) {
+            const updatedResident = { ...residentToUpdate, name, phone, email };
+            dataStore.updateResident(updatedResident);
+            return `¡Perfecto! La información del apartamento **${aptNumber}** ha sido actualizada en la base de datos. Puede verificarlo en la pestaña 'Base de datos'. ¿Puedo ayudarle en algo más?`;
+        } else {
+            return `No pude encontrar el residente del apartamento **${aptNumber}** para actualizar. Por favor, verifique el número.`;
+        }
     }
 
     // --- KEYWORD-BASED TRIGGERS TO START FLOWS ---
@@ -213,6 +334,12 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
     );
 
     if (matchesKeyword(option1Keywords)) {
+        const aptNumber = extractApartmentNumber(lowerCasePrompt);
+        if (aptNumber) {
+            const { resident, account } = findDataByApartment(aptNumber);
+            if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
+            return `Encontré la información para el apto **${aptNumber}**. ¿Desea que se la envíe por correo al residente o verla aquí en el chat?\n1. Enviar correo\n2. Ver aquí`;
+        }
         return `Claro, puedo ayudarte con el estado de cuenta. ¿Desea que la información se la envíe al 1. residente o 2. quiere verlo el como administrador?`;
     }
     if (matchesKeyword(option2Keywords)) {

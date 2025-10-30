@@ -1,15 +1,8 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { accountStatusData, monthlyCollectionData, pendingPaymentsData, overdueInstallmentsData } from '../../data/mockData';
+import { dataStore } from '../../data/dataStore';
 import { ChartData } from '../../types';
-
-const charts = [
-  { title: 'Estado de Cartera', data: accountStatusData, type: 'pie' },
-  { title: 'Cuotas Vencidas por Apartamento', data: overdueInstallmentsData, type: 'pie' },
-  { title: 'Recaudo del Mes (Últimos 6 meses)', data: monthlyCollectionData, type: 'bar' },
-  { title: 'Pagos Pendientes de la Administración', data: pendingPaymentsData, type: 'bar' },
-];
+import { monthlyCollectionData, pendingPaymentsData } from '../../data/mockData';
 
 const ChartCard: React.FC<{title: string; data: ChartData[], type: 'pie' | 'bar'}> = ({ title, data, type }) => (
   <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
@@ -39,7 +32,61 @@ const ChartCard: React.FC<{title: string; data: ChartData[], type: 'pie' | 'bar'
 );
 
 const DashboardView: React.FC = () => {
+    const [charts, setCharts] = useState<Array<{ title: string; data: ChartData[], type: 'pie' | 'bar' }>>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        const updateCharts = () => {
+            const residents = dataStore.getResidents();
+
+            // 1. Estado de Cartera
+            const alDiaCount = residents.filter(r => r.status === 'Al día').length;
+            const enMoraCount = residents.length - alDiaCount;
+            const accountStatusChart = {
+                title: 'Estado de Cartera',
+                data: [
+                    { name: 'Al día', value: alDiaCount, fill: '#34d399' },
+                    { name: 'En mora', value: enMoraCount, fill: '#f87171' },
+                ],
+                type: 'pie' as const
+            };
+
+            // 2. Cuotas Vencidas
+            const oneInstallment = residents.filter(r => r.overdue_installments === 1).length;
+            const twoInstallments = residents.filter(r => r.overdue_installments === 2).length;
+            const threePlusInstallments = residents.filter(r => r.overdue_installments >= 3).length;
+            const overdueInstallmentsChart = {
+                title: 'Cuotas Vencidas por Apartamento',
+                data: [
+                    { name: '1 cuota', value: oneInstallment, fill: '#fde047' },
+                    { name: '2 cuotas', value: twoInstallments, fill: '#f59e0b' },
+                    { name: '3+ cuotas', value: threePlusInstallments, fill: '#ef4444' },
+                ],
+                type: 'pie' as const
+            };
+            
+            // Keep static charts for now
+            const monthlyCollectionChart = { title: 'Recaudo del Mes (Últimos 6 meses)', data: monthlyCollectionData, type: 'bar' as const };
+            const pendingPaymentsChart = { title: 'Pagos Pendientes de la Administración', data: pendingPaymentsData, type: 'bar' as const };
+
+            setCharts([
+                accountStatusChart,
+                overdueInstallmentsChart,
+                monthlyCollectionChart,
+                pendingPaymentsChart
+            ]);
+        };
+
+        updateCharts(); // Initial calculation
+        const unsubscribe = dataStore.subscribe(updateCharts);
+        return () => unsubscribe();
+    }, []);
+    
+    // Graceful loading state to prevent errors
+    if (charts.length === 0) {
+        return <div className="text-center p-10 text-gray-500">Cargando gráficos...</div>;
+    }
+
     const chartsPerPage = 2;
     const totalPages = Math.ceil(charts.length / chartsPerPage);
 

@@ -59,6 +59,40 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
+  const renderMessageContent = (text: string) => {
+    // Regex to find markdown-style links: [text](url)
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts = text.split(linkRegex);
+    
+    return (
+        <p className="text-sm whitespace-pre-wrap">
+            {parts.map((part, i) => {
+                // Every 3rd part is the link text, and the 4th is the URL
+                if (i % 3 === 1) {
+                    const linkText = parts[i];
+                    const linkUrl = parts[i + 1];
+                    return (
+                        <a 
+                            key={i} 
+                            href={linkUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 underline hover:text-blue-700 font-medium"
+                        >
+                            {linkText}
+                        </a>
+                    );
+                }
+                if (i % 3 === 2) {
+                    return null; // This is the URL part, already handled
+                }
+                return part; // This is a regular text part
+            })}
+        </p>
+    );
+  };
+
+
   if (!isOpen) {
     return (
       <button
@@ -90,7 +124,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
                 </div>
               )}
               <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-gray-200 text-gray-800 rounded-br-none' : 'bg-blue-50 text-gray-800 rounded-bl-none'}`}>
-                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                 {renderMessageContent(msg.text)}
               </div>
               {msg.sender === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">

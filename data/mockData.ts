@@ -1,4 +1,3 @@
-
 import { ChartData, Resident, AccountStatus } from "../types";
 
 export const accountStatusData: ChartData[] = [
@@ -37,10 +36,33 @@ export const residentsData: Resident[] = [
      { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
 ];
 
+// New data for upload simulation
+export const newResidentsData: Resident[] = [
+    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677', status: 'En mora', balance: 200, overdue_installments: 4 },
+    { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '302', name: 'Sofia Hernandez', email: 'sofia.h@email.com', phone: '3128889900', status: 'Al día', balance: 0, overdue_installments: 0 }, // New resident
+    { apartment: '401', name: 'Pedro Ramirez', email: 'pedro.r@email.com', phone: '3187776655', status: 'En mora', balance: 50, overdue_installments: 1 }, // New resident
+];
+
+
 export const accountStatusDetailsData: AccountStatus[] = [
     { apartment: '101', lastPaymentDate: '2024-06-05', pendingInstallments: 0, outstandingBalance: 0 },
     { apartment: '102', lastPaymentDate: '2024-05-04', pendingInstallments: 1, outstandingBalance: 50 },
     { apartment: '201', lastPaymentDate: '2024-06-02', pendingInstallments: 0, outstandingBalance: 0 },
     { apartment: '202', lastPaymentDate: '2024-03-05', pendingInstallments: 3, outstandingBalance: 150 },
     { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
+];
+
+// New data for upload simulation
+export const newAccountStatusDetailsData: AccountStatus[] = [
+    { apartment: '101', lastPaymentDate: '2024-06-05', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '102', lastPaymentDate: '2024-06-04', pendingInstallments: 0, outstandingBalance: 0 }, // Updated
+    { apartment: '201', lastPaymentDate: '2024-06-02', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '202', lastPaymentDate: '2024-02-05', pendingInstallments: 4, outstandingBalance: 200 }, // Updated
+    { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '302', lastPaymentDate: '2024-06-10', pendingInstallments: 0, outstandingBalance: 0 }, // New
+    { apartment: '401', lastPaymentDate: '2024-05-08', pendingInstallments: 1, outstandingBalance: 50 }, // New
 ];

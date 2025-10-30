@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Resident } from '../../types';
-import { Icon } from '../ui/Icon';
+import { Resident } from '../types';
+import { Icon } from './ui/Icon';
 
 interface EditResidentModalProps {
   resident: Resident | null;
