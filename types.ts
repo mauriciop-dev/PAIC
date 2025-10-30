@@ -1,4 +1,3 @@
-
 export enum Tab {
   Dashboard = 'Dashboard',
   Database = 'Base de datos',
@@ -41,4 +40,10 @@ export interface Booking {
     time: string;
     event: string; // e.g., 'BBQ', 'Gimnasio'
     user: string; // e.g., 'Apt 101'
+}
+
+export interface UserProfile {
+    name: string;
+    email: string;
+    picture: string;
 }

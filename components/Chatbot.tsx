@@ -1,18 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getChatResponse } from '../services/geminiService';
-import { Message } from '../types';
+import { Message, UserProfile } from '../types';
 import { Icon } from './ui/Icon';
 
 interface ChatbotProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  userProfile: UserProfile | null;
 }
 
-const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
+const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'ai',
-      text: '¡Hola! Soy PAIC, tu asistente inteligente. ¿Cómo puedo ayudarte a administrar tu conjunto residencial hoy?',
+      text: `¡Hola, ${userProfile?.name.split(' ')[0]}! Soy PAIC, tu asistente inteligente. ¿Cómo puedo ayudarte a administrar tu conjunto residencial hoy?`,
     },
   ]);
   const [input, setInput] = useState('');
@@ -42,7 +43,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
     setIsLoading(true);
 
     try {
-      const aiResponseText = await getChatResponse(input, [...messages, userMessage]);
+      const aiResponseText = await getChatResponse(input, [...messages, userMessage], userProfile?.name);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
@@ -128,7 +129,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen }) => {
               </div>
               {msg.sender === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <Icon name="user" className="w-5 h-5 text-gray-600" />
+                    <img src={userProfile?.picture} alt="User" className="w-full h-full rounded-full" />
                 </div>
               )}
             </div>

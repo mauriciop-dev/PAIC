@@ -1,9 +1,14 @@
-import { Message, Resident, AccountStatus, Booking } from "../types";
+import { Message, Resident, AccountStatus, Booking, UserProfile } from "../types";
 import { dataStore } from '../data/dataStore';
+import { GoogleGenAI } from "@google/genai";
+
+// Initialize the real Gemini API client
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 // This is a mock service to simulate a stateful Gemini API response based on the new, detailed rules.
-
-const initialGreeting = `¡Hola! Soy PAIC, tu asistente virtual. Puedo ayudarte con las siguientes tareas:
+const getInitialGreeting = (userName?: string) => {
+    const name = userName ? `, ${userName.split(' ')[0]}` : '';
+    return `¡Hola${name}! Soy PAIC, tu asistente virtual. Puedo ayudarte con las siguientes tareas:
 
 1. Revisar el estado de cuenta.
 2. Enviar solicitudes de mantenimiento.
@@ -13,6 +18,7 @@ const initialGreeting = `¡Hola! Soy PAIC, tu asistente virtual. Puedo ayudarte 
 6. Actualizar información de la base de datos.
 
 ¿En qué te puedo ayudar?`;
+};
 
 
 const createMailtoLink = (to: string, subject: string, body: string): string => {
@@ -53,21 +59,50 @@ const extractApartmentNumber = (text: string): string | null => {
 };
 
 
-export const getChatResponse = async (prompt: string, messages: Message[]): Promise<string> => {
-    console.log("Sending to mock Gemini with data-driven logic:", prompt);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
+export const getChatResponse = async (prompt: string, messages: Message[], userName?: string): Promise<string> => {
     const lowerCasePrompt = prompt.toLowerCase().trim();
     const lastAiMessage = messages.filter(m => m.sender === 'ai').pop()?.text.toLowerCase() || '';
+    const initialGreeting = getInitialGreeting(userName);
 
+    // --- NEW: CONTEXT-AWARE QUERY ENGINE ---
+    const queryKeywords = ['cuándo', 'quien', 'quién', 'muéstrame', 'mostrar', 'ver las reservas', 'está ocupado', 'reservas de'];
+    const isQuery = queryKeywords.some(k => lowerCasePrompt.includes(k)) && !lastAiMessage.includes('reservar');
+
+    if (isQuery) {
+        console.log("AI is in QUERY mode.");
+        const bookings = dataStore.getBookings();
+
+        if (bookings.length === 0) {
+            return "Actualmente no hay ninguna reserva en el calendario de áreas comunes.";
+        }
+
+        const systemInstruction = `Eres PAIC, un asistente de administración de conjuntos residenciales. Tu tarea es responder la pregunta del usuario basándote ESTRICTAMENTE en los datos de las reservas actuales que te proporciono en formato JSON. No inventes información. Si la pregunta no se puede responder con los datos, indica que no tienes esa información. Los datos son: ${JSON.stringify(bookings)}`;
+        
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction: systemInstruction,
+                }
+            });
+            return response.text;
+        } catch (error) {
+            console.error("Error calling Gemini API for query:", error);
+            return "Lo siento, tuve un problema al consultar la información. Por favor, inténtalo de nuevo.";
+        }
+    }
+
+    console.log("AI is in COMMAND mode.");
+    // Simulate network delay for command flows
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // --- GENERAL CANCELLATION & HELP ---
     if (['cancelar', 'detener', 'volver al menú'].includes(lowerCasePrompt)) {
         return `Proceso cancelado. ¿En qué más puedo ayudarte?\n\n${initialGreeting.split('\n\n')[1]}`;
     }
     
-    // --- CONTEXT-AWARE RESPONSES (PRIORITY) ---
+    // --- CONTEXT-AWARE COMMAND RESPONSES (PRIORITY) ---
     
     // --- FLOW 1: ESTADO DE CUENTA (REFACTORED & FIXED) ---
     // Step 3: User chose to email or view in chat
@@ -291,8 +326,15 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
 ¿Iniciamos la actualización? 1. si 2. no`;
     }
     if (lastAiMessage.includes('iniciamos la actualización? 1. si 2. no')) {
+        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
+        const aptNumber = aptMatch ? aptMatch[1] : null;
+
+        if (!aptNumber) {
+            return "Hubo un error, no pude identificar el apartamento. Por favor, reinicie el proceso de actualización.";
+        }
+
         if (lowerCasePrompt === '1' || lowerCasePrompt.includes('si')) {
-            return "Perfecto. Por favor, indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas. (Ej: Ana García, 3001112233, ana.g@email.com)";
+            return `Perfecto. Actualizando apartamento **${aptNumber}**. Por favor, indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas. (Ej: Ana García, 3001112233, ana.g@email.com)`;
         }
         return "Actualización cancelada. Aquí tiene un video tutorial por si lo necesita más adelante: https://www.youtube.com/watch?v=aQ9mIPAAjjU&t=2s";
     }
