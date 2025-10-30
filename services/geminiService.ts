@@ -2,8 +2,17 @@ import { Message, Resident, AccountStatus, Booking, UserProfile } from "../types
 import { dataStore } from '../data/dataStore';
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the real Gemini API client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// FIX: This logic makes the app work seamlessly in both Vercel (using import.meta.env for build-time secrets)
+// and the AI Studio dev environment (using process.env for runtime secrets).
+// It prevents crashes by safely checking for the existence of each environment's secret variable.
+// @ts-ignore - `process` is a global available in the AI Studio environment, but not in standard browser types.
+const apiKey = import.meta.env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env?.API_KEY);
+
+if (!apiKey) {
+  console.error("Gemini API key is not configured for the current environment. Please set VITE_GEMINI_API_KEY in Vercel or ensure API_KEY is available in AI Studio.");
+}
+// Initialize with the found key, or an empty string to prevent crashes if the key is missing.
+const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 // This is a mock service to simulate a stateful Gemini API response based on the new, detailed rules.
 const getInitialGreeting = (userName?: string) => {
@@ -60,6 +69,9 @@ const extractApartmentNumber = (text: string): string | null => {
 
 
 export const getChatResponse = async (prompt: string, messages: Message[], userName?: string): Promise<string> => {
+    if (!apiKey) {
+        return "Error de configuración: La clave de la API no está disponible. Por favor, contacte al administrador.";
+    }
     const lowerCasePrompt = prompt.toLowerCase().trim();
     const lastAiMessage = messages.filter(m => m.sender === 'ai').pop()?.text.toLowerCase() || '';
     const initialGreeting = getInitialGreeting(userName);

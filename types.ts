@@ -1,3 +1,15 @@
+// FIX: Manually define `import.meta.env` to resolve TypeScript errors since
+// the `vite/client` types are not being found automatically. This replaces the
+// failing triple-slash directive.
+declare global {
+  interface ImportMeta {
+    readonly env: {
+      readonly VITE_GEMINI_API_KEY?: string;
+      readonly VITE_GOOGLE_CLIENT_ID?: string;
+    };
+  }
+}
+
 export enum Tab {
   Dashboard = 'Dashboard',
   Database = 'Base de datos',
