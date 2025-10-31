@@ -1,4 +1,4 @@
-import { ChartData, Resident, AccountStatus } from "../types";
+import { ChartData, Resident, AccountStatus, DueDate } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -88,4 +88,13 @@ export const newAccountStatusDetailsData: AccountStatus[] = [
     { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
     { apartment: '302', lastPaymentDate: '2024-06-10', pendingInstallments: 0, outstandingBalance: 0 }, // New
     { apartment: '401', lastPaymentDate: '2024-05-08', pendingInstallments: 1, outstandingBalance: 50 }, // New
+];
+
+export const dueDatesData: DueDate[] = [
+    { id: 1, item: 'Servicio de Vigilancia', category: 'Servicios', dueDate: '2024-06-30', status: 'Pendiente' },
+    { id: 2, item: 'Servicio de Aseo', category: 'Servicios', dueDate: '2024-06-30', status: 'Pendiente' },
+    { id: 3, item: 'Mantenimiento Ascensores', category: 'Mantenimiento', dueDate: '2024-07-05', status: 'Pendiente' },
+    { id: 4, item: 'Seguro de Áreas Comunes', category: 'Seguros', dueDate: '2024-05-31', status: 'Vencido' },
+    { id: 5, item: 'Servicios Públicos (Agua, Luz)', category: 'Servicios', dueDate: '2024-07-10', status: 'Pendiente' },
+    { id: 6, item: 'Pago de Nómina', category: 'Nómina', dueDate: '2024-06-28', status: 'Pagado' },
 ];

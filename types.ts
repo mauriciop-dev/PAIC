@@ -64,3 +64,11 @@ export interface UserProfile {
     email: string;
     picture: string;
 }
+
+export interface DueDate {
+    id: number;
+    item: string;
+    category: 'Servicios' | 'Mantenimiento' | 'Seguros' | 'Nómina' | 'Otros';
+    dueDate: string;
+    status: 'Pendiente' | 'Vencido' | 'Pagado';
+}

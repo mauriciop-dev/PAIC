@@ -1,9 +1,10 @@
-import { Resident, AccountStatus, Booking, CommonArea } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
     newResidentsData,
-    newAccountStatusDetailsData
+    newAccountStatusDetailsData,
+    dueDatesData as initialDueDates,
 } from './mockData';
 
 type Listener = () => void;
@@ -30,6 +31,7 @@ const getNextColor = () => {
 // This is a simple in-memory store to ensure both UI and services access the same data state.
 let currentResidents: Resident[] = [...initialResidents];
 let currentAccountStatus: AccountStatus[] = [...initialAccountStatus];
+let currentDueDates: DueDate[] = [...initialDueDates];
 let currentBookings: Booking[] = [
     { day: 5, time: '12pm-4pm', event: 'BBQ', user: 'Apt 101' },
     { day: 12, time: '6pm-9pm', event: 'Salón Social', user: 'Apt 202' },
@@ -59,6 +61,17 @@ export const dataStore = {
 
     getAccountStatus: (): AccountStatus[] => {
         return [...currentAccountStatus]; // Return a copy
+    },
+    
+    getDueDates: (): DueDate[] => {
+        return [...currentDueDates];
+    },
+
+    updateDueDateStatus: (id: number, status: 'Pagado'): void => {
+        currentDueDates = currentDueDates.map(d => 
+            d.id === id ? { ...d, status } : d
+        );
+        notifyListeners();
     },
 
     getBookings: (): Booking[] => {
