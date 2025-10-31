@@ -93,7 +93,9 @@ export const getChatResponse = async (
   // Rely solely on the aistudio environment for API key management.
   if (!window.aistudio || typeof window.aistudio.hasSelectedApiKey !== 'function') {
     console.error("AI Studio environment not detected. Cannot proceed with API calls.");
-    throw new Error("El entorno de la aplicación no está configurado correctamente para la autenticación.");
+    // Trigger the API key selection flow in the UI, which has its own specific error handling
+    // if the aistudio object is truly missing.
+    throw new Error('API_KEY_NOT_SELECTED');
   }
 
   const hasKey = await window.aistudio.hasSelectedApiKey();
