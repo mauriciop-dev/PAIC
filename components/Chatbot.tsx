@@ -85,6 +85,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   };
 
   const handleSelectKeyAndRetry = async () => {
+    // FIX: Added a check for `window.aistudio` to handle its optional nature and provide a clear error message if it's missing.
+    if (!window.aistudio) {
+      console.error("AI Studio environment not detected, cannot open key selection.");
+      const errorMessage: Message = { sender: 'ai', text: 'El entorno de AI Studio no está disponible para seleccionar una clave.' };
+      setMessages((prev) => [...prev, errorMessage]);
+      return;
+    }
     try {
       await window.aistudio.openSelectKey();
       if (lastUserMessageForRetry) {

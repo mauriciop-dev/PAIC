@@ -19,7 +19,8 @@ declare global {
 
   interface Window {
     google: any;
-    aistudio: AIStudio;
+    // FIX: Made `aistudio` optional to resolve modifier conflicts and reflect its runtime availability.
+    aistudio?: AIStudio;
   }
 }
 
