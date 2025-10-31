@@ -37,6 +37,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     }
   }, [isOpen, userProfile]); // Re-run if isOpen or userProfile changes
 
+  // This effect hook provides a more reliable way to refocus the input
+  // after the AI has responded and the component has re-rendered.
+  useEffect(() => {
+    if (!isLoading && isOpen) {
+      inputRef.current?.focus();
+    }
+  }, [isLoading, isOpen]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -55,9 +63,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      // This fixes the autofocus issue by delaying the focus call slightly,
-      // ensuring the input is re-enabled and ready to be focused after the state updates.
-      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
   
