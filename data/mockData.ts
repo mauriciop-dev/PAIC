@@ -27,6 +27,29 @@ export const overdueInstallmentsData: ChartData[] = [
     { name: '3+ cuotas', value: 5, fill: '#ef4444' },
 ];
 
+export const weeklyChatbotSummaryData: ChartData[] = [
+    { name: 'Consultas', value: 135, fill: '#60a5fa' },
+    { name: 'Reservas', value: 42, fill: '#34d399' },
+    { name: 'Mantenimiento', value: 18, fill: '#f87171' },
+    { name: 'Otros', value: 25, fill: '#a78bfa' },
+];
+
+const generateMonthlyData = (baseValue: number, color: string) => {
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+    return months.map(month => ({
+        name: month,
+        value: Math.floor(baseValue + (Math.random() - 0.5) * (baseValue * 0.3)), // baseValue +/- 15%
+        fill: color,
+    }));
+};
+
+export const waterBillHistoryData = generateMonthlyData(1200, '#3b82f6');
+export const electricityBillHistoryData = generateMonthlyData(2500, '#f59e0b');
+export const gasBillHistoryData = generateMonthlyData(800, '#10b981');
+export const phoneBillHistoryData = generateMonthlyData(500, '#8b5cf6');
+export const maintenanceHistoryData = generateMonthlyData(1800, '#ec4899');
+export const securityBillHistoryData = generateMonthlyData(5000, '#64748b');
+
 
 export const residentsData: Resident[] = [
     { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567', status: 'Al día', balance: 0, overdue_installments: 0 },

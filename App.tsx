@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isInitialSetupModalOpen, setIsInitialSetupModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [conjuntoName, setConjuntoName] = useState<string>("Conjunto Residencial 'El Mirador'");
 
   useEffect(() => {
     // Check for persisted user session
@@ -73,7 +74,7 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-8 md:ml-10'}`}>
         <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} />
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Dashboard activeTab={activeTab} />
+          <Dashboard activeTab={activeTab} conjuntoName={conjuntoName} />
         </div>
         <Footer activeTab={activeTab} setActiveTab={setActiveTab} />
       </main>

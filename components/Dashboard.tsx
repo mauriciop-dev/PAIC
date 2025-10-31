@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Tab } from '../types';
 import DashboardView from './views/DashboardView';
@@ -9,13 +8,14 @@ import PendingTasksView from './views/PendingTasksView';
 
 interface DashboardProps {
   activeTab: Tab;
+  conjuntoName: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeTab, conjuntoName }) => {
   const renderContent = () => {
     switch (activeTab) {
       case Tab.Dashboard:
-        return <DashboardView />;
+        return <DashboardView conjuntoName={conjuntoName} />;
       case Tab.Database:
         return <DatabaseView />;
       case Tab.CommonAreas:
@@ -25,7 +25,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab }) => {
       case Tab.PendingTasks:
           return <PendingTasksView />;
       default:
-        return <DashboardView />;
+        return <DashboardView conjuntoName={conjuntoName} />;
     }
   };
 
