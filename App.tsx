@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -9,10 +10,17 @@ import LoginView from './components/views/LoginView';
 import { Tab, UserProfile } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 
+// FIX: To resolve module augmentation errors, define a named interface for aistudio and use it.
+interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
 // FIX: Add global type for window.google to satisfy TypeScript compiler and fix errors on lines 49-50.
 declare global {
   interface Window {
     google: any;
+    aistudio: AIStudio;
   }
 }
 

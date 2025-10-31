@@ -8,32 +8,6 @@ import {
 import { Message } from '../types';
 import { dataStore } from '../data/dataStore';
 
-// --- Lazy Initialization for the AI Client ---
-let ai: GoogleGenAI | null = null;
-
-const getAiInstance = (): GoogleGenAI => {
-  if (ai) {
-    return ai;
-  }
-
-  // Per coding guidelines, the API key is obtained exclusively from `process.env.API_KEY`.
-  // The execution environment is expected to provide this value.
-  // We use `typeof process` to safely check for the existence of the `process` object
-  // in the browser environment, preventing a "process is not defined" ReferenceError.
-  const apiKey = (typeof process !== 'undefined' && process.env) 
-    ? (process.env as any).API_KEY 
-    : undefined;
-
-  if (!apiKey) {
-    // This custom error will be caught and displayed in the chat UI.
-    throw new Error("La clave de API de Gemini no está configurada. Por favor, contacta al administrador.");
-  }
-  
-  ai = new GoogleGenAI({ apiKey });
-  return ai;
-};
-
-
 // --- Function Declarations for Gemini ---
 
 const addBookingDeclaration: FunctionDeclaration = {
@@ -111,13 +85,34 @@ export const getInitialGreeting = (userName?: string): string => {
 };
 
 export const getChatResponse = async (
-  _currentMessage: string,
+  currentMessageText: string,
   fullHistory: Message[],
   userName?: string
 ): Promise<string> => {
-  
+
+  // Check for API key selection before making any calls.
+  if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+          throw new Error('API_KEY_NOT_SELECTED');
+      }
+  } else {
+      // Fallback for environments where aistudio is not present.
+      const apiKey = (typeof process !== 'undefined' && process.env) 
+          ? (process.env as any).API_KEY 
+          : undefined;
+      if (!apiKey) {
+          throw new Error("La clave de API de Gemini no está configurada. Por favor, contacta al administrador.");
+      }
+  }
+
   try {
-    const ai = getAiInstance(); // Lazily initialize and get the AI instance.
+    // Create a new instance right before the call to ensure the latest key is used.
+    const apiKey = (process.env as any).API_KEY;
+    if (!apiKey) {
+      throw new Error('API_KEY_NOT_SELECTED');
+    }
+    const ai = new GoogleGenAI({ apiKey });
 
     const today = new Date().toISOString().split('T')[0];
     const residents = dataStore.getResidents();
@@ -127,12 +122,8 @@ export const getChatResponse = async (
     const dueDates = dataStore.getDueDates();
     const tasks = dataStore.getTasks();
     
-    const currentMessage = fullHistory[fullHistory.length - 1];
     const chatHistoryForApi = fullHistory.slice(0, -1);
 
-    // The system instruction helps the AI understand commands like
-    // "recuerdame" (without accents) and to correctly interpret relative dates like "mañana".
-    // This makes the chatbot's natural language understanding more reliable.
     const systemInstruction = `Eres PAIC, un asistente IA para administradores de conjuntos residenciales en Colombia. Tu nombre es PAIC (Plataforma de Administración Inteligente de Conjuntos).
     Estás conversando con ${userName || 'el administrador'}.
     Tu objetivo es ser útil, amable y profesional. Responde siempre en español.
@@ -172,7 +163,7 @@ export const getChatResponse = async (
         }
     });
 
-    let response: GenerateContentResponse = await chat.sendMessage({ message: currentMessage.text });
+    let response: GenerateContentResponse = await chat.sendMessage({ message: currentMessageText });
 
     let functionCalls = response.functionCalls;
 
@@ -193,7 +184,6 @@ export const getChatResponse = async (
             }
         }
         
-        // Send function responses back to the model
         response = await chat.sendMessage({
             toolResponses: {
                 functionResponses: functionCallResponses,
@@ -205,7 +195,13 @@ export const getChatResponse = async (
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
-        return error.message; // Return the specific error message from getAiInstance or the API
+        if (error.message.includes("API_KEY_NOT_SELECTED")) {
+           throw error; // Re-throw for UI to handle
+        }
+        if (error.message.includes("Requested entity was not found")) {
+            return "Hubo un problema con la clave de API seleccionada. Por favor, intenta seleccionar una clave diferente.";
+        }
+        return error.message;
     }
     return "Lo siento, tuve un problema inesperado para procesar tu solicitud. Por favor, inténtalo de nuevo más tarde.";
   }

@@ -13,6 +13,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [lastUserMessageForRetry, setLastUserMessageForRetry] = useState<string | null>(null);
+
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,74 +39,111 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     }
   }, [isOpen, userProfile]); // Re-run if isOpen or userProfile changes
 
-  // This effect hook provides a more reliable way to refocus the input
-  // after the AI has responded and the component has re-rendered.
   useEffect(() => {
     if (!isLoading && isOpen) {
       inputRef.current?.focus();
     }
   }, [isLoading, isOpen]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = { sender: 'user', text: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+  const sendMessageAndGetResponse = async (messageText: string) => {
+    const userMessage: Message = { sender: 'user', text: messageText };
+    const currentMessages = [...messages.filter(m => !m.isApiKeyRequest), userMessage];
+    
+    setMessages(currentMessages);
     setIsLoading(true);
 
     try {
-      const aiResponseText = await getChatResponse(input, [...messages, userMessage], userProfile?.name);
+      const aiResponseText = await getChatResponse(messageText, currentMessages, userProfile?.name);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      const errorMessage: Message = { sender: 'ai', text: 'Lo siento, ocurrió un error. Por favor, intenta de nuevo.' };
-      setMessages((prev) => [...prev, errorMessage]);
+      setLastUserMessageForRetry(null); // Clear retry message on success
+    } catch (error: any) {
+      if (error.message === 'API_KEY_NOT_SELECTED') {
+        setLastUserMessageForRetry(messageText); // Save message for retry
+        const apiKeyMessage: Message = {
+          sender: 'ai',
+          text: `Para usar el asistente, por favor selecciona una Clave de API.\n\nTu clave se utiliza para acceder a los servicios de IA de Google y no se almacena en esta aplicación. Puedes encontrar más información sobre la facturación en [ai.google.dev/gemini-api/docs/billing](https://ai.google.dev/gemini-api/docs/billing).`,
+          isApiKeyRequest: true,
+        };
+        setMessages((prev) => [...prev, apiKeyMessage]);
+      } else {
+        const errorMessageText = error.message || 'Lo siento, ocurrió un error. Por favor, intenta de nuevo.';
+        const errorMessage: Message = { sender: 'ai', text: errorMessageText };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const handleOutsideClick = (e: React.MouseEvent) => {
-    if ((e.target as Element).id === 'chatbot-overlay') {
-      setIsOpen(false);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    const messageText = input;
+    setInput('');
+    await sendMessageAndGetResponse(messageText);
+  };
+
+  const handleSelectKeyAndRetry = async () => {
+    try {
+      await window.aistudio.openSelectKey();
+      if (lastUserMessageForRetry) {
+        // Optimistically remove the API key request message from UI
+        setMessages(prev => prev.filter(m => !m.isApiKeyRequest));
+        // Retry the message
+        await sendMessageAndGetResponse(lastUserMessageForRetry);
+      }
+    } catch (e) {
+      console.error("Error opening select key dialog", e);
+       const errorMessage: Message = { sender: 'ai', text: 'No se pudo completar la selección de clave. Por favor, inténtalo de nuevo.' };
+       setMessages((prev) => [...prev, errorMessage]);
     }
   };
 
-  const renderMessageContent = (text: string) => {
-    // Regex to find markdown-style links: [text](url)
+  const renderMessageContent = (msg: Message) => {
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const parts = text.split(linkRegex);
-    
-    return (
-        <p className="text-base whitespace-pre-wrap">
-            {parts.map((part, i) => {
-                // Every 3rd part is the link text, and the 4th is the URL
-                if (i % 3 === 1) {
-                    const linkText = parts[i];
-                    const linkUrl = parts[i + 1];
-                    return (
-                        <a 
-                            key={i} 
-                            href={linkUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-600 underline hover:text-blue-700 font-medium"
-                        >
-                            {linkText}
-                        </a>
-                    );
-                }
-                if (i % 3 === 2) {
-                    return null; // This is the URL part, already handled
-                }
-                return part; // This is a regular text part
-            })}
-        </p>
-    );
-  };
+    const parts = msg.text.split(linkRegex);
 
+    const content = (
+      <p className="text-base whitespace-pre-wrap">
+        {parts.map((part, i) => {
+          if (i % 3 === 1) {
+            const linkText = parts[i];
+            const linkUrl = parts[i + 1];
+            return (
+              <a
+                key={i}
+                href={linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-700 font-medium"
+              >
+                {linkText}
+              </a>
+            );
+          }
+          if (i % 3 === 2) return null;
+          return part;
+        })}
+      </p>
+    );
+
+    if (msg.isApiKeyRequest) {
+      return (
+        <div>
+          {content}
+          <button
+            onClick={handleSelectKeyAndRetry}
+            className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Seleccionar Clave de API
+          </button>
+        </div>
+      );
+    }
+
+    return content;
+  };
 
   if (!isOpen) {
     return (
@@ -119,7 +158,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   }
 
   return (
-    <div id="chatbot-overlay" onClick={handleOutsideClick} className="fixed inset-0 bg-black bg-opacity-50 z-40 flex">
+    <div id="chatbot-overlay" onClick={(e) => { if ((e.target as Element).id === 'chatbot-overlay') setIsOpen(false); }} className="fixed inset-0 bg-black bg-opacity-50 z-40 flex">
       <div className="bg-white w-full md:w-[30%] h-full flex flex-col shadow-2xl">
         <header className="p-4 bg-blue-600 text-white flex justify-between items-center">
           <h2 className="text-lg font-semibold">Asistente Inteligente PAIC</h2>
@@ -137,7 +176,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
                 </div>
               )}
               <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-gray-200 text-gray-800 rounded-br-none' : 'bg-blue-50 text-gray-800 rounded-bl-none'}`}>
-                 {renderMessageContent(msg.text)}
+                 {renderMessageContent(msg)}
               </div>
               {msg.sender === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">

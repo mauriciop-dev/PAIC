@@ -10,6 +10,7 @@ export enum Tab {
 export interface Message {
   sender: 'user' | 'ai';
   text: string;
+  isApiKeyRequest?: boolean;
 }
 
 export interface ChartData {
