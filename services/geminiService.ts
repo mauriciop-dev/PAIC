@@ -90,28 +90,22 @@ export const getChatResponse = async (
   userName?: string
 ): Promise<string> => {
 
-  // Check for API key selection before making any calls.
-  if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-          throw new Error('API_KEY_NOT_SELECTED');
-      }
-  } else {
-      // Fallback for environments where aistudio is not present.
-      const apiKey = (typeof process !== 'undefined' && process.env) 
-          ? (process.env as any).API_KEY 
-          : undefined;
-      if (!apiKey) {
-          throw new Error("La clave de API de Gemini no está configurada. Por favor, contacta al administrador.");
-      }
+  // Rely solely on the aistudio environment for API key management.
+  if (!window.aistudio || typeof window.aistudio.hasSelectedApiKey !== 'function') {
+    console.error("AI Studio environment not detected. Cannot proceed with API calls.");
+    throw new Error("El entorno de la aplicación no está configurado correctamente para la autenticación.");
   }
 
+  const hasKey = await window.aistudio.hasSelectedApiKey();
+  if (!hasKey) {
+    // This specific error triggers the API key selection flow in the UI.
+    throw new Error('API_KEY_NOT_SELECTED');
+  }
+  
   try {
-    // Create a new instance right before the call to ensure the latest key is used.
+    // A key has been selected, so the platform will have injected it into process.env.
+    // We create the client here to ensure it uses the fresh key for this call.
     const apiKey = (process.env as any).API_KEY;
-    if (!apiKey) {
-      throw new Error('API_KEY_NOT_SELECTED');
-    }
     const ai = new GoogleGenAI({ apiKey });
 
     const today = new Date().toISOString().split('T')[0];
@@ -195,14 +189,14 @@ export const getChatResponse = async (
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
-        if (error.message.includes("API_KEY_NOT_SELECTED")) {
-           throw error; // Re-throw for UI to handle
+        // If the API key is invalid or not found by the backend, trigger the selection flow in the UI.
+        if (error.message.includes("API key not valid") || error.message.includes("Requested entity was not found")) {
+            throw new Error('API_KEY_NOT_SELECTED');
         }
-        if (error.message.includes("Requested entity was not found")) {
-            return "Hubo un problema con la clave de API seleccionada. Por favor, intenta seleccionar una clave diferente.";
-        }
-        return error.message;
+        // Re-throw other errors to be displayed as a message in the chat.
+        throw error;
     }
-    return "Lo siento, tuve un problema inesperado para procesar tu solicitud. Por favor, inténtalo de nuevo más tarde.";
+    // Handle non-Error objects.
+    throw new Error("Lo siento, tuve un problema inesperado para procesar tu solicitud.");
   }
 };

@@ -10,14 +10,13 @@ import LoginView from './components/views/LoginView';
 import { Tab, UserProfile } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 
-// FIX: To resolve module augmentation errors, define a named interface for aistudio and use it.
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-// FIX: Add global type for window.google to satisfy TypeScript compiler and fix errors on lines 49-50.
+// FIX: Moved the AIStudio interface into `declare global` to resolve module augmentation errors.
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
     google: any;
     aistudio: AIStudio;
