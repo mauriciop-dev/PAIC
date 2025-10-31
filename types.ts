@@ -77,6 +77,7 @@ export interface UserProfile {
     name: string;
     email: string;
     picture: string;
+    phone?: string; // Teléfono opcional
 }
 
 // Nuevo tipo para la configuración inicial

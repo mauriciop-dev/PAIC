@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile } from '../types';
+import { Icon } from './ui/Icon';
 
 interface HeaderProps {
   onHelpClick: () => void;
   userProfile: UserProfile | null;
   onLogout: () => void;
+  onSettingsClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout }) => {
+const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onSettingsClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +53,14 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout }) =
                   </div>
                   <div className="p-1">
                     <button
-                      onClick={onLogout}
+                      onClick={() => { onSettingsClick(); setIsMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
+                    >
+                      <Icon name="settings" className="w-4 h-4 text-gray-500" />
+                      Configuración
+                    </button>
+                    <button
+                      onClick={() => { onLogout(); setIsMenuOpen(false); }}
                       className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
                     >
                       Cerrar Sesión
