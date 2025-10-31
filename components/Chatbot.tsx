@@ -14,6 +14,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastUserMessageForRetry, setLastUserMessageForRetry] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,15 +58,25 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages((prev) => [...prev, aiMessage]);
       setLastUserMessageForRetry(null); // Clear retry message on success
+      setRetryCount(0); // Reset retry counter on success
     } catch (error: any) {
       if (error.message === 'API_KEY_NOT_SELECTED') {
-        setLastUserMessageForRetry(messageText); // Save message for retry
-        const apiKeyMessage: Message = {
-          sender: 'ai',
-          text: `Para usar el asistente, por favor selecciona una Clave de API.\n\nTu clave se utiliza para acceder a los servicios de IA de Google y no se almacena en esta aplicación. Puedes encontrar más información sobre la facturación en [ai.google.dev/gemini-api/docs/billing](https://ai.google.dev/gemini-api/docs/billing).`,
-          isApiKeyRequest: true,
-        };
-        setMessages((prev) => [...prev, apiKeyMessage]);
+        if (retryCount > 0) {
+            const errorMessage: Message = {
+                sender: 'ai',
+                text: "Parece que hay un problema persistente para acceder a la Clave de API, incluso después de seleccionarla. Por favor, recarga la página e inténtalo de nuevo. Si el problema continúa, verifica la configuración de tu entorno de AI Studio."
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+        } else {
+            setLastUserMessageForRetry(messageText); // Save message for retry
+            setRetryCount(prev => prev + 1);
+            const apiKeyMessage: Message = {
+              sender: 'ai',
+              text: `Para usar el asistente, por favor selecciona una Clave de API.\n\nTu clave se utiliza para acceder a los servicios de IA de Google y no se almacena en esta aplicación. Puedes encontrar más información sobre la facturación en [ai.google.dev/gemini-api/docs/billing](https://ai.google.dev/gemini-api/docs/billing).`,
+              isApiKeyRequest: true,
+            };
+            setMessages((prev) => [...prev, apiKeyMessage]);
+        }
       } else {
         const errorMessageText = error.message || 'Lo siento, ocurrió un error. Por favor, intenta de nuevo.';
         const errorMessage: Message = { sender: 'ai', text: errorMessageText };
@@ -81,6 +92,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     if (!input.trim() || isLoading) return;
     const messageText = input;
     setInput('');
+    setRetryCount(0); // Reset for new messages
     await sendMessageAndGetResponse(messageText);
   };
 

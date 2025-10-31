@@ -108,18 +108,14 @@ export const getChatResponse = async (
     // A key has been selected, so the platform will have injected it into process.env.
     // We create the client here to ensure it uses the fresh key for this call.
     
-    // FIX: Safely access process.env to prevent ReferenceError in browser environments.
+    // Safely access process.env to prevent ReferenceError in browser environments.
     const apiKey = (typeof process !== 'undefined' && process.env && (process.env as any).API_KEY)
       ? (process.env as any).API_KEY
       : undefined;
 
-    if (!apiKey) {
-      console.error("API key not found in environment after selection. Retriggering selection.");
-      // If the key is missing after a successful check, something is wrong.
-      // The safest bet is to ask the user to select again.
-      throw new Error('API_KEY_NOT_SELECTED');
-    }
-
+    // The explicit check for a missing apiKey is removed to prevent a race condition loop.
+    // If the key is truly missing or invalid, the API call will fail, and the catch
+    // block below will handle it gracefully by prompting the user to select a key again.
     const ai = new GoogleGenAI({ apiKey });
 
     const today = new Date().toISOString().split('T')[0];
