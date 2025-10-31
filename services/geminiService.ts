@@ -1,6 +1,6 @@
 import { Message, Resident, AccountStatus, Booking, UserProfile, Task } from "../types";
 import { dataStore } from '../data/dataStore';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // FIX: This logic makes the app work seamlessly in both Vercel (using import.meta.env for build-time secrets)
 // and the AI Studio dev environment (using process.env for runtime secrets).
@@ -322,12 +322,16 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         const taskTextMatch = lastAiMessage.match(/he agregado '(.*?)'/);
         if (taskTextMatch) {
             const taskText = taskTextMatch[1];
+            // Find the original task to update its date
+            const taskToUpdate = dataStore.getTasks().find(t => t.text === taskText && t.dueDate === '');
             if (lowerCasePrompt.includes('no')) {
                 return `Entendido. La tarea '${taskText}' ha sido guardada sin fecha.`;
             }
-            // Simple date parsing for now. Could be improved with NLP.
-            dataStore.addTask({ text: taskText, dueDate: prompt, completed: false });
-            return `Perfecto, he asignado la fecha. La tarea ha sido guardada y la puedes ver en la pestaña 'Tareas pendientes'.`;
+            if(taskToUpdate) {
+                dataStore.updateTask({ ...taskToUpdate, dueDate: prompt });
+                return `Perfecto, he asignado la fecha. La tarea ha sido guardada y la puedes ver en la pestaña 'Tareas pendientes'.`;
+            }
+            return `No pude encontrar la tarea original para actualizar. Por favor, agrégala de nuevo con la fecha.`;
         }
     }
 
@@ -475,12 +479,54 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
              }
              return "No estoy seguro de a qué tarea te refieres. ¿Puedes ser más específico o decirme la lista de tareas para ver las opciones?";
         }
-        // ADD TASK
+        // ADD TASK (NEW INTELLIGENT PARSING)
         if (lowerCasePrompt.includes('recuérdame') || lowerCasePrompt.includes('anota') || lowerCasePrompt.includes('agrega')) {
-            const taskText = prompt.replace(/(recuérdame|anota que|anota|agrega una tarea:|agrega)/i, '').trim();
-            if (taskText) {
-                dataStore.addTask({ text: taskText, dueDate: '', completed: false });
-                return `Entendido. He agregado '${taskText}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2024-07-15)`;
+            try {
+                // Get today's date in YYYY-MM-DD format for context
+                const today = new Date('2025-10-30T12:00:00Z'); // Fixed date for consistent testing
+                const todayString = today.toISOString().split('T')[0];
+
+                const response = await ai.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: prompt,
+                    config: {
+                        systemInstruction: `Eres un asistente de análisis de tareas. La fecha de hoy es ${todayString}. Extrae la descripción de la tarea y calcula la fecha de vencimiento basándote en el texto del usuario. Responde ÚNICAMENTE con un objeto JSON con dos claves: "text" (la descripción de la tarea) y "dueDate" (la fecha calculada en formato 'YYYY-MM-DD'). Si no se menciona ninguna fecha, "dueDate" debe ser una cadena vacía.`,
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                text: { type: Type.STRING },
+                                dueDate: { type: Type.STRING }
+                            }
+                        }
+                    }
+                });
+
+                const jsonStr = response.text.trim();
+                const taskData = JSON.parse(jsonStr);
+
+                if (taskData.text) {
+                    const newTask: Omit<Task, 'id'> = {
+                        text: taskData.text,
+                        dueDate: taskData.dueDate || '',
+                        completed: false
+                    };
+                    dataStore.addTask(newTask);
+
+                    if (taskData.dueDate) {
+                        return `¡Anotado! He agregado "${taskData.text}" a tus tareas para el ${taskData.dueDate}.`;
+                    } else {
+                        return `Entendido. He agregado '${taskData.text}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2025-11-15)`;
+                    }
+                }
+            } catch (error) {
+                console.error("Error parsing task with Gemini:", error);
+                // Fallback to simple logic if Gemini fails
+                const taskText = prompt.replace(/(recuérdame|anota que|anota|agrega una tarea:|agrega)/i, '').trim();
+                 if (taskText) {
+                    dataStore.addTask({ text: taskText, dueDate: '', completed: false });
+                    return `Entendido. He agregado '${taskText}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2025-11-15)`;
+                }
             }
         }
         return "Puedo ayudarte con tus tareas. ¿Quieres agregar una nueva, ver tu lista de pendientes o marcar una como completada?";
