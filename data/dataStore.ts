@@ -1,4 +1,4 @@
-import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog, PlatformUser, UserRole, AccessPoint } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
@@ -55,6 +55,16 @@ let commonAreas: CommonArea[] = [
     { id: '3', name: 'Salón Social', color: getNextColor() },
 ];
 
+// New data for User Management
+let currentUsers: PlatformUser[] = [
+    { id: 1, name: 'Admin Principal', email: 'admin@conjunto.com', role: UserRole.Admin },
+    { id: 2, name: 'Carlos (Portería)', email: 'porteria1@conjunto.com', role: UserRole.Guard, password: '123' }
+];
+let currentAccessPoints: AccessPoint[] = [
+    { id: 1, name: 'Portería Principal' },
+    { id: 2, name: 'Portería Vehicular' }
+];
+
 const notifyListeners = () => {
     listeners.forEach(listener => listener());
 };
@@ -63,6 +73,38 @@ export const dataStore = {
     subscribe: (listener: Listener): (() => void) => {
         listeners.add(listener);
         return () => listeners.delete(listener); // Return an unsubscribe function
+    },
+
+    // --- User Management ---
+    getUsers: (): PlatformUser[] => [...currentUsers],
+    addUser: (user: Omit<PlatformUser, 'id'>): void => {
+        const newUser = { ...user, id: Date.now() };
+        currentUsers.push(newUser);
+        notifyListeners();
+    },
+    updateUser: (updatedUser: PlatformUser): void => {
+        currentUsers = currentUsers.map(u => u.id === updatedUser.id ? updatedUser : u);
+        notifyListeners();
+    },
+    deleteUser: (userId: number): void => {
+        currentUsers = currentUsers.filter(u => u.id !== userId);
+        notifyListeners();
+    },
+    authenticateUser: (email: string, pass: string): PlatformUser | null => {
+        const user = currentUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
+        return user || null;
+    },
+
+    // --- Access Point Management ---
+    getAccessPoints: (): AccessPoint[] => [...currentAccessPoints],
+    addAccessPoint: (name: string): void => {
+        const newPoint = { id: Date.now(), name };
+        currentAccessPoints.push(newPoint);
+        notifyListeners();
+    },
+    deleteAccessPoint: (id: number): void => {
+        currentAccessPoints = currentAccessPoints.filter(ap => ap.id !== id);
+        notifyListeners();
     },
 
     getResidents: (): Resident[] => [...currentResidents],

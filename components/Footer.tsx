@@ -1,29 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Tab } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 
 interface FooterProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  userProfile: UserProfile;
 }
 
-const tabs = [
-  { id: Tab.Dashboard, label: 'Dashboard', icon: 'dashboard' },
-  { id: Tab.Database, label: 'Base de datos', icon: 'database' },
-  { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar' },
-  { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail' },
-  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign' },
-  { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield' },
-  { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock' },
-  { id: Tab.PendingTasks, label: 'Tareas pendientes', icon: 'checkSquare' },
+const allTabs = [
+  { id: Tab.Dashboard, label: 'Dashboard', icon: 'dashboard', roles: [UserRole.Admin] },
+  { id: Tab.Database, label: 'Base de datos', icon: 'database', roles: [UserRole.Admin] },
+  { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar', roles: [UserRole.Admin] },
+  { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail', roles: [UserRole.Admin] },
+  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Admin] },
+  { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield', roles: [UserRole.Admin, UserRole.Guard] },
+  { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock', roles: [UserRole.Admin] },
+  { id: Tab.PendingTasks, label: 'Tareas pendientes', icon: 'checkSquare', roles: [UserRole.Admin] },
 ];
 
-const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
+const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, userProfile }) => {
   const [sliderItems, setSliderItems] = useState<{ text: string; color: 'red' | 'yellow' | 'green' }[]>([]);
   const [currentItem, setCurrentItem] = useState(0);
 
+  const visibleTabs = useMemo(() => {
+    return allTabs.filter(tab => tab.roles.includes(userProfile.role));
+  }, [userProfile.role]);
+
   useEffect(() => {
+    if (userProfile.role !== UserRole.Admin) return;
+
     const updateSliderItems = async () => {
       const [dueDates, tasks] = await Promise.all([
         apiService.fetchDueDates(),
@@ -94,7 +101,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
     const intervalId = setInterval(updateSliderItems, 60000); // Refresh every minute
     return () => clearInterval(intervalId);
 
-  }, []);
+  }, [userProfile.role]);
 
   useEffect(() => {
     if (sliderItems.length <= 1) return;
@@ -104,20 +111,18 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
     return () => clearInterval(interval);
   }, [sliderItems]);
   
-  if (sliderItems.length === 0) {
-      return null;
-  }
-  
-  const trafficLightColor = {
-      red: 'bg-red-500',
-      yellow: 'bg-yellow-500',
-      green: 'bg-green-500',
-  }[sliderItems[currentItem].color] || 'bg-gray-500';
+  const trafficLightColor = sliderItems[currentItem] 
+    ? {
+        red: 'bg-red-500',
+        yellow: 'bg-yellow-500',
+        green: 'bg-green-500',
+      }[sliderItems[currentItem].color] || 'bg-gray-500'
+    : 'bg-gray-500';
 
   return (
     <footer className="p-2 md:p-3 border-t border-gray-200 bg-white sticky bottom-0 z-10 flex justify-between items-center gap-4">
       <nav className="flex items-center gap-1 md:gap-2 flex-wrap">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -132,10 +137,12 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
           </button>
         ))}
       </nav>
-      <div className="hidden sm:flex items-center gap-2 overflow-hidden flex-shrink min-w-0">
-         <div className={`w-3 h-3 rounded-full ${trafficLightColor} flex-shrink-0`}></div>
-         <p className="text-sm text-gray-700 truncate">{sliderItems[currentItem].text}</p>
-      </div>
+      {userProfile.role === UserRole.Admin && sliderItems.length > 0 && (
+          <div className="hidden sm:flex items-center gap-2 overflow-hidden flex-shrink min-w-0">
+             <div className={`w-3 h-3 rounded-full ${trafficLightColor} flex-shrink-0`}></div>
+             <p className="text-sm text-gray-700 truncate">{sliderItems[currentItem].text}</p>
+          </div>
+      )}
     </footer>
   );
 };

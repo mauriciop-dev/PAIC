@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 
 interface HeaderProps {
@@ -24,6 +24,8 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+  
+  if (!userProfile) return null;
 
   return (
     <header className="p-4 md:p-6 border-b border-gray-200 bg-white sticky top-0 z-10">
@@ -39,19 +41,26 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
             Ayuda
           </button>
           
-          {userProfile && (
-            <div className="relative" ref={menuRef}>
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-2 rounded-full p-1 hover:bg-gray-100">
-                <img src={userProfile.picture} alt="User Avatar" className="w-8 h-8 rounded-full" />
-                <span className="hidden md:inline font-semibold text-sm">{userProfile.name}</span>
-              </button>
-              {isMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20 border border-gray-100">
-                  <div className="p-3 border-b">
-                     <p className="font-semibold text-sm text-gray-800">{userProfile.name}</p>
-                     <p className="text-xs text-gray-500">{userProfile.email}</p>
-                  </div>
-                  <div className="p-1">
+          <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-2 rounded-full p-1 hover:bg-gray-100">
+              {userProfile.picture ? (
+                 <img src={userProfile.picture} alt="User Avatar" className="w-8 h-8 rounded-full" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                    <Icon name="user" className="w-5 h-5 text-gray-600" />
+                </div>
+              )}
+              <span className="hidden md:inline font-semibold text-sm">{userProfile.name}</span>
+            </button>
+            {isMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20 border border-gray-100">
+                <div className="p-3 border-b">
+                   <p className="font-semibold text-sm text-gray-800">{userProfile.name}</p>
+                   <p className="text-xs text-gray-500">{userProfile.email}</p>
+                   <p className="text-xs font-bold text-blue-600 mt-1">{userProfile.role}</p>
+                </div>
+                <div className="p-1">
+                  {userProfile.role === UserRole.Admin && (
                     <button
                       onClick={() => { onSettingsClick(); setIsMenuOpen(false); }}
                       className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
@@ -59,17 +68,17 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
                       <Icon name="settings" className="w-4 h-4 text-gray-500" />
                       Configuración
                     </button>
-                    <button
-                      onClick={() => { onLogout(); setIsMenuOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
-                    >
-                      Cerrar Sesión
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={() => { onLogout(); setIsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
+                  >
+                    Cerrar Sesión
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

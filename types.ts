@@ -9,6 +9,24 @@ export enum Tab {
   PendingTasks = 'Tareas pendientes',
 }
 
+export enum UserRole {
+  Admin = 'Administrador',
+  Guard = 'Portero',
+}
+
+export interface PlatformUser {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  password?: string;
+}
+
+export interface AccessPoint {
+  id: number;
+  name: string;
+}
+
 export interface Message {
   sender: 'user' | 'ai';
   text: string;
@@ -76,8 +94,9 @@ export interface CommonArea {
 export interface UserProfile {
     name: string;
     email: string;
-    picture: string;
-    phone?: string; // Teléfono opcional
+    picture?: string;
+    phone?: string;
+    role: UserRole;
 }
 
 // Nuevo tipo para la configuración inicial

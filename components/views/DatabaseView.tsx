@@ -1,23 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { Resident, AccountStatus, Provider, InternalStaff } from '../../types';
+import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser } from '../../types';
 import EditResidentModal from '../EditResidentModal';
+import UserModal from '../UserModal';
+import { Icon } from '../ui/Icon';
+
 
 enum DbTab {
   Residents = 'Residentes',
   AccountStatus = 'Estado de Cuentas',
   Providers = 'Proveedores',
   Internal = 'Internos',
+  Users = 'Usuarios',
 }
 
-const DatabaseView: React.FC = () => {
+interface DatabaseViewProps {
+    userProfile: UserProfile;
+}
+
+const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [accountStatus, setAccountStatus] = useState<AccountStatus[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
   const [activeDbTab, setActiveDbTab] = useState<DbTab>(DbTab.Residents);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -27,16 +38,18 @@ const DatabaseView: React.FC = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [res, acc, prov, staff] = await Promise.all([
+      const [res, acc, prov, staff, users] = await Promise.all([
         apiService.fetchResidents(),
         apiService.fetchAccountStatus(),
         apiService.fetchProviders(),
         apiService.fetchInternalStaff(),
+        userProfile.role === UserRole.Admin ? apiService.fetchUsers() : Promise.resolve([]),
       ]);
       setResidents(res);
       setAccountStatus(acc);
       setProviders(prov);
       setInternalStaff(staff);
+      setPlatformUsers(users);
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -48,27 +61,45 @@ const DatabaseView: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleEditClick = (resident: Resident) => {
+  const handleEditResidentClick = (resident: Resident) => {
     setSelectedResident(resident);
     setIsEditModalOpen(true);
   };
-
-  const handleCloseModal = () => {
-    setIsEditModalOpen(false);
-    setSelectedResident(null);
+  
+  const handleUserModalOpen = (user: PlatformUser | null) => {
+      setSelectedUser(user);
+      setIsUserModalOpen(true);
   };
 
   const handleSaveChanges = async (updatedResident: Resident) => {
     await apiService.updateResident(updatedResident);
     fetchData(); // Refresh data
-    handleCloseModal();
+    setIsEditModalOpen(false);
   };
+  
+  const handleSaveUser = async (user: PlatformUser) => {
+      if(user.id) {
+          await apiService.updateUser(user);
+      } else {
+          await apiService.addUser(user);
+      }
+      fetchData();
+      setIsUserModalOpen(false);
+  };
+  
+  const handleDeleteUser = async (userId: number) => {
+      if(window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+          await apiService.deleteUser(userId);
+          fetchData();
+      }
+  };
+
 
   const handleSimulateUpload = async () => {
     setIsUploading(true);
     setFeedbackMessage(null);
     try {
-      await apiService.loadNewData(activeDbTab);
+      await apiService.loadNewData(activeDbTab as any); // Assuming activeDbTab matches a valid type
       await fetchData(); // Refresh data from the "API"
       setFeedbackMessage({type: 'success', text: `¡Datos de ${activeDbTab} actualizados exitosamente!`});
     } catch (error) {
@@ -92,6 +123,36 @@ const DatabaseView: React.FC = () => {
       );
 
       switch (activeDbTab) {
+          case DbTab.Users:
+             return (
+                  <table className="w-full text-sm text-left text-gray-500">
+                      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                          <tr>
+                              <th scope="col" className="px-6 py-3">Nombre</th>
+                              <th scope="col" className="px-6 py-3">Correo</th>
+                              <th scope="col" className="px-6 py-3">Rol</th>
+                              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {platformUsers.map((user) => (
+                              <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
+                                  <td className="px-6 py-4 font-medium text-gray-900">{user.name}</td>
+                                  <td className="px-6 py-4">{user.email}</td>
+                                  <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.role === UserRole.Admin ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                      {user.role}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                     <button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                     <button onClick={() => handleDeleteUser(user.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              );
           case DbTab.Residents:
               return (
                   <table className="w-full text-sm text-left text-gray-500">
@@ -199,35 +260,37 @@ const DatabaseView: React.FC = () => {
       }
   };
 
-  const dbTabs = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal];
+  const dbTabs = Object.values(DbTab).filter(tab => userProfile.role === UserRole.Admin || tab !== DbTab.Users);
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Base de Datos</h2>
       
-      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Gestión de Información</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Utiliza estas herramientas para cargar o actualizar la información de <span className="font-semibold">{activeDbTab}</span> de forma masiva.
-        </p>
-        <div className="flex flex-wrap items-center gap-4">
-            <button className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                Descargar Plantilla
-            </button>
-            <button 
-                onClick={handleSimulateUpload} 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={isUploading}
-            >
-                {isUploading ? 'Cargando...' : `Cargar Información (${activeDbTab})`}
-            </button>
-        </div>
-        {feedbackMessage && (
-          <p className={`text-sm mt-4 ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-            {feedbackMessage.text}
+      {activeDbTab !== DbTab.Users && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Gestión de Información</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Utiliza estas herramientas para cargar o actualizar la información de <span className="font-semibold">{activeDbTab}</span> de forma masiva.
           </p>
-        )}
-      </div>
+          <div className="flex flex-wrap items-center gap-4">
+              <button className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                  Descargar Plantilla
+              </button>
+              <button 
+                  onClick={handleSimulateUpload} 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
+                  disabled={isUploading}
+              >
+                  {isUploading ? 'Cargando...' : `Cargar Información (${activeDbTab})`}
+              </button>
+          </div>
+          {feedbackMessage && (
+            <p className={`text-sm mt-4 ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {feedbackMessage.text}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mb-4 border-b border-gray-200">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
@@ -249,8 +312,11 @@ const DatabaseView: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="flex justify-end p-2 border-b">
-           <button className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md font-semibold hover:bg-blue-200 transition-colors text-xs">
-              + Agregar Registro
+           <button 
+                onClick={() => activeDbTab === DbTab.Users ? handleUserModalOpen(null) : alert('Add new record')}
+                className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md font-semibold hover:bg-blue-200 transition-colors text-xs flex items-center gap-1">
+              <Icon name="user-plus" className="w-4 h-4" />
+              {activeDbTab === DbTab.Users ? 'Agregar Usuario' : 'Agregar Registro'}
             </button>
         </div>
         <div className="overflow-x-auto">
@@ -261,9 +327,17 @@ const DatabaseView: React.FC = () => {
       {isEditModalOpen && (
         <EditResidentModal
           resident={selectedResident}
-          onClose={handleCloseModal}
+          onClose={() => setIsEditModalOpen(false)}
           onSave={handleSaveChanges}
         />
+      )}
+      {isUserModalOpen && (
+          <UserModal
+            isOpen={isUserModalOpen}
+            onClose={() => setIsUserModalOpen(false)}
+            onSave={handleSaveUser}
+            userToEdit={selectedUser}
+          />
       )}
     </div>
   );

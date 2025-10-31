@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tab } from '../types';
+import { Tab, UserProfile } from '../types';
 import DashboardView from './views/DashboardView';
 import DatabaseView from './views/DatabaseView';
 import CommonAreasView from './views/CommonAreasView';
@@ -13,15 +13,16 @@ interface DashboardProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   conjuntoName: string;
+  userProfile: UserProfile;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile }) => {
   const renderContent = () => {
     switch (activeTab) {
       case Tab.Dashboard:
         return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} />;
       case Tab.Database:
-        return <DatabaseView />;
+        return <DatabaseView userProfile={userProfile} />;
       case Tab.CommonAreas:
         return <CommonAreasView />;
       case Tab.DueDates:

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { UserProfile, ConjuntoInfo } from '../types';
+import React, { useState, useEffect } from 'react';
+import { UserProfile, ConjuntoInfo, AccessPoint } from '../types';
 import { Icon } from './ui/Icon';
+import { apiService } from '../services/apiService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface SettingsModalProps {
   conjuntoInfo: ConjuntoInfo;
 }
 
-type SettingsTab = 'Perfil' | 'Conjunto';
+type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -23,6 +24,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [profileData, setProfileData] = useState<UserProfile>(userProfile);
   const [conjuntoData, setConjuntoData] = useState<ConjuntoInfo>(conjuntoInfo);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Access Points state
+  const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
+  const [newAccessPointName, setNewAccessPointName] = useState('');
+
+  useEffect(() => {
+    const fetchAccessPoints = async () => {
+        if (activeTab === 'Puntos de Acceso') {
+            const data = await apiService.fetchAccessPoints();
+            setAccessPoints(data);
+        }
+    };
+    fetchAccessPoints();
+  }, [activeTab]);
+
 
   if (!isOpen) return null;
 
@@ -38,6 +54,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setHasChanges(true);
   };
   
+  const handleAddAccessPoint = async () => {
+      if (newAccessPointName.trim()) {
+          await apiService.addAccessPoint(newAccessPointName.trim());
+          setNewAccessPointName('');
+          const data = await apiService.fetchAccessPoints(); // Refresh
+          setAccessPoints(data);
+      }
+  };
+
+  const handleDeleteAccessPoint = async (id: number) => {
+      if(window.confirm('¿Estás seguro de que quieres eliminar este punto de acceso?')) {
+          await apiService.deleteAccessPoint(id);
+          const data = await apiService.fetchAccessPoints(); // Refresh
+          setAccessPoints(data);
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(profileData, conjuntoData);
@@ -80,6 +113,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
   );
 
+  const renderAccessPointsTab = () => (
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+            <input 
+                type="text"
+                value={newAccessPointName}
+                onChange={(e) => setNewAccessPointName(e.target.value)}
+                placeholder="Nombre del punto de acceso"
+                className="flex-1 p-2 border border-gray-300 rounded-md"
+            />
+            <button
+                type="button"
+                onClick={handleAddAccessPoint}
+                className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700"
+            >
+                Agregar
+            </button>
+        </div>
+        <div className="space-y-2">
+            {accessPoints.map(point => (
+                <div key={point.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                    <span className="text-gray-800">{point.name}</span>
+                    <button type="button" onClick={() => handleDeleteAccessPoint(point.id)} className="text-red-500 hover:text-red-700 font-medium text-sm">Eliminar</button>
+                </div>
+            ))}
+        </div>
+      </div>
+  );
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
@@ -98,7 +160,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-6 overflow-y-auto">
                 <div className="mb-6 border-b border-gray-200">
                     <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                        {(['Perfil', 'Conjunto'] as SettingsTab[]).map(tab => (
+                        {(['Perfil', 'Conjunto', 'Puntos de Acceso'] as SettingsTab[]).map(tab => (
                             <button
                                 key={tab}
                                 type="button"
@@ -115,7 +177,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </nav>
                 </div>
 
-                {activeTab === 'Perfil' ? renderProfileTab() : renderConjuntoTab()}
+                {activeTab === 'Perfil' && renderProfileTab()}
+                {activeTab === 'Conjunto' && renderConjuntoTab()}
+                {activeTab === 'Puntos de Acceso' && renderAccessPointsTab()}
             </div>
             
             <footer className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-4">

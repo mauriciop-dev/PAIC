@@ -1,10 +1,46 @@
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const apiService = {
+  // --- Auth & User Management ---
+  authenticateUser: async (email: string, pass: string): Promise<PlatformUser | null> => {
+      await delay(500);
+      return dataStore.authenticateUser(email, pass);
+  },
+  fetchUsers: async (): Promise<PlatformUser[]> => {
+      await delay(200);
+      return dataStore.getUsers();
+  },
+  addUser: async (user: Omit<PlatformUser, 'id'>): Promise<void> => {
+      await delay(300);
+      dataStore.addUser(user);
+  },
+  updateUser: async (user: PlatformUser): Promise<void> => {
+      await delay(300);
+      dataStore.updateUser(user);
+  },
+  deleteUser: async (userId: number): Promise<void> => {
+      await delay(300);
+      dataStore.deleteUser(userId);
+  },
+  
+  // --- Access Point Management ---
+  fetchAccessPoints: async (): Promise<AccessPoint[]> => {
+      await delay(200);
+      return dataStore.getAccessPoints();
+  },
+  addAccessPoint: async (name: string): Promise<void> => {
+      await delay(300);
+      dataStore.addAccessPoint(name);
+  },
+  deleteAccessPoint: async (id: number): Promise<void> => {
+      await delay(300);
+      dataStore.deleteAccessPoint(id);
+  },
+
   // --- Fetching Data ---
   fetchResidents: async (): Promise<Resident[]> => {
     await delay(200);
