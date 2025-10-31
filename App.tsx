@@ -50,11 +50,14 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
-                const storedConjunto = localStorage.getItem('paic_conjuntoInfo');
+                // FIX: This logic is more robust. It handles cases where 'paic_conjuntoInfo' might be the string "null".
+                // It attempts to parse from storage first, and if the result is not a valid object, it fetches from the API.
+                const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
+                const storedConjunto = storedConjuntoRaw ? JSON.parse(storedConjuntoRaw) : null;
+
                 if (storedConjunto) {
-                    setConjuntoInfo(JSON.parse(storedConjunto));
+                    setConjuntoInfo(storedConjunto);
                 } else {
-                    // FIX: If conjuntoInfo is not in local storage, fetch it from the API
                     const info = await apiService.fetchConjuntoInfo(parsedUser.conjuntoId);
                     if (info) {
                         setConjuntoInfo(info);
