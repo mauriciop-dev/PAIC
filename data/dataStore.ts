@@ -66,6 +66,28 @@ export const dataStore = {
     getDueDates: (): DueDate[] => {
         return [...currentDueDates];
     },
+    
+    addDueDate: (newDueDateData: Omit<DueDate, 'id' | 'status'>): void => {
+        const newDueDate: DueDate = {
+            ...newDueDateData,
+            id: Date.now(),
+            status: 'Pendiente',
+        };
+        currentDueDates.unshift(newDueDate); // Add to the beginning of the list
+        notifyListeners();
+    },
+
+    updateDueDate: (updatedDueDate: DueDate): void => {
+        currentDueDates = currentDueDates.map(d => 
+            d.id === updatedDueDate.id ? updatedDueDate : d
+        );
+        notifyListeners();
+    },
+    
+    deleteDueDate: (id: number): void => {
+        currentDueDates = currentDueDates.filter(d => d.id !== id);
+        notifyListeners();
+    },
 
     updateDueDateStatus: (id: number, status: 'Pagado'): void => {
         currentDueDates = currentDueDates.map(d => 

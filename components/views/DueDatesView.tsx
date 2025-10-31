@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { dataStore } from '../../data/dataStore';
 import { DueDate } from '../../types';
+import DueDateModal from '../DueDateModal';
 
 type StatusFilter = 'Todos' | 'Pendiente' | 'Vencido' | 'Pagado';
 
 const DueDatesView: React.FC = () => {
   const [dueDates, setDueDates] = useState<DueDate[]>(dataStore.getDueDates());
   const [filter, setFilter] = useState<StatusFilter>('Todos');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDueDate, setEditingDueDate] = useState<DueDate | null>(null);
 
   useEffect(() => {
     const handleStoreChange = () => {
@@ -16,8 +19,36 @@ const DueDatesView: React.FC = () => {
     return () => unsubscribe();
   }, []);
   
-  const handleMarkAsPaid = (id: number) => {
-      dataStore.updateDueDateStatus(id, 'Pagado');
+  const handleOpenAddModal = () => {
+      setEditingDueDate(null);
+      setIsModalOpen(true);
+  };
+  
+  const handleOpenEditModal = (dueDate: DueDate) => {
+      setEditingDueDate(dueDate);
+      setIsModalOpen(true);
+  };
+  
+  const handleCloseModal = () => {
+      setIsModalOpen(false);
+      setEditingDueDate(null);
+  };
+  
+  const handleSaveDueDate = (dueDate: DueDate) => {
+      if (editingDueDate) {
+          dataStore.updateDueDate(dueDate);
+      } else {
+          // The store handles adding 'id' and 'status'
+          const { id, status, ...newDueDateData } = dueDate;
+          dataStore.addDueDate(newDueDateData);
+      }
+      handleCloseModal();
+  };
+  
+  const handleDelete = (id: number) => {
+      if (window.confirm('¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer.')) {
+          dataStore.deleteDueDate(id);
+      }
   };
 
   const getStatusChipStyle = (status: DueDate['status']) => {
@@ -42,10 +73,20 @@ const DueDatesView: React.FC = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Vencimientos de Pagos</h2>
-      <p className="text-gray-600 mb-6">
-        Aquí puedes ver los vencimientos de pagos pendientes de la administración. El asistente te alertará sobre los próximos vencimientos.
-      </p>
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+            <div>
+                <h2 className="text-2xl font-bold text-gray-800">Vencimientos de Pagos</h2>
+                <p className="text-gray-600 mt-1">
+                    Gestiona las obligaciones de pago de la administración.
+                </p>
+            </div>
+            <button 
+                onClick={handleOpenAddModal}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+            >
+                Agregar Vencimiento
+            </button>
+        </div>
 
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
         <div className="flex items-center gap-2">
@@ -75,18 +116,12 @@ const DueDatesView: React.FC = () => {
                     <p className="text-sm text-gray-500">Vence: {payment.dueDate}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className={`px-3 py-1 text-sm font-medium rounded-full w-24 text-center ${getStatusChipStyle(payment.status)}`}>
                   {payment.status}
                 </span>
-                {(payment.status === 'Pendiente' || payment.status === 'Vencido') && (
-                     <button 
-                        onClick={() => handleMarkAsPaid(payment.id)}
-                        className="px-3 py-1 bg-green-500 text-white rounded-md text-sm font-semibold hover:bg-green-600 transition-colors"
-                     >
-                        Marcar como Pagado
-                     </button>
-                )}
+                <button onClick={() => handleOpenEditModal(payment)} className="font-medium text-blue-600 hover:underline text-sm p-1">Editar</button>
+                <button onClick={() => handleDelete(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
               </div>
             </li>
           )) : (
@@ -96,6 +131,14 @@ const DueDatesView: React.FC = () => {
           )}
         </ul>
       </div>
+      {isModalOpen && (
+        <DueDateModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            onSave={handleSaveDueDate}
+            dueDateToEdit={editingDueDate}
+        />
+      )}
     </div>
   );
 };
