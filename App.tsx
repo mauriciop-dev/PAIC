@@ -37,7 +37,15 @@ const App: React.FC = () => {
     
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
+      
+      // Compatibility fix for old user profiles without a role.
+      if (!parsedUser.role) {
+          parsedUser.role = UserRole.Admin;
+          localStorage.setItem('paic_userProfile', JSON.stringify(parsedUser));
+      }
+      
       setUserProfile(parsedUser);
+
       if(parsedUser.role === UserRole.Guard){
         // Do not automatically show for guard on refresh, assume they already selected.
       }
