@@ -1,5 +1,5 @@
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -37,6 +37,10 @@ export const apiService = {
   fetchCommonAreas: async (): Promise<CommonArea[]> => {
     await delay(200);
     return dataStore.getCommonAreas();
+  },
+  fetchExpenses: async (): Promise<Expense[]> => {
+      await delay(200);
+      return dataStore.getExpenses();
   },
   
   // --- Modifying Data ---
@@ -87,6 +91,20 @@ export const apiService = {
   updateDueDateStatus: async (id: number, status: 'Pagado'): Promise<void> => {
     await delay(300);
     dataStore.updateDueDateStatus(id, status);
+  },
+  
+  // Expenses
+  addExpense: async (expense: Omit<Expense, 'id'>): Promise<void> => {
+    await delay(300);
+    dataStore.addExpense(expense);
+  },
+  updateExpense: async (expense: Expense): Promise<void> => {
+    await delay(300);
+    dataStore.updateExpense(expense);
+  },
+  deleteExpense: async (id: number): Promise<void> => {
+    await delay(300);
+    dataStore.deleteExpense(id);
   },
   
   // --- Data Loading Simulation ---

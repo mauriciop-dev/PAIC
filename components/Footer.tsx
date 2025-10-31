@@ -13,6 +13,7 @@ const tabs = [
   { id: Tab.Database, label: 'Base de datos', icon: 'database' },
   { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar' },
   { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail' },
+  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign' },
   { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock' },
   { id: Tab.PendingTasks, label: 'Tareas pendientes', icon: 'checkSquare' },
 ];
@@ -114,7 +115,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
 
   return (
     <footer className="p-2 md:p-3 border-t border-gray-200 bg-white sticky bottom-0 z-10 flex justify-between items-center gap-4">
-      <nav className="flex items-center gap-1 md:gap-2">
+      <nav className="flex items-center gap-1 md:gap-2 flex-wrap">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -126,7 +127,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
             }`}
           >
             <Icon name={tab.icon} className="w-5 h-5" />
-            <span className="hidden md:inline">{tab.label}</span>
+            <span className="hidden lg:inline">{tab.label}</span>
           </button>
         ))}
       </nav>

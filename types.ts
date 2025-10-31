@@ -2,9 +2,10 @@ export enum Tab {
   Dashboard = 'Dashboard',
   Database = 'Base de datos',
   CommonAreas = 'Áreas comunes',
+  Comunicaciones = 'Comunicaciones',
+  Finanzas = 'Finanzas',
   DueDates = 'Vencimientos',
   PendingTasks = 'Tareas pendientes',
-  Comunicaciones = 'Comunicaciones',
 }
 
 export interface Message {
@@ -17,6 +18,9 @@ export interface ChartData {
     name: string;
     value: number;
     fill: string;
+    // Added for dual bar charts
+    ingresos?: number;
+    gastos?: number;
 }
 
 // Actualizado según requerimientos
@@ -97,4 +101,15 @@ export interface Task {
     text: string;
     dueDate: string;
     completed: boolean;
+}
+
+// Nuevo tipo para la sección de Finanzas
+export type ExpenseCategory = 'Servicios' | 'Mantenimiento' | 'Nómina' | 'Administrativos' | 'Otros';
+export interface Expense {
+    id: number;
+    description: string;
+    amount: number;
+    category: ExpenseCategory;
+    date: string;
+    providerId?: number;
 }

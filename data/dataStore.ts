@@ -1,4 +1,4 @@
-import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
@@ -6,6 +6,7 @@ import {
     internalStaffData as initialInternalStaff,
     dueDatesData as initialDueDates,
     tasksData as initialTasks,
+    expensesData as initialExpenses,
 } from './mockData';
 
 type Listener = () => void;
@@ -36,6 +37,7 @@ let currentProviders: Provider[] = [...initialProviders];
 let currentInternalStaff: InternalStaff[] = [...initialInternalStaff];
 let currentDueDates: DueDate[] = [...initialDueDates];
 let currentTasks: Task[] = [...initialTasks];
+let currentExpenses: Expense[] = [...initialExpenses];
 let currentBookings: Booking[] = [
     { day: 5, time: '12pm-4pm', event: 'BBQ', user: 'Apt 101' },
     { day: 12, time: '6pm-9pm', event: 'Salón Social', user: 'Apt 202' },
@@ -131,6 +133,29 @@ export const dataStore = {
 
     removeCommonArea: (id: string): void => {
         commonAreas = commonAreas.filter(area => area.id !== id);
+        notifyListeners();
+    },
+    
+    getExpenses: (): Expense[] => [...currentExpenses],
+    
+    addExpense: (newExpenseData: Omit<Expense, 'id'>): void => {
+        const newExpense: Expense = {
+            ...newExpenseData,
+            id: Date.now(),
+        };
+        currentExpenses.unshift(newExpense);
+        notifyListeners();
+    },
+    
+    updateExpense: (updatedExpense: Expense): void => {
+        currentExpenses = currentExpenses.map(e => 
+            e.id === updatedExpense.id ? updatedExpense : e
+        );
+        notifyListeners();
+    },
+    
+    deleteExpense: (id: number): void => {
+        currentExpenses = currentExpenses.filter(e => e.id !== id);
         notifyListeners();
     },
 

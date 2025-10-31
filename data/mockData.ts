@@ -1,4 +1,4 @@
-import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff } from "../types";
+import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff, Expense } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -98,3 +98,14 @@ export const tasksData: Task[] = [
     { id: 4, text: 'Revisar contrato de vigilancia', dueDate: '2024-06-28', completed: false },
     { id: 5, text: 'Enviar comunicado sobre uso de piscina', dueDate: '2024-06-20', completed: true },
 ];
+
+// New data for Finance View
+export const expensesData: Expense[] = [
+    { id: 1, description: 'Pago nómina vigilantes', amount: 15000, category: 'Nómina', date: '2024-06-28', providerId: 1 },
+    { id: 2, description: 'Compra de productos de aseo', amount: 800, category: 'Mantenimiento', date: '2024-06-15', providerId: 2 },
+    { id: 3, description: 'Servicios públicos - Agua', amount: 1200, category: 'Servicios', date: '2024-06-10' },
+    { id: 4, description: 'Arreglo de gotera T2 Apto 501', amount: 350, category: 'Mantenimiento', date: '2024-06-05', providerId: 3 },
+    { id: 5, description: 'Papelería y fotocopias', amount: 150, category: 'Administrativos', date: '2024-06-02' },
+];
+
+export const monthlyBudget = 40000;
