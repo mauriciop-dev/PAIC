@@ -1,5 +1,5 @@
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -49,6 +49,106 @@ export const apiService = {
   fetchPackageLogs: async (): Promise<PackageLog[]> => {
       await delay(200);
       return dataStore.getPackageLogs();
+  },
+
+  fetchDashboardSummary: async (): Promise<DashboardSummary> => {
+    await delay(400); // Simulate a more complex query
+    const accounts = dataStore.getAccountStatus();
+    const tasks = dataStore.getTasks();
+    const dueDates = dataStore.getDueDates();
+    const packages = dataStore.getPackageLogs();
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const notifications: NotificationItem[] = [];
+
+    // Process due dates
+    dueDates.forEach(d => {
+        if (d.status === 'Vencido') {
+            notifications.push({
+                id: `due-${d.id}`,
+                type: 'due-date',
+                text: `Pago Vencido: ${d.item}`,
+                details: `Venció el ${d.dueDate}.`,
+                urgency: 'high',
+                linkTo: Tab.DueDates
+            });
+        } else if (d.status === 'Pendiente') {
+            const dueDate = new Date(d.dueDate);
+            const timeDiff = dueDate.getTime() - today.getTime();
+            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            if (dayDiff >= 0 && dayDiff <= 3) {
+                 notifications.push({
+                    id: `due-${d.id}`,
+                    type: 'due-date',
+                    text: `Pago Próximo: ${d.item}`,
+                    details: `Vence en ${dayDiff} día(s).`,
+                    urgency: 'medium',
+                    linkTo: Tab.DueDates
+                });
+            }
+        }
+    });
+
+    // Process tasks
+    tasks.forEach(t => {
+        if (!t.completed && t.dueDate) {
+            const dueDate = new Date(t.dueDate);
+            const timeDiff = dueDate.getTime() - today.getTime();
+            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+             if (dayDiff < 0) {
+                 notifications.push({
+                    id: `task-${t.id}`,
+                    type: 'task',
+                    text: `Tarea Atrasada: ${t.text}`,
+                    details: `Venció hace ${Math.abs(dayDiff)} día(s).`,
+                    urgency: 'high',
+                    linkTo: Tab.PendingTasks
+                });
+             } else if (dayDiff <= 3) {
+                  notifications.push({
+                    id: `task-${t.id}`,
+                    type: 'task',
+                    text: `Tarea Urgente: ${t.text}`,
+                    details: `Vence en ${dayDiff} día(s).`,
+                    urgency: 'medium',
+                    linkTo: Tab.PendingTasks
+                });
+             }
+        }
+    });
+    
+    // Process packages
+    packages.forEach(p => {
+        if (p.status === 'En recepción') {
+            notifications.push({
+                id: `pkg-${p.id}`,
+                type: 'package',
+                text: `Paquete para Apto ${p.apartment}`,
+                details: `Recibido de ${p.courier} el ${p.receivedDate}.`,
+                urgency: 'low',
+                linkTo: Tab.Seguridad
+            });
+        }
+    });
+    
+    // Sort notifications: high -> medium -> low
+    notifications.sort((a, b) => {
+        const urgencyOrder = { high: 0, medium: 1, low: 2 };
+        return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    });
+
+
+    return {
+        stats: {
+            residentsInDebt: accounts.filter(a => a.outstandingBalance > 0).length,
+            pendingTasks: tasks.filter(t => !t.completed).length,
+            overduePayments: dueDates.filter(d => d.status === 'Vencido').length,
+            packagesToDeliver: packages.filter(p => p.status === 'En recepción').length,
+        },
+        notifications: notifications.slice(0, 5) // Return top 5 most urgent notifications
+    };
   },
   
   // --- Modifying Data ---

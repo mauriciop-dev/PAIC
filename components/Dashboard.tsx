@@ -11,14 +11,15 @@ import SeguridadView from './views/SeguridadView';
 
 interface DashboardProps {
   activeTab: Tab;
+  setActiveTab: (tab: Tab) => void;
   conjuntoName: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeTab, conjuntoName }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName }) => {
   const renderContent = () => {
     switch (activeTab) {
       case Tab.Dashboard:
-        return <DashboardView conjuntoName={conjuntoName} />;
+        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} />;
       case Tab.Database:
         return <DatabaseView />;
       case Tab.CommonAreas:
@@ -34,7 +35,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, conjuntoName }) => {
       case Tab.Seguridad:
           return <SeguridadView />;
       default:
-        return <DashboardView conjuntoName={conjuntoName} />;
+        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} />;
     }
   };
 

@@ -134,3 +134,23 @@ export interface PackageLog {
     receivedDate: string;
     status: 'En recepción' | 'Entregado';
 }
+
+// Nuevos tipos para Dashboard View
+export interface NotificationItem {
+    id: number | string;
+    type: 'due-date' | 'task' | 'package';
+    text: string;
+    details: string;
+    urgency: 'high' | 'medium' | 'low';
+    linkTo: Tab;
+}
+
+export interface DashboardSummary {
+    stats: {
+        residentsInDebt: number;
+        pendingTasks: number;
+        overduePayments: number;
+        packagesToDeliver: number;
+    };
+    notifications: NotificationItem[];
+}
