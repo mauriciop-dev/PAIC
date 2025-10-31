@@ -7,7 +7,7 @@ import Chatbot from './components/Chatbot';
 import HelpModal from './components/HelpModal';
 import InitialSetupModal from './components/InitialSetupModal';
 import LoginView from './components/views/LoginView';
-import { Tab, UserProfile } from './types';
+import { Tab, UserProfile, ConjuntoInfo } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 import { Icon } from './components/ui/Icon';
 
@@ -24,13 +24,21 @@ const App: React.FC = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isInitialSetupModalOpen, setIsInitialSetupModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [conjuntoName, setConjuntoName] = useState<string>("Conjunto Residencial 'El Mirador'");
+  const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
 
   useEffect(() => {
-    // Check for persisted user session
+    // Check for persisted user session and conjunto info
     const storedUser = localStorage.getItem('paic_userProfile');
+    const storedConjunto = localStorage.getItem('paic_conjuntoInfo');
+    
     if (storedUser) {
       setUserProfile(JSON.parse(storedUser));
+    }
+    if (storedConjunto) {
+      setConjuntoInfo(JSON.parse(storedConjunto));
+    } else if (storedUser) {
+        // If user is logged in but no conjunto info, prompt for setup.
+        setIsInitialSetupModalOpen(true);
     }
   }, []);
 
@@ -48,26 +56,34 @@ const App: React.FC = () => {
     setUserProfile(newUserProfile);
     localStorage.setItem('paic_userProfile', JSON.stringify(newUserProfile));
 
-    // Optional: show initial setup only after first login
-    const isFirstVisit = !localStorage.getItem('paic_visited');
-    if (isFirstVisit) {
+    // After first login, if no conjunto info exists, open the setup modal.
+    const storedConjunto = localStorage.getItem('paic_conjuntoInfo');
+    if (!storedConjunto) {
       setIsInitialSetupModalOpen(true);
-      localStorage.setItem('paic_visited', 'true');
     }
   }, []);
 
   const handleLogout = useCallback(() => {
     setUserProfile(null);
     localStorage.removeItem('paic_userProfile');
-    // It's good practice to also disable one-tap sign-in for a while after logout
+    // For privacy, you might also want to clear conjunto info on logout, or keep it. Let's keep it for convenience.
+    // localStorage.removeItem('paic_conjuntoInfo');
     if (window.google && window.google.accounts && window.google.accounts.id) {
         window.google.accounts.id.disableAutoSelect();
     }
   }, []);
 
+  const handleSaveSetup = (info: ConjuntoInfo) => {
+    setConjuntoInfo(info);
+    localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
+    setIsInitialSetupModalOpen(false);
+  };
+
   if (!userProfile) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />;
   }
+  
+  const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";
 
   return (
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
@@ -96,7 +112,7 @@ const App: React.FC = () => {
       </main>
 
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} />}
-      {isInitialSetupModalOpen && <InitialSetupModal onClose={() => setIsInitialSetupModalOpen(false)} />}
+      {isInitialSetupModalOpen && <InitialSetupModal onClose={() => setIsInitialSetupModalOpen(false)} onSaveSetup={handleSaveSetup} />}
     </div>
   );
 };

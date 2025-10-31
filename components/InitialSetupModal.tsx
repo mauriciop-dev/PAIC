@@ -1,12 +1,34 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Icon } from './ui/Icon';
+import { ConjuntoInfo } from '../types';
 
 interface InitialSetupModalProps {
   onClose: () => void;
+  onSaveSetup: (info: ConjuntoInfo) => void;
 }
 
-const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose }) => {
+const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSetup }) => {
+  const [formData, setFormData] = useState<ConjuntoInfo>({
+    name: '',
+    nit: '',
+    address: '',
+    adminName: '',
+    adminEmail: '',
+    adminPhone: '',
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSaveSetup(formData);
+    onClose(); 
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center">
       <div 
@@ -16,14 +38,14 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose }) => {
         <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Bienvenido a PAIC!</h2>
         <p className="text-gray-600 mb-6">Comencemos registrando la información básica de tu conjunto residencial.</p>
         
-        <form onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+        <form onSubmit={handleSubmit}>
             <div className="space-y-4">
-                <input type="text" placeholder="Nombre del conjunto" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="text" placeholder="NIT" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="text" placeholder="Dirección del conjunto" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="text" placeholder="Nombre del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="email" placeholder="Correo del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="tel" placeholder="Teléfono del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nombre del conjunto" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="text" name="nit" value={formData.nit} onChange={handleChange} placeholder="NIT" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Dirección del conjunto" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="text" name="adminName" value={formData.adminName} onChange={handleChange} placeholder="Nombre del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="email" name="adminEmail" value={formData.adminEmail} onChange={handleChange} placeholder="Correo del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="tel" name="adminPhone" value={formData.adminPhone} onChange={handleChange} placeholder="Teléfono del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
             </div>
             <div className="mt-8 flex justify-end gap-4">
                 <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">

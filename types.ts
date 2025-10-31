@@ -4,6 +4,7 @@ export enum Tab {
   CommonAreas = 'Áreas comunes',
   DueDates = 'Vencimientos',
   PendingTasks = 'Tareas pendientes',
+  Comunicaciones = 'Comunicaciones',
 }
 
 export interface Message {
@@ -71,6 +72,16 @@ export interface UserProfile {
     name: string;
     email: string;
     picture: string;
+}
+
+// Nuevo tipo para la configuración inicial
+export interface ConjuntoInfo {
+    name: string;
+    nit: string;
+    address: string;
+    adminName: string;
+    adminEmail: string;
+    adminPhone: string;
 }
 
 export interface DueDate {

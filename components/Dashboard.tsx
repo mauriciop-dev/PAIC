@@ -5,6 +5,7 @@ import DatabaseView from './views/DatabaseView';
 import CommonAreasView from './views/CommonAreasView';
 import DueDatesView from './views/DueDatesView';
 import PendingTasksView from './views/PendingTasksView';
+import ComunicacionesView from './views/ComunicacionesView';
 
 interface DashboardProps {
   activeTab: Tab;
@@ -24,6 +25,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, conjuntoName }) => {
         return <DueDatesView />;
       case Tab.PendingTasks:
           return <PendingTasksView />;
+      case Tab.Comunicaciones:
+          return <ComunicacionesView />;
       default:
         return <DashboardView conjuntoName={conjuntoName} />;
     }

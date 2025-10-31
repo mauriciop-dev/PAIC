@@ -110,6 +110,23 @@ const processApiResponse = async (response: string): Promise<string> => {
     }
 };
 
+const runStandaloneQuery = async (systemInstruction: string, prompt: string): Promise<string> => {
+    if (!apiKey || !ai) {
+        return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada.";
+    }
+    try {
+        const response: GenerateContentResponse = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+            config: { systemInstruction },
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error in standalone query:", error);
+        throw new Error("No se pudo obtener una respuesta de la IA.");
+    }
+}
+
 export const geminiService = {
   runChat: async (prompt: string): Promise<string> => {
     if (!apiKey || !ai) {
@@ -135,5 +152,15 @@ export const geminiService = {
       console.error("Error running chat:", error);
       return "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo.";
     }
+  },
+
+  generateSubject: async (messageBody: string): Promise<string> => {
+    const systemInstruction = "Eres un experto en comunicación. Tu tarea es crear un asunto de correo electrónico corto, claro y efectivo (máximo 10 palabras) para el siguiente mensaje. Responde únicamente con el texto del asunto.";
+    return runStandaloneQuery(systemInstruction, `Crea un asunto para este mensaje: "${messageBody}"`);
+  },
+
+  improveWriting: async (messageBody: string): Promise<string> => {
+    const systemInstruction = "Eres un asistente de redacción profesional. Tu tarea es mejorar el siguiente texto para que sea más claro, profesional y amigable, manteniendo el mensaje central. No agregues saludos ni despedidas, solo mejora el cuerpo del mensaje. Responde únicamente con el texto mejorado.";
+    return runStandaloneQuery(systemInstruction, `Mejora la redacción de este mensaje: "${messageBody}"`);
   },
 };
