@@ -53,6 +53,12 @@ export interface Booking {
     user: string; // e.g., 'Apt 101'
 }
 
+export interface CommonArea {
+  id: string;
+  name: string;
+  color: { bg: string; text: string; border: string; };
+}
+
 export interface UserProfile {
     name: string;
     email: string;

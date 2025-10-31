@@ -222,10 +222,29 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
          if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
          const { resident } = findDataByApartment(aptNumber);
          if (!resident) return `El apartamento **${aptNumber}** no parece existir en la base de datos. Por favor verifique.`;
-         return `Entendido, apartamento **${aptNumber}**. ¿Qué espacio van a requerir? (Ej. BBQ, Gimnasio, Salón Comunal, etc.)`;
+         
+         const areas = dataStore.getCommonAreas();
+         const areaList = areas.map((area, index) => `${index + 1}. ${area.name}`).join('\n');
+
+         return `Entendido, apartamento **${aptNumber}**. ¿Qué espacio de la siguiente lista van a requerir?\n${areaList}\nPor favor, indique el número o el nombre del espacio.`;
     }
-    if (lastAiMessage.includes('qué espacio van a requerir')) {
-        return `Perfecto, **${prompt}**. Ahora, por favor, indique el día (solo el número), la hora de inicio y la hora de finalización. (Ej: 25, 2pm a 6pm)`;
+    if (lastAiMessage.includes('qué espacio de la siguiente lista van a requerir')) {
+        const areas = dataStore.getCommonAreas();
+        let selectedArea = null;
+
+        // Check if user entered a number
+        const choiceNumber = parseInt(prompt, 10);
+        if (!isNaN(choiceNumber) && choiceNumber > 0 && choiceNumber <= areas.length) {
+            selectedArea = areas[choiceNumber - 1];
+        } else {
+            // Check if user entered a name
+            selectedArea = areas.find(area => area.name.toLowerCase().includes(lowerCasePrompt));
+        }
+
+        if (!selectedArea) {
+            return "No reconocí esa área. Por favor, elige una opción de la lista.";
+        }
+        return `Perfecto, **${selectedArea.name}**. Ahora, por favor, indique el día (solo el número), la hora de inicio y la hora de finalización. (Ej: 25, 2pm a 6pm)`;
     }
     if (lastAiMessage.includes('indique el día (solo el número), la hora de inicio y la hora de finalización')) {
         const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
@@ -234,9 +253,9 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         const spaceMatch = lastAiMessage.match(/perfecto, \*\*(.*?)\*\*/);
         const space = spaceMatch ? spaceMatch[1] : 'Área Común';
 
-        const parts = prompt.split(',');
-        const day = parseInt(parts[0]?.trim(), 10);
-        const time = parts[1]?.trim() || 'hora no especificada';
+        const parts = prompt.split(',').map(p => p.trim());
+        const day = parseInt(parts[0], 10);
+        const time = parts[1] || 'hora no especificada';
 
         if (isNaN(day)) {
             return "No pude entender el día. Por favor, indique solo el número del día. (Ej: 25, 2pm a 6pm)";

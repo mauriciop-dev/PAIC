@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { dataStore } from '../../data/dataStore';
-import { Booking } from '../../types';
+import { Booking, CommonArea } from '../../types';
+import ManageAreasModal from '../ManageAreasModal';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-const eventColors: { [key: string]: { bg: string, text: string, border: string } } = {
-    'BBQ': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
-    'Gimnasio': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
-    'Salón Social': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
-    'Default': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
-};
-
 const CommonAreasView: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>(dataStore.getBookings());
+  const [commonAreas, setCommonAreas] = useState<CommonArea[]>(dataStore.getCommonAreas());
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
   useEffect(() => {
     const handleStoreChange = () => {
       setBookings(dataStore.getBookings());
+      setCommonAreas(dataStore.getCommonAreas());
     };
     const unsubscribe = dataStore.subscribe(handleStoreChange);
     return () => unsubscribe();
@@ -66,13 +63,21 @@ const CommonAreasView: React.FC = () => {
             Consulta las reservas. Para agendar, usa el asistente de IA.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-            {Object.keys(eventColors).filter(k => k !== 'Default').map(event => (
-                <div key={event} className="flex items-center gap-1">
-                    <div className={`w-3 h-3 rounded-full ${eventColors[event].bg} border ${eventColors[event].border}`}></div>
-                    <span className="text-xs text-gray-600">{event}</span>
-                </div>
-            ))}
+         <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+                {commonAreas.map(area => (
+                    <div key={area.id} className="flex items-center gap-1">
+                        <div className={`w-3 h-3 rounded-full ${area.color.bg} border ${area.color.border}`}></div>
+                        <span className="text-xs text-gray-600">{area.name}</span>
+                    </div>
+                ))}
+            </div>
+            <button
+              onClick={() => setIsManageModalOpen(true)}
+              className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-md hover:bg-gray-100 bg-white"
+            >
+                Gestionar Áreas
+            </button>
         </div>
       </div>
       
@@ -98,9 +103,10 @@ const CommonAreasView: React.FC = () => {
                     {day}
                   </span>
                 )}
-                <div className="space-y-1 mt-1">
+                <div className="space-y-1 mt-1 overflow-y-auto" style={{maxHeight: 'calc(8rem - 2rem)'}}>
                     {day && bookings.filter(b => b.day === day).map(booking => {
-                        const colors = eventColors[booking.event] || eventColors['Default'];
+                        const area = commonAreas.find(a => a.name === booking.event);
+                        const colors = area ? area.color : { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
                         return (
                           <div key={booking.event+booking.day+booking.user} className="relative group">
                               <div className={`${colors.bg} ${colors.text} p-1 rounded-md text-xs text-left cursor-pointer`}>
@@ -122,6 +128,12 @@ const CommonAreasView: React.FC = () => {
           })}
         </div>
       </div>
+      {isManageModalOpen && (
+        <ManageAreasModal 
+            isOpen={isManageModalOpen} 
+            onClose={() => setIsManageModalOpen(false)} 
+        />
+      )}
     </div>
   );
 };

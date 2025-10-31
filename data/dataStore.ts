@@ -1,4 +1,4 @@
-import { Resident, AccountStatus, Booking } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
@@ -9,6 +9,24 @@ import {
 type Listener = () => void;
 const listeners: Set<Listener> = new Set();
 
+const availableColors = [
+    { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+    { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+    { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+    { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+    { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
+    { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
+    { bg: 'bg-sky-100', text: 'text-sky-800', border: 'border-sky-300' },
+];
+
+let lastColorIndex = -1;
+
+const getNextColor = () => {
+    lastColorIndex = (lastColorIndex + 1) % availableColors.length;
+    return availableColors[lastColorIndex];
+};
+
+
 // This is a simple in-memory store to ensure both UI and services access the same data state.
 let currentResidents: Resident[] = [...initialResidents];
 let currentAccountStatus: AccountStatus[] = [...initialAccountStatus];
@@ -18,6 +36,11 @@ let currentBookings: Booking[] = [
     { day: 18, time: '9am-10am', event: 'Gimnasio', user: 'Apt 301' },
     { day: 18, time: '5pm-7pm', event: 'BBQ', user: 'Apt 102' },
     { day: 25, time: 'Todo el día', event: 'Salón Social', user: 'Admin' },
+];
+let commonAreas: CommonArea[] = [
+    { id: '1', name: 'BBQ', color: getNextColor() },
+    { id: '2', name: 'Gimnasio', color: getNextColor() },
+    { id: '3', name: 'Salón Social', color: getNextColor() },
 ];
 
 const notifyListeners = () => {
@@ -40,6 +63,25 @@ export const dataStore = {
 
     getBookings: (): Booking[] => {
         return [...currentBookings];
+    },
+
+    getCommonAreas: (): CommonArea[] => {
+        return [...commonAreas];
+    },
+
+    addCommonArea: (name: string): void => {
+        const newArea: CommonArea = {
+            id: Date.now().toString(),
+            name,
+            color: getNextColor(),
+        };
+        commonAreas.push(newArea);
+        notifyListeners();
+    },
+
+    removeCommonArea: (id: string): void => {
+        commonAreas = commonAreas.filter(area => area.id !== id);
+        notifyListeners();
     },
 
     updateResident: (updatedResident: Resident): void => {
