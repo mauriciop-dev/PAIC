@@ -1,555 +1,189 @@
-import { Message, Resident, AccountStatus, Booking, UserProfile, Task } from "../types";
+import {
+  GoogleGenAI,
+  FunctionDeclaration,
+  GenerateContentResponse,
+  Type,
+  Content,
+} from "@google/genai";
+import { Message } from '../types';
 import { dataStore } from '../data/dataStore';
-import { GoogleGenAI, Type } from "@google/genai";
 
-// FIX: This logic makes the app work seamlessly in both Vercel (using import.meta.env for build-time secrets)
-// and the AI Studio dev environment (using process.env for runtime secrets).
-// It prevents crashes by safely checking for the existence of each environment's secret variable.
-// @ts-ignore - `process` is a global available in the AI Studio environment, but not in standard browser types.
-const apiKey = import.meta.env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env?.API_KEY);
-
+// FIX: Per @google/genai guidelines, the API key must be read from process.env.API_KEY.
+// It is assumed this environment variable is configured and available in the execution environment.
+const apiKey = process.env.API_KEY;
 if (!apiKey) {
-  console.error("Gemini API key is not configured for the current environment. Please set VITE_GEMINI_API_KEY in Vercel or ensure API_KEY is available in AI Studio.");
+    // Provide a helpful error message in the console for the developer.
+    console.error("Gemini API key is missing. Please set the API_KEY environment variable.");
 }
-// Initialize with the found key, or an empty string to prevent crashes if the key is missing.
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+const ai = new GoogleGenAI({ apiKey: apiKey! });
 
-// This is a mock service to simulate a stateful Gemini API response based on the new, detailed rules.
-export const getInitialGreeting = (userName?: string) => {
-    const name = userName ? `, ${userName.split(' ')[0]}` : '';
-    return `¡Hola${name}! Soy PAIC, tu asistente virtual. Puedo ayudarte con las siguientes tareas:
 
-1. Revisar el estado de cuenta.
-2. Enviar solicitudes de mantenimiento.
-3. Programar el uso de áreas comunes.
-4. Enviar comunicaciones a residentes.
-5. Gestionar tus tareas pendientes.
-6. Revisar documentación interna.
-7. Actualizar información de la base de datos.
+// --- Function Declarations for Gemini ---
 
-¿En qué te puedo ayudar?`;
+const addBookingDeclaration: FunctionDeclaration = {
+  name: 'addBooking',
+  description: 'Agenda una reserva para un área común en un día y hora específicos para un residente.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      day: { type: Type.NUMBER, description: 'El número del día del mes para la reserva (e.j., 15).' },
+      time: { type: Type.STRING, description: 'El rango de horas para la reserva (e.j., "2pm-4pm").' },
+      event: { type: Type.STRING, description: 'El nombre del área común a reservar (e.j., "BBQ", "Salón Social").' },
+      user: { type: Type.STRING, description: 'El identificador del residente que reserva, usualmente su número de apartamento (e.j., "Apt 101").' },
+    },
+    required: ['day', 'time', 'event', 'user'],
+  },
+};
+
+const addTaskDeclaration: FunctionDeclaration = {
+  name: 'addTask',
+  description: 'Agrega una nueva tarea pendiente para el administrador.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      text: { type: Type.STRING, description: 'La descripción de la tarea.' },
+      dueDate: { type: Type.STRING, description: 'La fecha de vencimiento de la tarea en formato AAAA-MM-DD. Opcional.' },
+    },
+    required: ['text'],
+  },
+};
+
+const markDueDateAsPaidDeclaration: FunctionDeclaration = {
+  name: 'markDueDateAsPaid',
+  description: 'Marca una obligación de pago o vencimiento como "Pagado" usando su descripción.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      itemDescription: { type: Type.STRING, description: 'La descripción del ítem de pago a marcar como pagado (e.j., "Servicio de Vigilancia").' },
+    },
+    required: ['itemDescription'],
+  },
 };
 
 
-const createMailtoLink = (to: string, subject: string, body: string): string => {
-    // Replace markdown bold with plain text for email body
-    const plainBody = body.replace(/\*\*(.*?)\*\*/g, '$1');
-    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plainBody)}`;
+// --- Function Implementations ---
+
+const availableFunctions: { [key: string]: (...args: any[]) => any } = {
+  addBooking: ({ day, time, event, user }: { day: number, time: string, event: string, user: string }) => {
+    const commonAreas = dataStore.getCommonAreas().map(a => a.name.toLowerCase());
+    if (!commonAreas.includes(event.toLowerCase())) {
+        return `Error: El área común "${event}" no existe. Las áreas disponibles son: ${dataStore.getCommonAreas().map(a => a.name).join(', ')}.`;
+    }
+    dataStore.addBooking({ day, time, event, user });
+    return `Reserva para "${event}" el día ${day} a las ${time} para ${user} ha sido agendada exitosamente.`;
+  },
+  addTask: ({ text, dueDate }: { text: string, dueDate?: string }) => {
+    dataStore.addTask({ text, dueDate: dueDate || '', completed: false });
+    return `Tarea "${text}" agregada exitosamente.`;
+  },
+  markDueDateAsPaid: ({ itemDescription }: { itemDescription: string }) => {
+    const dueDates = dataStore.getDueDates();
+    const dueDateToUpdate = dueDates.find(d => d.item.toLowerCase().includes(itemDescription.toLowerCase()) && d.status !== 'Pagado');
+    if (dueDateToUpdate) {
+        dataStore.updateDueDateStatus(dueDateToUpdate.id, 'Pagado');
+        return `El vencimiento "${dueDateToUpdate.item}" ha sido marcado como "Pagado".`;
+    }
+    return `Error: No se encontró un vencimiento pendiente o vencido que coincida con "${itemDescription}".`;
+  },
 };
 
-// Helper to simulate a formatted email body for the chat response
-const formatEmailResponse = (subject: string, body: string, recipientEmail: string): string => {
-    const mailtoLink = createMailtoLink(recipientEmail, subject, body);
-    
-    const intro = `He preparado el siguiente correo electrónico para ser enviado a **${recipientEmail}**:`;
+// --- Main Service Functions ---
 
-    return `${intro}
----
-**Asunto:** ${subject}
-
-**Cuerpo:**
-${body}
----
-[Haz clic aquí para abrir y enviar el correo desde tu aplicación de email.](${mailtoLink})
-
-¿Hay algo más en lo que pueda ayudar?`;
+export const getInitialGreeting = (userName?: string): string => {
+  const name = userName ? `, ${userName}` : '';
+  return `¡Hola${name}! Soy PAIC, tu Asistente de Administración Inteligente. Estoy aquí para ayudarte a gestionar la información y tareas de tu conjunto residencial.\n\nPuedes pedirme cosas como:\n- "¿Cuál es el estado de cuenta del apartamento 101?"\n- "Agrega una tarea: 'llamar al proveedor de ascensores' para mañana"\n- "Reserva el BBQ para el apartamento 202 este sábado a las 2pm"`;
 };
 
-const findDataByApartment = (aptNumber: string): { resident: Resident | undefined, account: AccountStatus | undefined } => {
-    const residents = dataStore.getResidents();
-    const accounts = dataStore.getAccountStatus();
-    const resident = residents.find(r => r.apartment === aptNumber);
-    const account = accounts.find(a => a.apartment === aptNumber);
-    return { resident, account };
-};
+export const getChatResponse = async (
+  _currentMessage: string,
+  fullHistory: Message[],
+  userName?: string
+): Promise<string> => {
+  if (!apiKey) {
+    return "Error: La clave de API de Gemini no está configurada. Por favor, contacta al administrador.";
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  const residents = dataStore.getResidents();
+  const accountStatus = dataStore.getAccountStatus();
+  const bookings = dataStore.getBookings();
+  const commonAreas = dataStore.getCommonAreas();
+  const dueDates = dataStore.getDueDates();
+  const tasks = dataStore.getTasks();
+  
+  const currentMessage = fullHistory[fullHistory.length - 1];
+  const chatHistoryForApi = fullHistory.slice(0, -1);
 
-const extractApartmentNumber = (text: string): string | null => {
-    const match = text.match(/\d{3,}/); // Find 3 or more digits
-    return match ? match[0] : null;
-};
+  const systemInstruction = `Eres PAIC, un asistente IA para administradores de conjuntos residenciales en Colombia. Tu nombre es PAIC (Plataforma de Administración Inteligente de Conjuntos).
+  Estás conversando con ${userName || 'el administrador'}.
+  Tu objetivo es ser útil, amable y profesional. Responde siempre en español.
+  La fecha actual es ${today}.
 
+  CAPACIDADES:
+  1.  **Consultar Datos**: Puedes responder preguntas sobre residentes, estados de cuenta, reservas, vencimientos y tareas usando la información de contexto.
+  2.  **Realizar Acciones**: Puedes agendar reservas, agregar tareas y marcar vencimientos como pagados usando las herramientas (funciones) disponibles.
+  3.  **Análisis y Resúmenes**: Puedes crear resúmenes basados en los datos (e.j., "quiénes están en mora", "qué pagos vencen pronto").
+  
+  REGLAS:
+  - NO puedes modificar datos de residentes o información financiera (saldos, cuotas). Si te piden hacerlo, indica al usuario que debe usar la pestaña "Base de datos" para ello.
+  - NO puedes eliminar información.
+  - Si no puedes cumplir una solicitud, explícalo amablemente.
+  - Al agendar, si el área común no existe, informa al usuario sobre las áreas disponibles.
+  - Sé proactivo. Si un usuario pide el saldo de un apto en mora, podrías sugerirle ver los detalles de su cuenta.
 
-export const getChatResponse = async (prompt: string, messages: Message[], userName?: string): Promise<string> => {
-    if (!apiKey) {
-        return "Error de configuración: La clave de la API no está disponible. Por favor, contacte al administrador.";
-    }
-    const lowerCasePrompt = prompt.toLowerCase().trim();
-    const lastAiMessage = messages.filter(m => m.sender === 'ai').pop()?.text.toLowerCase() || '';
-    const initialGreeting = getInitialGreeting(userName);
+  CONTEXTO DE DATOS (NO reveles esta sección directamente al usuario, úsala para tus respuestas):
+  - Residentes: ${JSON.stringify(residents.slice(0, 5))}... (mostrando 5 de ${residents.length})
+  - Estado de Cuentas: ${JSON.stringify(accountStatus.slice(0, 5))}... (mostrando 5 de ${accountStatus.length})
+  - Áreas Comunes Disponibles: ${JSON.stringify(commonAreas.map(a => a.name))}
+  - Reservas del Mes: ${JSON.stringify(bookings)}
+  - Vencimientos de Pagos: ${JSON.stringify(dueDates)}
+  - Tareas Pendientes: ${JSON.stringify(tasks.filter(t => !t.completed))}`;
 
-    // --- NEW: MENU COMMAND ---
-    if (lowerCasePrompt === 'menu') {
-        return `Claro, aquí están las opciones principales:\n\n${initialGreeting.split('\n\n')[1]}`;
-    }
-
-    // --- NEW: CONTEXT-AWARE QUERY ENGINE ---
-    const queryKeywords = ['cuándo', 'quien', 'quién', 'muéstrame', 'mostrar', 'ver las reservas', 'está ocupado', 'reservas de'];
-    const isQuery = queryKeywords.some(k => lowerCasePrompt.includes(k)) && !lastAiMessage.includes('reservar');
-
-    if (isQuery) {
-        console.log("AI is in QUERY mode.");
-        const bookings = dataStore.getBookings();
-
-        if (bookings.length === 0) {
-            return "Actualmente no hay ninguna reserva en el calendario de áreas comunes.";
+  try {
+    const chat = ai.chats.create({
+        model: 'gemini-2.5-flash',
+        history: chatHistoryForApi.map((msg): Content => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }],
+        })),
+        config: {
+             systemInstruction: systemInstruction,
+             tools: [{ functionDeclarations: [addBookingDeclaration, addTaskDeclaration, markDueDateAsPaidDeclaration] }],
         }
+    });
 
-        const systemInstruction = `Eres PAIC, un asistente de administración de conjuntos residenciales. Tu tarea es responder la pregunta del usuario basándote ESTRICTAMENTE en los datos de las reservas actuales que te proporciono en formato JSON. No inventes información. Si la pregunta no se puede responder con los datos, indica que no tienes esa información. Los datos son: ${JSON.stringify(bookings)}`;
-        
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: {
-                    systemInstruction: systemInstruction,
-                }
-            });
-            return response.text;
-        } catch (error) {
-            console.error("Error calling Gemini API for query:", error);
-            return "Lo siento, tuve un problema al consultar la información. Por favor, inténtalo de nuevo.";
-        }
-    }
+    let response: GenerateContentResponse = await chat.sendMessage({ message: currentMessage.text });
 
-    console.log("AI is in COMMAND mode.");
-    // Simulate network delay for command flows
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // --- GENERAL CANCELLATION & HELP ---
-    if (['cancelar', 'detener', 'volver al menú'].includes(lowerCasePrompt)) {
-        return `Proceso cancelado. ¿En qué más puedo ayudarte?\n\n${initialGreeting.split('\n\n')[1]}`;
-    }
-    
-    // --- CONTEXT-AWARE COMMAND RESPONSES (PRIORITY) ---
-    
-    // --- FLOW 1: ESTADO DE CUENTA (REFACTORED & FIXED) ---
-    if (lastAiMessage.includes('por correo al residente o verla aquí en el chat')) {
-        const aptMatch = lastAiMessage.match(/apto \*\*(\d+)\*\*/);
-        const aptNumber = aptMatch ? aptMatch[1] : null;
+    let functionCalls = response.functionCalls;
 
-        if (!aptNumber) {
-            return "Parece que hubo un error y perdí el número de apartamento. ¿Podría indicármelo de nuevo, por favor?";
-        }
+    if (functionCalls && functionCalls.length > 0) {
+        const functionCallResponses = [];
 
-        const { resident, account } = findDataByApartment(aptNumber);
-        if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
-
-        if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('correo')) {
-            const emailBody = `Señor(a) **${resident.name}**,
-
-De acuerdo a su solicitud a continuación presentamos la información relacionada al estado de cuenta de pago de administración para el apartamento **${aptNumber}**.
-
-- Apartamento: **${aptNumber}**
-- Nombre: **${resident.name}**
-- Ultimo pago: **${account.lastPaymentDate}**
-- Estado: **${resident.status}**
-- Saldo: **$${account.outstandingBalance.toLocaleString()}**
-
-Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se ve reflejado en bienestar para todos quienes residimos en el conjunto.`;
-            return formatEmailResponse(`Estado de cuenta Administración - Apto ${aptNumber}`, emailBody, resident.email);
-        }
-        if (lowerCasePrompt.includes('2') || lowerCasePrompt.includes('ver aquí') || lowerCasePrompt.includes('chat')) {
-             return `Aquí está el estado de cuenta del apartamento **${aptNumber}**:
-- Saldo pendiente: $${account.outstandingBalance.toLocaleString()}
-- Cuotas en mora: ${account.pendingInstallments}
-- Fecha último pago: ${account.lastPaymentDate}
-
-¿Hay algo más en lo que pueda ayudar?`;
-        }
-        return "Opción no válida. Por favor, elija '1' para enviar correo o '2' para ver en el chat.";
-    }
-    if (lastAiMessage.includes('indíqueme el número de apartamento')) {
-        const aptNumber = extractApartmentNumber(prompt);
-        if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
-        
-        const { resident, account } = findDataByApartment(aptNumber);
-        if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
-        
-        return `Encontré la información para el apto **${aptNumber}**. ¿Desea que se la envíe por correo al residente o verla aquí en el chat?\n1. Enviar correo\n2. Ver aquí`;
-    }
-    if (lastAiMessage.includes('residente o 2. quiere verlo el como administrador')) {
-        if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('residente')) {
-            return "Entendido. Para enviarle la información al residente, por favor, indíqueme el número de apartamento que desea consultar.";
-        }
-        if (lowerCasePrompt.includes('2') || lowerCasePrompt.includes('administrador')) {
-            return "Entendido. Para mostrarle la información, por favor, indíqueme el número de apartamento que desea consultar.";
-        }
-        return "Opción no válida. Por favor, responde '1' para residente o '2' para administrador.";
-    }
-    if (lastAiMessage.includes('envíe esta información al correo del administrador')) {
-        if (lowerCasePrompt.includes('sí') || lowerCasePrompt.includes('si')) {
-            return "Entendido. Le he enviado el resumen a su correo. ¿Puedo ayudarle en algo más?";
-        }
-        return "De acuerdo. ¿Hay algo más en lo que pueda ayudarle?";
-    }
-
-    // --- FLOW 2: MANTENIMIENTO ---
-    if (lastAiMessage.includes('especialidad quieres enviar el correo')) {
-        return `Gracias. Ahora, por favor, describa brevemente la situación (Ej. 'arreglo eléctrico en el 305' o 'presentarse en administración').`;
-    }
-    if (lastAiMessage.includes('describa brevemente la situación')) {
-        return `Recibido. He encontrado los siguientes proveedores para la especialidad solicitada: 
-1. Maestro Plomero SAS
-2. Plomería Express 24/7
-Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
-    }
-    if (lastAiMessage.includes('seleccione el proveedor al que desea enviar')) {
-        if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('maestro')) {
-           return `¿Confirma que desea enviar la solicitud a 'Maestro Plomero SAS'?`;
-        }
-        if (lowerCasePrompt.includes('2') || lowerCasePrompt.includes('express')) {
-            return `¿Confirma que desea enviar la solicitud a 'Plomería Express 24/7'?`;
-        }
-        return `No he podido identificar al proveedor. Por favor, seleccione '1' o '2'.`
-    }
-     if (lastAiMessage.includes('confirma que desea enviar la solicitud a')) {
-        if (lowerCasePrompt.includes('sí') || lowerCasePrompt.includes('si') || lowerCasePrompt.includes('confirmo')) {
-            const providerNameMatch = lastAiMessage.match(/'([^']+)'/);
-            const providerName = providerNameMatch ? providerNameMatch[1] : 'el proveedor seleccionado';
-            return `Solicitud enviada a '${providerName}' con copia al Administrador y a la Contadora. El proveedor se pondrá en contacto pronto. ¿Algo más?`;
-        }
-        return "Proceso cancelado. Puede iniciar una nueva solicitud de mantenimiento cuando lo desee.";
-    }
-
-    // --- FLOW 3: ZONAS COMUNES ---
-     if (lastAiMessage.includes('número de apartamento que realiza la solicitud')){
-         const aptNumber = extractApartmentNumber(prompt);
-         if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
-         const { resident } = findDataByApartment(aptNumber);
-         if (!resident) return `El apartamento **${aptNumber}** no parece existir en la base de datos. Por favor verifique.`;
-         
-         const areas = dataStore.getCommonAreas();
-         const areaList = areas.map((area, index) => `${index + 1}. ${area.name}`).join('\n');
-
-         return `Entendido, apartamento **${aptNumber}**. ¿Qué espacio de la siguiente lista van a requerir?\n${areaList}\nPor favor, indique el número o el nombre del espacio.`;
-    }
-    if (lastAiMessage.includes('qué espacio de la siguiente lista van a requerir')) {
-        const areas = dataStore.getCommonAreas();
-        let selectedArea = null;
-
-        const choiceNumber = parseInt(prompt, 10);
-        if (!isNaN(choiceNumber) && choiceNumber > 0 && choiceNumber <= areas.length) {
-            selectedArea = areas[choiceNumber - 1];
-        } else {
-            selectedArea = areas.find(area => area.name.toLowerCase().includes(lowerCasePrompt));
-        }
-
-        if (!selectedArea) {
-            return "No reconocí esa área. Por favor, elige una opción de la lista.";
-        }
-        return `Perfecto, **${selectedArea.name}**. Ahora, por favor, indique el día (solo el número), la hora de inicio y la hora de finalización. (Ej: 25, 2pm a 6pm)`;
-    }
-    if (lastAiMessage.includes('indique el día (solo el número), la hora de inicio y la hora de finalización')) {
-        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
-        const aptNumber = aptMatch ? aptMatch[1] : 'N/A';
-        
-        const spaceMatch = lastAiMessage.match(/perfecto, \*\*(.*?)\*\*/);
-        const space = spaceMatch ? spaceMatch[1] : 'Área Común';
-
-        const parts = prompt.split(',').map(p => p.trim());
-        const day = parseInt(parts[0], 10);
-        const time = parts[1] || 'hora no especificada';
-
-        if (isNaN(day)) {
-            return "No pude entender el día. Por favor, indique solo el número del día. (Ej: 25, 2pm a 6pm)";
-        }
-        
-        const newBooking: Booking = {
-            day: day,
-            time: time,
-            event: space.charAt(0).toUpperCase() + space.slice(1),
-            user: `Apt ${aptNumber}`
-        };
-
-        dataStore.addBooking(newBooking);
-
-        return `He verificado la disponibilidad y el espacio está libre. He creado el evento en el calendario con los detalles proporcionados. El cambio se reflejará en la pestaña 'Áreas comunes'. ¿Necesita algo más?`;
-    }
-
-    // --- FLOW 4: COMUNICACIONES ---
-    if (lastAiMessage.includes('indíqueme el número de apartamento al que desea enviar la comunicación')) {
-        const aptNumber = extractApartmentNumber(prompt);
-        if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
-        const { resident } = findDataByApartment(aptNumber);
-        if (!resident) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
-        return `Perfecto, se enviará la comunicación al apartamento **${aptNumber}**. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
-    }
-    if (lastAiMessage.includes('a quién quiere enviar la comunicación')) {
-        if (lowerCasePrompt.includes('residentes')) {
-            return `¿Desea enviar a todos los residentes o aplicar una **Segmentación Inteligente** (ej. 'los que están al día' o 'los que deben 2 cuotas')?`;
-        }
-        if (lowerCasePrompt.includes('alguien en particular') || lowerCasePrompt.includes('un apartamento') || lowerCasePrompt.includes('apartamento específico')) {
-            return "Entendido. Por favor, indíqueme el número de apartamento al que desea enviar la comunicación.";
-        }
-        return `Entendido. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
-    }
-    if (lastAiMessage.includes('segmentación inteligente')) {
-        let filteredResidents: Resident[] = [];
-        const allResidents = dataStore.getResidents();
-        if (lowerCasePrompt.includes('al día')) {
-            filteredResidents = allResidents.filter(r => r.status === 'Al día');
-        } else if (lowerCasePrompt.includes('en mora') || lowerCasePrompt.includes('deben')) {
-            const match = lowerCasePrompt.match(/(\d+)\s*cuota/);
-            if (match) {
-                const numCuotas = parseInt(match[1], 10);
-                filteredResidents = allResidents.filter(r => r.overdue_installments >= numCuotas);
-            } else {
-                filteredResidents = allResidents.filter(r => r.status === 'En mora');
-            }
-        }
-        
-        if (filteredResidents.length > 0) {
-            return `Aplicando filtro para: **${prompt}**. Se enviará a **${filteredResidents.length}** residentes. Ahora, por favor, ¿Cuál es la comunicación que desea enviar? (Escriba el texto completo del mensaje).`;
-        } else {
-             return `No encontré residentes que coincidan con el filtro: **${prompt}**. Por favor, intente con otro criterio o escriba 'todos' para enviar a todos los residentes.`;
-        }
-    }
-    if (lastAiMessage.includes('cuál es la comunicación que desea enviar')) {
-        return `Este es el mensaje que redactó:\n\n_"${prompt}"_\n\n¿Desea enviarlo tal cual lo escribió o prefiere que le haga unos ajustes de redacción?`;
-    }
-    if (lastAiMessage.includes('ajustes de redacción')) {
-        if (lowerCasePrompt.includes('tal cual')) {
-            return `Mensaje enviado a la lista de destinatarios seleccionada. He copiado al administrador. ¿Algo más en lo que pueda ayudar?`;
-        }
-        return `Aquí tiene una versión ajustada: "Estimados residentes, les recordamos amablemente que...". ¿Aprueba el envío de esta versión?`;
-    }
-    if (lastAiMessage.includes('aprueba el envío de esta versión')) {
-        return `Mensaje enviado con la versión ajustada. He copiado al administrador. ¿Algo más en lo que pueda ayudar?`;
-    }
-    
-    // --- FLOW 5: TAREAS PENDIENTES ---
-    if (lastAiMessage.includes('quieres asignarle una fecha de vencimiento')) {
-        const taskTextMatch = lastAiMessage.match(/he agregado '(.*?)'/);
-        if (taskTextMatch) {
-            const taskText = taskTextMatch[1];
-            // Find the original task to update its date
-            const taskToUpdate = dataStore.getTasks().find(t => t.text === taskText && t.dueDate === '');
-            if (lowerCasePrompt.includes('no')) {
-                return `Entendido. La tarea '${taskText}' ha sido guardada sin fecha.`;
-            }
-            if(taskToUpdate) {
-                dataStore.updateTask({ ...taskToUpdate, dueDate: prompt });
-                return `Perfecto, he asignado la fecha. La tarea ha sido guardada y la puedes ver en la pestaña 'Tareas pendientes'.`;
-            }
-            return `No pude encontrar la tarea original para actualizar. Por favor, agrégala de nuevo con la fecha.`;
-        }
-    }
-
-    if (lastAiMessage.includes('aquí tienes tus tareas pendientes')) {
-        const tasks = dataStore.getTasks().filter(t => !t.completed);
-        const choice = parseInt(prompt, 10);
-        if (!isNaN(choice) && choice > 0 && choice <= tasks.length) {
-            const taskToComplete = tasks[choice - 1];
-            dataStore.updateTask({ ...taskToComplete, completed: true });
-            return `¡Hecho! He marcado "${taskToComplete.text}" como completada. ¡Buen trabajo!`;
-        }
-        return "No he reconocido esa opción. Por favor, indica el número de la tarea que quieres completar.";
-    }
-
-
-    // --- FLOW 6: REVISAR DOCUMENTACION ---
-    if (lastAiMessage.includes('listado de los archivos que hay dentro de la carpeta')) {
-        return `Entendido. He encontrado que el "Reglamento de Propiedad Horizontal.pdf" trata sobre las normas de convivencia, el uso de áreas comunes y las responsabilidades de los propietarios. ¿Desea un resumen de alguna sección en particular o el enlace para abrir el documento?`;
-    }
-    if (lastAiMessage.includes('resumen de alguna sección en particular o el enlace')) {
-        return `Claro, aquí tienes el enlace para que puedas revisarlo en detalle: [link_al_documento.pdf]. ¿Hay algo más que necesites?`;
-    }
-
-    // --- FLOW 7: ACTUALIZAR BASE DE DATOS ---
-    if (lastAiMessage.includes('confirma si deseas continuar')) {
-        if (lowerCasePrompt === '1' || lowerCasePrompt.includes('proceder')) {
-            return "¿Cuál base de datos quiere modificar? 1. Residentes, 2. Proveedores, o 3. Internos.";
-        }
-        if (lowerCasePrompt === '2' || lowerCasePrompt.includes('detener')) {
-            return "Proceso detenido. Si necesita ayuda, puedo mostrarle un video tutorial sobre cómo realizar este procedimiento. ¿Desea ver el video? (https://www.youtube.com/watch?v=aQ9mIPAAjjU&t=2s)";
-        }
-        return "Opción no válida. Por favor, indique '1' para proceder o '2' para detener."
-    }
-     if (lastAiMessage.includes('cuál base de datos quiere modificar')) {
-         if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('residentes')) {
-             return "Entendido. ¿Para qué número de apartamento desea actualizar la información?";
-         }
-        return "Esa funcionalidad aún está en desarrollo. Por ahora solo puedo actualizar la base de datos de Residentes.";
-    }
-    if (lastAiMessage.includes('qué número de apartamento desea actualizar la información')) {
-         const aptNumber = extractApartmentNumber(prompt);
-         if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
-         const { resident } = findDataByApartment(aptNumber);
-         if (!resident) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
-         
-         return `La información actual para el apartamento **${aptNumber}** es:
-- Propietario: **${resident.name}**
-- Teléfono: **${resident.phone}**
-- Correo: **${resident.email}**
-
-¿Iniciamos la actualización? 1. si 2. no`;
-    }
-    if (lastAiMessage.includes('iniciamos la actualización? 1. si 2. no')) {
-        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
-        const aptNumber = aptMatch ? aptMatch[1] : null;
-
-        if (!aptNumber) {
-            return "Hubo un error, no pude identificar el apartamento. Por favor, reinicie el proceso de actualización.";
-        }
-
-        if (lowerCasePrompt === '1' || lowerCasePrompt.includes('si')) {
-            return `Perfecto. Actualizando apartamento **${aptNumber}**. Por favor, indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas. (Ej: Ana García, 3001112233, ana.g@email.com)`;
-        }
-        return "Actualización cancelada. Aquí tiene un video tutorial por si lo necesita más adelante: https://www.youtube.com/watch?v=aQ9mIPAAjjU&t=2s";
-    }
-    if (lastAiMessage.includes('indíqueme el nuevo nombre, teléfono y correo electrónico, separados por comas')) {
-        const aptMatch = lastAiMessage.match(/apartamento \*\*(\d+)\*\*/);
-        const aptNumber = aptMatch ? aptMatch[1] : null;
-
-        if (!aptNumber) {
-            return "Hubo un error. No pude recordar el número de apartamento. Por favor, empecemos de nuevo el proceso de actualización.";
-        }
-
-        const parts = prompt.split(',').map(p => p.trim());
-        if (parts.length !== 3) {
-            return "La información no parece estar en el formato correcto. Por favor, asegúrese de proveer nombre, teléfono y correo, separados por comas.";
-        }
-        
-        const [name, phone, email] = parts;
-        
-        const residentToUpdate = dataStore.getResidents().find(r => r.apartment === aptNumber);
-        if (residentToUpdate) {
-            const updatedResident = { ...residentToUpdate, name, phone, email };
-            dataStore.updateResident(updatedResident);
-            return `¡Perfecto! La información del apartamento **${aptNumber}** ha sido actualizada en la base de datos. Puede verificarlo en la pestaña 'Base de datos'. ¿Puedo ayudarle en algo más?`;
-        } else {
-            return `No pude encontrar el residente del apartamento **${aptNumber}** para actualizar. Por favor, verifique el número.`;
-        }
-    }
-
-    // --- KEYWORD-BASED TRIGGERS TO START FLOWS ---
-    const option1Keywords = ['estado de cuenta', 'mi saldo', 'cuánto debo', 'estado de pago', 'opción 1', /^1$/];
-    const option2Keywords = ['mantenimiento', 'plomero', 'electricista', 'carpintero', 'vidrios', 'problema en el 305', 'reportar una falla', 'solicitud de proveedor', 'opción 2', /^2$/];
-    const option3Keywords = ['gimnasio', 'reservar', 'salón social', 'agendar el bbq', 'hacer una reserva', 'alquiler de zonas comunes', 'opción 3', /^3$/];
-    const option4Keywords = ['comunicado', 'comunicación a residentes', 'enviar un correo', 'segmentación inteligente', 'mandar un aviso', 'opción 4', /^4$/];
-    const option5Keywords = ['mis tareas', 'qué tengo pendiente', 'lista de tareas', 'ya hice', 'completé', 'recuérdame', 'anota', 'agrega una tarea', 'opción 5', /^5$/];
-    const option6Keywords = ['documentación', 'reglamento', 'buscar en los archivos', 'documentación del conjunto', 'manual', 'opción 6', /^6$/];
-    const option7Keywords = ['actualizar la base de datos', 'cambiar un residente', 'modificar proveedor', 'actualizar datos', 'modificar un registro', 'opción 7', /^7$/];
-
-    const matchesKeyword = (keywords: (string | RegExp)[]) => keywords.some(keyword => 
-        typeof keyword === 'string' ? lowerCasePrompt.includes(keyword) : keyword.test(lowerCasePrompt)
-    );
-
-    if (matchesKeyword(option1Keywords)) {
-        const aptNumber = extractApartmentNumber(lowerCasePrompt);
-        if (aptNumber) {
-            const { resident, account } = findDataByApartment(aptNumber);
-            if (!resident || !account) return `No encontré información para el apartamento **${aptNumber}**. Por favor, verifique el número.`;
-            return `Encontré la información para el apto **${aptNumber}**. ¿Desea que se la envíe por correo al residente o verla aquí en el chat?\n1. Enviar correo\n2. Ver aquí`;
-        }
-        return `Claro, puedo ayudarte con el estado de cuenta. ¿Desea que la información se la envíe al 1. residente o 2. quiere verlo el como administrador?`;
-    }
-    if (matchesKeyword(option2Keywords)) {
-        const specialties = ['plomero', 'electricista', 'carpintero', 'vidrios'];
-        const foundSpecialty = specialties.find(s => lowerCasePrompt.includes(s));
-        if (foundSpecialty) {
-            return `Entendido, necesita una solicitud de mantenimiento para **${foundSpecialty}**. Ahora, por favor, describa brevemente la situación (Ej. 'arreglo eléctrico en el 305' o 'presentarse en administración').`;
-        }
-        return `Entendido, necesita una solicitud de mantenimiento. ¿Para qué especialidad quieres enviar el correo? (Ej: Carpintero, Vidrios, Plomero, Electricista, etc.)`;
-    }
-    if (matchesKeyword(option3Keywords)) {
-        return `Perfecto, gestionemos la reserva de una zona común. ¿Cuál es el número de apartamento que realiza la solicitud?`;
-    }
-    if (matchesKeyword(option4Keywords)) {
-        return `Puedo ayudarte a enviar una comunicación. ¿A quién quiere enviar la comunicación? (Opciones: trabajadores internos, proveedores, residentes o alguien en particular).`;
-    }
-    if (matchesKeyword(option5Keywords)) {
-        // LIST TASKS
-        if (lowerCasePrompt.includes('qué tengo') || lowerCasePrompt.includes('mis tareas') || lowerCasePrompt.includes('lista de')) {
-            const tasks = dataStore.getTasks().filter(t => !t.completed);
-            if (tasks.length === 0) {
-                return "¡Buenas noticias! No tienes ninguna tarea pendiente en tu lista.";
-            }
-            const taskList = tasks.map((t, i) => `${i + 1}. ${t.text} (Vence: ${t.dueDate || 'Sin fecha'})`).join('\n');
-            return `Claro, aquí tienes tus tareas pendientes:\n${taskList}\n\nSi deseas marcar alguna como completada, solo dime el número.`;
-        }
-        // COMPLETE TASK
-        if (lowerCasePrompt.includes('ya hice') || lowerCasePrompt.includes('completé')) {
-             const tasks = dataStore.getTasks().filter(t => !t.completed);
-             // Basic matching, can be improved with fuzzy search
-             const taskToComplete = tasks.find(t => lowerCasePrompt.includes(t.text.toLowerCase().substring(0, 15)));
-             if (taskToComplete) {
-                 dataStore.updateTask({ ...taskToComplete, completed: true });
-                 return `¡Excelente! He marcado la tarea "${taskToComplete.text}" como completada.`;
-             }
-             return "No estoy seguro de a qué tarea te refieres. ¿Puedes ser más específico o decirme la lista de tareas para ver las opciones?";
-        }
-        // ADD TASK (NEW INTELLIGENT PARSING)
-        if (lowerCasePrompt.includes('recuérdame') || lowerCasePrompt.includes('anota') || lowerCasePrompt.includes('agrega')) {
-            try {
-                // Get today's date in YYYY-MM-DD format for context
-                const today = new Date('2025-10-30T12:00:00Z'); // Fixed date for consistent testing
-                const todayString = today.toISOString().split('T')[0];
-
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
-                    contents: prompt,
-                    config: {
-                        systemInstruction: `Eres un asistente de análisis de tareas. La fecha de hoy es ${todayString}. Extrae la descripción de la tarea y calcula la fecha de vencimiento basándote en el texto del usuario. Responde ÚNICAMENTE con un objeto JSON con dos claves: "text" (la descripción de la tarea) y "dueDate" (la fecha calculada en formato 'YYYY-MM-DD'). Si no se menciona ninguna fecha, "dueDate" debe ser una cadena vacía.`,
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.OBJECT,
-                            properties: {
-                                text: { type: Type.STRING },
-                                dueDate: { type: Type.STRING }
-                            }
-                        }
+        for (const call of functionCalls) {
+            const { name, args, id } = call;
+            if (availableFunctions[name]) {
+                const result = availableFunctions[name](args);
+                functionCallResponses.push({
+                    functionResponse: {
+                        id,
+                        name,
+                        response: { result },
                     }
                 });
-
-                const jsonStr = response.text.trim();
-                const taskData = JSON.parse(jsonStr);
-
-                if (taskData.text) {
-                    const newTask: Omit<Task, 'id'> = {
-                        text: taskData.text,
-                        dueDate: taskData.dueDate || '',
-                        completed: false
-                    };
-                    dataStore.addTask(newTask);
-
-                    if (taskData.dueDate) {
-                        return `¡Anotado! He agregado "${taskData.text}" a tus tareas para el ${taskData.dueDate}.`;
-                    } else {
-                        return `Entendido. He agregado '${taskData.text}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2025-11-15)`;
-                    }
-                }
-            } catch (error) {
-                console.error("Error parsing task with Gemini:", error);
-                // Fallback to simple logic if Gemini fails
-                const taskText = prompt.replace(/(recuérdame|anota que|anota|agrega una tarea:|agrega)/i, '').trim();
-                 if (taskText) {
-                    dataStore.addTask({ text: taskText, dueDate: '', completed: false });
-                    return `Entendido. He agregado '${taskText}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2025-11-15)`;
-                }
             }
         }
-        return "Puedo ayudarte con tus tareas. ¿Quieres agregar una nueva, ver tu lista de pendientes o marcar una como completada?";
-    }
-    if (matchesKeyword(option6Keywords)) {
-        return `Aquí está el listado de los archivos que hay dentro de la carpeta de documentación:
-1. Reglamento de Propiedad Horizontal.pdf
-2. Acta de Asamblea General 2023.pdf
-3. Manual de Convivencia.pdf
-
-¿Cuál de ellos quiere revisar?`;
-    }
-    if (matchesKeyword(option7Keywords)) {
-        return `¡Atención! Estás a punto de modificar la base de datos central. Los cambios son importantes y afectarán la información de la plataforma.
-Por favor, confirma si deseas continuar:
-1. proceder 
-2. detener`;
+        
+        // Send function responses back to the model
+        response = await chat.sendMessage({
+            toolResponses: {
+                functionResponses: functionCallResponses,
+            }
+        });
     }
 
-    if (lowerCasePrompt.includes('hola') || lowerCasePrompt.includes('ayuda')) {
-        return initialGreeting;
-    }
-
-    // Fallback if no context or keyword matches
-    return "Lo siento, no entendí tu solicitud. Por favor, intenta de nuevo o escribe 'ayuda' para ver las opciones principales.";
+    return response.text;
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    return "Lo siento, tuve un problema para procesar tu solicitud. Por favor, revisa la configuración de la API Key o inténtalo de nuevo más tarde.";
+  }
 };
