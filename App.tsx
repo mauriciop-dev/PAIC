@@ -33,26 +33,43 @@ const App: React.FC = () => {
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
 
   useEffect(() => {
-    // Check for persisted sessions
-    const storedUser = localStorage.getItem('paic_userProfile');
-    const storedSuperAdmin = localStorage.getItem('paic_superAdminProfile');
-    const storedConjunto = localStorage.getItem('paic_conjuntoInfo');
-    
-    if (storedSuperAdmin) {
-        setSuperAdminProfile(JSON.parse(storedSuperAdmin));
-    } else if (storedUser) {
-        const parsedUser: UserProfile = JSON.parse(storedUser);
-        if (!parsedUser.role) { // Compatibility fix
-            parsedUser.role = UserRole.Admin;
-            localStorage.setItem('paic_userProfile', JSON.stringify(parsedUser));
+    const loadSession = async () => {
+        const storedUser = localStorage.getItem('paic_userProfile');
+        const storedSuperAdmin = localStorage.getItem('paic_superAdminProfile');
+
+        if (storedSuperAdmin) {
+            setSuperAdminProfile(JSON.parse(storedSuperAdmin));
+            return;
         }
-        setUserProfile(parsedUser);
-        if (storedConjunto) {
-            setConjuntoInfo(JSON.parse(storedConjunto));
-        } else if (parsedUser.role === UserRole.Admin) {
-            setIsInitialSetupModalOpen(true);
+
+        if (storedUser) {
+            const parsedUser: UserProfile = JSON.parse(storedUser);
+            if (!parsedUser.role) { // Compatibility fix
+                parsedUser.role = UserRole.Admin;
+            }
+            setUserProfile(parsedUser); // Set user profile immediately
+
+            if (parsedUser.conjuntoId) {
+                const storedConjunto = localStorage.getItem('paic_conjuntoInfo');
+                if (storedConjunto) {
+                    setConjuntoInfo(JSON.parse(storedConjunto));
+                } else {
+                    // FIX: If conjuntoInfo is not in local storage, fetch it from the API
+                    const info = await apiService.fetchConjuntoInfo(parsedUser.conjuntoId);
+                    if (info) {
+                        setConjuntoInfo(info);
+                        localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
+                    } else if (parsedUser.role === UserRole.Admin) {
+                        setIsInitialSetupModalOpen(true);
+                    }
+                }
+            } else if (parsedUser.role === UserRole.Admin) {
+                setIsInitialSetupModalOpen(true);
+            }
         }
-    }
+    };
+
+    loadSession();
   }, []);
   
   const handleAuthSuccess = async (profile: UserProfile) => {
@@ -153,7 +170,7 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (userProfile.role === UserRole.Admin ? 'ml-8' : 'ml-0')}`}>
         <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} onSettingsClick={() => setIsSettingsModalOpen(true)} />
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} />
+          <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
         </div>
         <Footer activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />
       </main>

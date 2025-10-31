@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tab, UserProfile } from '../types';
+import { Tab, UserProfile, ConjuntoInfo } from '../types';
 import DashboardView from './views/DashboardView';
 import DatabaseView from './views/DatabaseView';
 import CommonAreasView from './views/CommonAreasView';
@@ -14,12 +14,14 @@ interface DashboardProps {
   setActiveTab: (tab: Tab) => void;
   conjuntoName: string;
   userProfile: UserProfile;
+  conjuntoInfo: ConjuntoInfo | null;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile, conjuntoInfo }) => {
   const renderContent = () => {
-    // A guard in case user profile or conjuntoId is not available yet.
-    if (!userProfile.conjuntoId) {
+    // FIX: Wait for the full conjuntoInfo object to be loaded, not just the ID on the user profile.
+    // This makes the loading state more accurate on page refresh.
+    if (!conjuntoInfo) {
         return <div className="text-center p-10">Cargando información del conjunto...</div>;
     }
       
