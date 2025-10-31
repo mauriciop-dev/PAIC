@@ -84,39 +84,35 @@ export const getInitialGreeting = (userName?: string): string => {
   return `¡Hola${name}! Soy PAIC, tu Asistente de Administración Inteligente. Estoy aquí para ayudarte a gestionar la información y tareas de tu conjunto residencial.\n\nPuedes pedirme cosas como:\n- "¿Cuál es el estado de cuenta del apartamento 101?"\n- "Agrega una tarea: 'llamar al proveedor de ascensores' para mañana"\n- "Reserva el BBQ para el apartamento 202 este sábado a las 2pm"`;
 };
 
+// A single, reusable AI client instance.
+let ai: GoogleGenAI | null = null;
+
+const getAiClient = (): GoogleGenAI => {
+  if (ai) {
+    return ai;
+  }
+  
+  // FIX: Adhere to guideline to use process.env.API_KEY and fix import.meta.env error.
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    console.error("La variable de entorno API_KEY no está configurada.");
+    throw new Error("La configuración de la Clave de API no se encontró. Asegúrate de que la variable API_KEY esté definida en Vercel.");
+  }
+  
+  ai = new GoogleGenAI({ apiKey });
+  return ai;
+};
+
+
 export const getChatResponse = async (
   currentMessageText: string,
   fullHistory: Message[],
   userName?: string
 ): Promise<string> => {
-
-  // Rely solely on the aistudio environment for API key management.
-  if (!window.aistudio || typeof window.aistudio.hasSelectedApiKey !== 'function') {
-    console.error("AI Studio environment not detected. Cannot proceed with API calls.");
-    // Trigger the API key selection flow in the UI, which has its own specific error handling
-    // if the aistudio object is truly missing.
-    throw new Error('API_KEY_NOT_SELECTED');
-  }
-
-  const hasKey = await window.aistudio.hasSelectedApiKey();
-  if (!hasKey) {
-    // This specific error triggers the API key selection flow in the UI.
-    throw new Error('API_KEY_NOT_SELECTED');
-  }
   
   try {
-    // A key has been selected, so the platform will have injected it into process.env.
-    // We create the client here to ensure it uses the fresh key for this call.
-    
-    // Safely access process.env to prevent ReferenceError in browser environments.
-    const apiKey = (typeof process !== 'undefined' && process.env && (process.env as any).API_KEY)
-      ? (process.env as any).API_KEY
-      : undefined;
-
-    // The explicit check for a missing apiKey is removed to prevent a race condition loop.
-    // If the key is truly missing or invalid, the API call will fail, and the catch
-    // block below will handle it gracefully by prompting the user to select a key again.
-    const ai = new GoogleGenAI({ apiKey });
+    const aiClient = getAiClient();
 
     const today = new Date().toISOString().split('T')[0];
     const residents = dataStore.getResidents();
@@ -155,7 +151,7 @@ export const getChatResponse = async (
     - Vencimientos de Pagos: ${JSON.stringify(dueDates)}
     - Tareas Pendientes: ${JSON.stringify(tasks.filter(t => !t.completed))}`;
 
-    const chat = ai.chats.create({
+    const chat = aiClient.chats.create({
         model: 'gemini-2.5-flash',
         history: chatHistoryForApi.map((msg): Content => ({
             role: msg.sender === 'user' ? 'user' : 'model',
@@ -199,9 +195,12 @@ export const getChatResponse = async (
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
-        // If the API key is invalid or not found by the backend, trigger the selection flow in the UI.
-        if (error.message.includes("API key not valid") || error.message.includes("Requested entity was not found")) {
-            throw new Error('API_KEY_NOT_SELECTED');
+        // Provide a more user-friendly error message for configuration issues.
+        if (error.message.includes("API key not valid") || error.message.includes("API key is missing")) {
+            return "Error de configuración: La Clave de API para el servicio de IA no es válida o no se ha proporcionado. Por favor, contacta al soporte técnico.";
+        }
+         if (error.message.includes("La configuración de la Clave de API no se encontró")) {
+            return error.message;
         }
         // Re-throw other errors to be displayed as a message in the chat.
         throw error;

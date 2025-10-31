@@ -10,17 +10,10 @@ import LoginView from './components/views/LoginView';
 import { Tab, UserProfile } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 
-// FIX: Moved the AIStudio interface into `declare global` to resolve module augmentation errors.
+// Declarations for Google Identity Services client
 declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-
   interface Window {
     google: any;
-    // FIX: Made `aistudio` optional to resolve modifier conflicts and reflect its runtime availability.
-    aistudio?: AIStudio;
   }
 }
 

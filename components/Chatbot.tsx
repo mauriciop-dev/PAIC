@@ -13,8 +13,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [lastUserMessageForRetry, setLastUserMessageForRetry] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +46,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
 
   const sendMessageAndGetResponse = async (messageText: string) => {
     const userMessage: Message = { sender: 'user', text: messageText };
-    const currentMessages = [...messages.filter(m => !m.isApiKeyRequest), userMessage];
+    const currentMessages = [...messages, userMessage];
     
     setMessages(currentMessages);
     setIsLoading(true);
@@ -57,31 +55,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
       const aiResponseText = await getChatResponse(messageText, currentMessages, userProfile?.name);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages((prev) => [...prev, aiMessage]);
-      setLastUserMessageForRetry(null); // Clear retry message on success
-      setRetryCount(0); // Reset retry counter on success
     } catch (error: any) {
-      if (error.message === 'API_KEY_NOT_SELECTED') {
-        if (retryCount > 0) {
-            const errorMessage: Message = {
-                sender: 'ai',
-                text: "Parece que hay un problema persistente para acceder a la Clave de API, incluso después de seleccionarla. Por favor, recarga la página e inténtalo de nuevo. Si el problema continúa, verifica la configuración de tu entorno de AI Studio."
-            };
-            setMessages((prev) => [...prev, errorMessage]);
-        } else {
-            setLastUserMessageForRetry(messageText); // Save message for retry
-            setRetryCount(prev => prev + 1);
-            const apiKeyMessage: Message = {
-              sender: 'ai',
-              text: `Para usar el asistente, por favor selecciona una Clave de API.\n\nTu clave se utiliza para acceder a los servicios de IA de Google y no se almacena en esta aplicación. Puedes encontrar más información sobre la facturación en [ai.google.dev/gemini-api/docs/billing](https://ai.google.dev/gemini-api/docs/billing).`,
-              isApiKeyRequest: true,
-            };
-            setMessages((prev) => [...prev, apiKeyMessage]);
-        }
-      } else {
         const errorMessageText = error.message || 'Lo siento, ocurrió un error. Por favor, intenta de nuevo.';
         const errorMessage: Message = { sender: 'ai', text: errorMessageText };
         setMessages((prev) => [...prev, errorMessage]);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -92,52 +69,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     if (!input.trim() || isLoading) return;
     const messageText = input;
     setInput('');
-    setRetryCount(0); // Reset for new messages
     await sendMessageAndGetResponse(messageText);
-  };
-
-  const handleSelectKeyAndRetry = async () => {
-    if (isLoading) return;
-
-    if (!window.aistudio || typeof window.aistudio.openSelectKey !== 'function') {
-      const errorMessage: Message = {
-        sender: 'ai',
-        text: 'La funcionalidad para seleccionar la Clave de API no está disponible en este entorno. Por favor, asegúrate de estar ejecutando la aplicación dentro de Google AI Studio.',
-      };
-      // Remove the API key request to replace it with the error
-      setMessages((prev) => [...prev.filter(m => !m.isApiKeyRequest), errorMessage]);
-      return;
-    }
-    
-    setIsLoading(true);
-
-    try {
-      await window.aistudio.openSelectKey();
-      if (lastUserMessageForRetry) {
-        // Optimistically remove the API key request message from UI
-        setMessages(prev => prev.filter(m => !m.isApiKeyRequest));
-        
-        // Introduce a delay to allow the environment to update with the new API key
-        setTimeout(async () => {
-            await sendMessageAndGetResponse(lastUserMessageForRetry);
-        }, 500); // 500ms delay
-
-      } else {
-          setIsLoading(false); // No message to retry, so reset state
-      }
-    } catch (e) {
-      console.error("Error opening select key dialog", e);
-       const errorMessage: Message = { sender: 'ai', text: 'No se pudo completar la selección de clave. Por favor, inténtalo de nuevo.' };
-       setMessages((prev) => [...prev, errorMessage]);
-       setIsLoading(false); // Reset on error
-    }
   };
 
   const renderMessageContent = (msg: Message) => {
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const parts = msg.text.split(linkRegex);
 
-    const content = (
+    return (
       <p className="text-base whitespace-pre-wrap">
         {parts.map((part, i) => {
           if (i % 3 === 1) {
@@ -160,23 +99,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
         })}
       </p>
     );
-
-    if (msg.isApiKeyRequest) {
-      return (
-        <div>
-          {content}
-          <button
-            onClick={handleSelectKeyAndRetry}
-            disabled={isLoading}
-            className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300"
-          >
-            {isLoading ? 'Procesando...' : 'Seleccionar Clave de API'}
-          </button>
-        </div>
-      );
-    }
-
-    return content;
   };
 
   if (!isOpen) {
