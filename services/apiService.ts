@@ -1,5 +1,5 @@
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -41,6 +41,14 @@ export const apiService = {
   fetchExpenses: async (): Promise<Expense[]> => {
       await delay(200);
       return dataStore.getExpenses();
+  },
+  fetchVisitorLogs: async (): Promise<VisitorLog[]> => {
+      await delay(200);
+      return dataStore.getVisitorLogs();
+  },
+  fetchPackageLogs: async (): Promise<PackageLog[]> => {
+      await delay(200);
+      return dataStore.getPackageLogs();
   },
   
   // --- Modifying Data ---

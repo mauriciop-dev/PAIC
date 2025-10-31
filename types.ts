@@ -4,6 +4,7 @@ export enum Tab {
   CommonAreas = 'Áreas comunes',
   Comunicaciones = 'Comunicaciones',
   Finanzas = 'Finanzas',
+  Seguridad = 'Seguridad',
   DueDates = 'Vencimientos',
   PendingTasks = 'Tareas pendientes',
 }
@@ -112,4 +113,24 @@ export interface Expense {
     category: ExpenseCategory;
     date: string;
     providerId?: number;
+}
+
+// Nuevos tipos para el Módulo de Seguridad
+export interface VisitorLog {
+    id: number;
+    apartment: string;
+    visitorName: string;
+    date: string;
+    status: 'Autorizado' | 'Ingresó' | 'Salió';
+    entryTime?: string;
+    exitTime?: string;
+}
+
+export interface PackageLog {
+    id: number;
+    apartment: string;
+    courier: string;
+    trackingNumber?: string;
+    receivedDate: string;
+    status: 'En recepción' | 'Entregado';
 }

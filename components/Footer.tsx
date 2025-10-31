@@ -14,6 +14,7 @@ const tabs = [
   { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar' },
   { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail' },
   { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign' },
+  { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield' },
   { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock' },
   { id: Tab.PendingTasks, label: 'Tareas pendientes', icon: 'checkSquare' },
 ];

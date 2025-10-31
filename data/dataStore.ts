@@ -1,4 +1,4 @@
-import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
@@ -7,6 +7,8 @@ import {
     dueDatesData as initialDueDates,
     tasksData as initialTasks,
     expensesData as initialExpenses,
+    visitorLogsData as initialVisitorLogs,
+    packageLogsData as initialPackageLogs,
 } from './mockData';
 
 type Listener = () => void;
@@ -38,6 +40,8 @@ let currentInternalStaff: InternalStaff[] = [...initialInternalStaff];
 let currentDueDates: DueDate[] = [...initialDueDates];
 let currentTasks: Task[] = [...initialTasks];
 let currentExpenses: Expense[] = [...initialExpenses];
+let currentVisitorLogs: VisitorLog[] = [...initialVisitorLogs];
+let currentPackageLogs: PackageLog[] = [...initialPackageLogs];
 let currentBookings: Booking[] = [
     { day: 5, time: '12pm-4pm', event: 'BBQ', user: 'Apt 101' },
     { day: 12, time: '6pm-9pm', event: 'Salón Social', user: 'Apt 202' },
@@ -170,6 +174,10 @@ export const dataStore = {
         currentBookings.push(booking);
         notifyListeners();
     },
+
+    getVisitorLogs: (): VisitorLog[] => [...currentVisitorLogs],
+    getPackageLogs: (): PackageLog[] => [...currentPackageLogs],
+
 
     // --- Simulation of data loading ---
     loadNewData: (dataType: 'Residents' | 'AccountStatus' | 'Providers' | 'InternalStaff'): void => {

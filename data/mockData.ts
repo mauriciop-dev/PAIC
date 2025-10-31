@@ -1,4 +1,4 @@
-import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff, Expense } from "../types";
+import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -109,3 +109,17 @@ export const expensesData: Expense[] = [
 ];
 
 export const monthlyBudget = 40000;
+
+// New data for Security View
+export const visitorLogsData: VisitorLog[] = [
+    { id: 1, apartment: '101', visitorName: 'Ana Gomez', date: '2024-06-25', status: 'Salió', entryTime: '14:00', exitTime: '16:30' },
+    { id: 2, apartment: '202', visitorName: 'Domicilio Rappi', date: '2024-06-25', status: 'Salió', entryTime: '19:30', exitTime: '19:45' },
+    { id: 3, apartment: '301', visitorName: 'Luis Fernandez', date: '2024-06-26', status: 'Ingresó', entryTime: '09:00' },
+    { id: 4, apartment: '102', visitorName: 'Mariana Velez', date: '2024-06-26', status: 'Autorizado' },
+];
+
+export const packageLogsData: PackageLog[] = [
+    { id: 1, apartment: '201', courier: 'Servientrega', trackingNumber: '123456789', receivedDate: '2024-06-24', status: 'Entregado' },
+    { id: 2, apartment: '101', courier: 'MercadoLibre', trackingNumber: 'MELI98765', receivedDate: '2024-06-25', status: 'En recepción' },
+    { id: 3, apartment: '301', courier: 'Interrapidisimo', receivedDate: '2024-06-26', status: 'En recepción' },
+];
