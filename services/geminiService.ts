@@ -18,7 +18,11 @@ const getAiInstance = (): GoogleGenAI => {
 
   // Per coding guidelines, the API key is obtained exclusively from `process.env.API_KEY`.
   // The execution environment is expected to provide this value.
-  const apiKey = (process as any)?.env?.API_KEY;
+  // We use `typeof process` to safely check for the existence of the `process` object
+  // in the browser environment, preventing a "process is not defined" ReferenceError.
+  const apiKey = (typeof process !== 'undefined' && process.env) 
+    ? (process.env as any).API_KEY 
+    : undefined;
 
   if (!apiKey) {
     // This custom error will be caught and displayed in the chat UI.
