@@ -10,12 +10,7 @@ interface ChatbotProps {
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: 'ai',
-      text: getInitialGreeting(userProfile?.name),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatWindowRef = useRef<HTMLDivElement>(null);
@@ -28,10 +23,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   }, [messages]);
   
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+    if (isOpen) {
+      inputRef.current?.focus();
+      // Show welcome menu only if the chat is empty when opened
+      if (messages.length === 0) {
+        setMessages([
+          {
+            sender: 'ai',
+            text: getInitialGreeting(userProfile?.name),
+          },
+        ]);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, userProfile]); // Re-run if isOpen or userProfile changes
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +55,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      inputRef.current?.focus();
+      // This fixes the autofocus issue by delaying the focus call slightly,
+      // ensuring the input is re-enabled and ready to be focused after the state updates.
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
   
@@ -99,7 +105,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-0 left-0 h-full w-6 md:w-7 bg-blue-600 hover:bg-blue-700 z-50 transition-all duration-300 ease-in-out flex items-center justify-center animate-subtle-pulse"
+        className="fixed top-0 left-0 h-full w-8 md:w-10 bg-blue-600 hover:bg-blue-700 z-50 transition-all duration-300 ease-in-out flex items-center justify-center animate-subtle-pulse"
         aria-label="Open Chatbot"
       >
         <span className="text-white font-bold text-xs transform -rotate-90 whitespace-nowrap">PAIC IA</span>
