@@ -15,6 +15,9 @@ let currentAccountStatus: AccountStatus[] = [...initialAccountStatus];
 let currentBookings: Booking[] = [
     { day: 5, time: '12pm-4pm', event: 'BBQ', user: 'Apt 101' },
     { day: 12, time: '6pm-9pm', event: 'Salón Social', user: 'Apt 202' },
+    { day: 18, time: '9am-10am', event: 'Gimnasio', user: 'Apt 301' },
+    { day: 18, time: '5pm-7pm', event: 'BBQ', user: 'Apt 102' },
+    { day: 25, time: 'Todo el día', event: 'Salón Social', user: 'Admin' },
 ];
 
 const notifyListeners = () => {
