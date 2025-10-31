@@ -97,7 +97,15 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   };
 
   const handleSelectKeyAndRetry = async () => {
-    if (!window.aistudio || isLoading) {
+    if (isLoading) return;
+
+    if (!window.aistudio || typeof window.aistudio.openSelectKey !== 'function') {
+      const errorMessage: Message = {
+        sender: 'ai',
+        text: 'La funcionalidad para seleccionar la Clave de API no está disponible en este entorno. Por favor, asegúrate de estar ejecutando la aplicación dentro de Google AI Studio.',
+      };
+      // Remove the API key request to replace it with the error
+      setMessages((prev) => [...prev.filter(m => !m.isApiKeyRequest), errorMessage]);
       return;
     }
     
