@@ -50,18 +50,30 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
-                // FIX: This logic is more robust. It handles cases where 'paic_conjuntoInfo' might be the string "null".
-                // It attempts to parse from storage first, and if the result is not a valid object, it fetches from the API.
+                // FIX: This robust logic handles corrupted or invalid JSON in localStorage.
+                let infoToSet: ConjuntoInfo | null = null;
                 const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
-                const storedConjunto = storedConjuntoRaw ? JSON.parse(storedConjuntoRaw) : null;
 
-                if (storedConjunto) {
-                    setConjuntoInfo(storedConjunto);
+                if (storedConjuntoRaw) {
+                    try {
+                        const parsed = JSON.parse(storedConjuntoRaw);
+                        // Ensure we have a valid object, not just `null` or other primitives
+                        if (parsed && typeof parsed === 'object') {
+                            infoToSet = parsed;
+                        }
+                    } catch (error) {
+                        console.error('Could not parse conjuntoInfo from localStorage, fetching from API.', error);
+                        localStorage.removeItem('paic_conjuntoInfo'); // Clear corrupted data
+                    }
+                }
+
+                if (infoToSet) {
+                    setConjuntoInfo(infoToSet);
                 } else {
-                    const info = await apiService.fetchConjuntoInfo(parsedUser.conjuntoId);
-                    if (info) {
-                        setConjuntoInfo(info);
-                        localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
+                    const infoFromApi = await apiService.fetchConjuntoInfo(parsedUser.conjuntoId);
+                    if (infoFromApi) {
+                        setConjuntoInfo(infoFromApi);
+                        localStorage.setItem('paic_conjuntoInfo', JSON.stringify(infoFromApi));
                     } else if (parsedUser.role === UserRole.Admin) {
                         setIsInitialSetupModalOpen(true);
                     }
