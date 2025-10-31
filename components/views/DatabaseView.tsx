@@ -17,7 +17,6 @@ const DatabaseView: React.FC = () => {
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [activeDbTab, setActiveDbTab] = useState<DbTab>(DbTab.Residents);
   
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
@@ -45,24 +44,12 @@ const DatabaseView: React.FC = () => {
     handleCloseModal();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setSelectedFile(event.target.files[0]);
-      setFeedbackMessage(null);
-    }
-  };
-
-  const handleUpload = () => {
-    if (!selectedFile) {
-      setFeedbackMessage({type: 'error', text: 'Por favor, selecciona un archivo primero.'});
-      return;
-    }
+  const handleSimulateUpload = () => {
     setIsLoading(true);
     setFeedbackMessage(null);
 
     // Simulate file processing
     setTimeout(() => {
-      // Based on the active tab, we call the corresponding store function
       if (activeDbTab === DbTab.Residents) {
         dataStore.loadNewResidentData();
       } else if (activeDbTab === DbTab.AccountStatus) {
@@ -70,8 +57,7 @@ const DatabaseView: React.FC = () => {
       }
       
       setIsLoading(false);
-      setFeedbackMessage({type: 'success', text: '¡Archivo cargado exitosamente!'});
-      setSelectedFile(null);
+      setFeedbackMessage({type: 'success', text: `¡Datos de ${activeDbTab} actualizados exitosamente!`});
       // Clear message after some time
       setTimeout(() => setFeedbackMessage(null), 5000);
     }, 1500);
@@ -151,26 +137,17 @@ const DatabaseView: React.FC = () => {
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Base de Datos</h2>
       
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">Cargar Información</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-4">Simular Carga de Información</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Sube un archivo de Excel o Google Sheets para actualizar la base de datos de <span className="font-semibold">{activeDbTab}</span>. El sistema leerá el archivo y migrará los datos.
+          Haz clic en el botón para simular una carga de datos y actualizar la tabla de <span className="font-semibold">{activeDbTab}</span> con nueva información de ejemplo.
         </p>
         <div className="flex items-center gap-4">
-            <input type="file" onChange={handleFileChange} className="text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
-                accept=".xlsx, .xls, .csv"
-                key={selectedFile ? 'file-selected' : 'no-file'} // Reset input
-            />
             <button 
-                onClick={handleUpload} 
+                onClick={handleSimulateUpload} 
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={isLoading}
+                disabled={isLoading || (activeDbTab !== DbTab.Residents && activeDbTab !== DbTab.AccountStatus)}
             >
-                {isLoading ? 'Cargando...' : 'Subir Archivo'}
+                {isLoading ? 'Cargando...' : 'Simular Carga de Datos'}
             </button>
         </div>
         {feedbackMessage && (
