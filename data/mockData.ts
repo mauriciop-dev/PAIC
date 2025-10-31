@@ -1,4 +1,4 @@
-import { ChartData, Resident, AccountStatus, DueDate } from "../types";
+import { ChartData, Resident, AccountStatus, DueDate, Task } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -97,4 +97,12 @@ export const dueDatesData: DueDate[] = [
     { id: 4, item: 'Seguro de Áreas Comunes', category: 'Seguros', dueDate: '2024-05-31', status: 'Vencido' },
     { id: 5, item: 'Servicios Públicos (Agua, Luz)', category: 'Servicios', dueDate: '2024-07-10', status: 'Pendiente' },
     { id: 6, item: 'Pago de Nómina', category: 'Nómina', dueDate: '2024-06-28', status: 'Pagado' },
+];
+
+export const tasksData: Task[] = [
+    { id: 1, text: 'Contactar a plomero para cotización de arreglo en torre 2', dueDate: '2024-06-25', completed: false },
+    { id: 2, text: 'Preparar informe de cartera para la asamblea', dueDate: '2024-07-01', completed: false },
+    { id: 3, text: 'Comprar bombillos para pasillos', dueDate: '2024-06-22', completed: true },
+    { id: 4, text: 'Revisar contrato de vigilancia', dueDate: '2024-06-28', completed: false },
+    { id: 5, text: 'Enviar comunicado sobre uso de piscina', dueDate: '2024-06-20', completed: true },
 ];

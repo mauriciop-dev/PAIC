@@ -23,10 +23,11 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
   useEffect(() => {
     const updateSliderItems = () => {
       const dueDates = dataStore.getDueDates();
+      const tasks = dataStore.getTasks();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const urgentItems = dueDates
+      const urgentDueDates = dueDates
         .filter(d => d.status === 'Pendiente' || d.status === 'Vencido')
         .map(d => {
           const dueDate = new Date(d.dueDate);
@@ -40,22 +41,43 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
             text = `VENCIDO: ${d.item}`;
             color = 'red';
           } else if (dayDiff <= 3) {
-            text = `${d.item} vence en ${dayDiff} día(s)`;
+            text = `PAGO: ${d.item} vence en ${dayDiff} día(s)`;
             color = 'red';
           } else {
-            text = `${d.item} vence el ${d.dueDate}`;
+            text = `PAGO: ${d.item} vence el ${d.dueDate}`;
             color = 'yellow';
           }
-          return { text, color, dueDate };
-        })
-        .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+          return { text, color, date: dueDate };
+        });
       
-      const staticItems = [
-          { text: "Revisar cotización de plomería", color: 'yellow' as const },
-          { text: "Soporte ProDig - 3144897092", color: 'green' as const },
-      ];
+      const urgentTasks = tasks
+          .filter(t => !t.completed && t.dueDate)
+          .map(t => {
+              const dueDate = new Date(t.dueDate);
+              const timeDiff = dueDate.getTime() - today.getTime();
+              const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+              
+              let text = `TAREA: ${t.text}`;
+              let color: 'red' | 'yellow' = 'yellow';
 
-      const combinedItems = [...urgentItems.slice(0, 3), ...staticItems];
+              if (dayDiff < 0) {
+                  text += ' (Vencida)';
+                  color = 'red';
+              } else if (dayDiff <= 3) {
+                  text += ` (Vence en ${dayDiff} día(s))`;
+                  color = 'red';
+              }
+              
+              return { text, color, date: dueDate };
+          });
+
+      const staticItems = [
+          { text: "Soporte ProDig - 3144897092", color: 'green' as const, date: new Date(9999,0,1) },
+      ];
+      
+      const allUrgentItems = [...urgentDueDates, ...urgentTasks].sort((a,b) => a.date.getTime() - b.date.getTime());
+
+      const combinedItems = [...allUrgentItems.slice(0, 4), ...staticItems];
       setSliderItems(combinedItems);
       setCurrentItem(0);
     };
@@ -66,7 +88,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
   }, []);
 
   useEffect(() => {
-    if (sliderItems.length === 0) return;
+    if (sliderItems.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentItem((prev) => (prev + 1) % sliderItems.length);
     }, 5000);

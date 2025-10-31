@@ -1,4 +1,4 @@
-import { Message, Resident, AccountStatus, Booking, UserProfile } from "../types";
+import { Message, Resident, AccountStatus, Booking, UserProfile, Task } from "../types";
 import { dataStore } from '../data/dataStore';
 import { GoogleGenAI } from "@google/genai";
 
@@ -23,8 +23,9 @@ export const getInitialGreeting = (userName?: string) => {
 2. Enviar solicitudes de mantenimiento.
 3. Programar el uso de áreas comunes.
 4. Enviar comunicaciones a residentes.
-5. Revisar documentación interna.
-6. Actualizar información de la base de datos.
+5. Gestionar tus tareas pendientes.
+6. Revisar documentación interna.
+7. Actualizar información de la base de datos.
 
 ¿En qué te puedo ayudar?`;
 };
@@ -122,7 +123,6 @@ export const getChatResponse = async (prompt: string, messages: Message[], userN
     // --- CONTEXT-AWARE COMMAND RESPONSES (PRIORITY) ---
     
     // --- FLOW 1: ESTADO DE CUENTA (REFACTORED & FIXED) ---
-    // Step 3: User chose to email or view in chat
     if (lastAiMessage.includes('por correo al residente o verla aquí en el chat')) {
         const aptMatch = lastAiMessage.match(/apto \*\*(\d+)\*\*/);
         const aptNumber = aptMatch ? aptMatch[1] : null;
@@ -158,8 +158,6 @@ Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se
         }
         return "Opción no válida. Por favor, elija '1' para enviar correo o '2' para ver en el chat.";
     }
-
-    // Step 2: User provided an apartment number
     if (lastAiMessage.includes('indíqueme el número de apartamento')) {
         const aptNumber = extractApartmentNumber(prompt);
         if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
@@ -169,8 +167,6 @@ Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se
         
         return `Encontré la información para el apto **${aptNumber}**. ¿Desea que se la envíe por correo al residente o verla aquí en el chat?\n1. Enviar correo\n2. Ver aquí`;
     }
-
-    // Step 1: User chose between "residente" or "administrador"
     if (lastAiMessage.includes('residente o 2. quiere verlo el como administrador')) {
         if (lowerCasePrompt.includes('1') || lowerCasePrompt.includes('residente')) {
             return "Entendido. Para enviarle la información al residente, por favor, indíqueme el número de apartamento que desea consultar.";
@@ -180,7 +176,6 @@ Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se
         }
         return "Opción no válida. Por favor, responde '1' para residente o '2' para administrador.";
     }
-
     if (lastAiMessage.includes('envíe esta información al correo del administrador')) {
         if (lowerCasePrompt.includes('sí') || lowerCasePrompt.includes('si')) {
             return "Entendido. Le he enviado el resumen a su correo. ¿Puedo ayudarle en algo más?";
@@ -188,7 +183,7 @@ Como ya es costumbre, agradecemos su pago oportuno y recordamos que este pago se
         return "De acuerdo. ¿Hay algo más en lo que pueda ayudarle?";
     }
 
-    // --- FLOW 2: MANTENIMIENTO (No changes, as it doesn't depend on resident data yet) ---
+    // --- FLOW 2: MANTENIMIENTO ---
     if (lastAiMessage.includes('especialidad quieres enviar el correo')) {
         return `Gracias. Ahora, por favor, describa brevemente la situación (Ej. 'arreglo eléctrico en el 305' o 'presentarse en administración').`;
     }
@@ -216,7 +211,7 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return "Proceso cancelado. Puede iniciar una nueva solicitud de mantenimiento cuando lo desee.";
     }
 
-    // --- FLOW 3: ZONAS COMUNES (NOW FUNCTIONAL) ---
+    // --- FLOW 3: ZONAS COMUNES ---
      if (lastAiMessage.includes('número de apartamento que realiza la solicitud')){
          const aptNumber = extractApartmentNumber(prompt);
          if (!aptNumber) return "No pude identificar un número de apartamento. Por favor, inténtelo de nuevo.";
@@ -232,12 +227,10 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         const areas = dataStore.getCommonAreas();
         let selectedArea = null;
 
-        // Check if user entered a number
         const choiceNumber = parseInt(prompt, 10);
         if (!isNaN(choiceNumber) && choiceNumber > 0 && choiceNumber <= areas.length) {
             selectedArea = areas[choiceNumber - 1];
         } else {
-            // Check if user entered a name
             selectedArea = areas.find(area => area.name.toLowerCase().includes(lowerCasePrompt));
         }
 
@@ -323,8 +316,34 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
     if (lastAiMessage.includes('aprueba el envío de esta versión')) {
         return `Mensaje enviado con la versión ajustada. He copiado al administrador. ¿Algo más en lo que pueda ayudar?`;
     }
+    
+    // --- FLOW 5: TAREAS PENDIENTES ---
+    if (lastAiMessage.includes('quieres asignarle una fecha de vencimiento')) {
+        const taskTextMatch = lastAiMessage.match(/he agregado '(.*?)'/);
+        if (taskTextMatch) {
+            const taskText = taskTextMatch[1];
+            if (lowerCasePrompt.includes('no')) {
+                return `Entendido. La tarea '${taskText}' ha sido guardada sin fecha.`;
+            }
+            // Simple date parsing for now. Could be improved with NLP.
+            dataStore.addTask({ text: taskText, dueDate: prompt, completed: false });
+            return `Perfecto, he asignado la fecha. La tarea ha sido guardada y la puedes ver en la pestaña 'Tareas pendientes'.`;
+        }
+    }
 
-    // --- FLOW 5: REVISAR DOCUMENTACION (No changes) ---
+    if (lastAiMessage.includes('aquí tienes tus tareas pendientes')) {
+        const tasks = dataStore.getTasks().filter(t => !t.completed);
+        const choice = parseInt(prompt, 10);
+        if (!isNaN(choice) && choice > 0 && choice <= tasks.length) {
+            const taskToComplete = tasks[choice - 1];
+            dataStore.updateTask({ ...taskToComplete, completed: true });
+            return `¡Hecho! He marcado "${taskToComplete.text}" como completada. ¡Buen trabajo!`;
+        }
+        return "No he reconocido esa opción. Por favor, indica el número de la tarea que quieres completar.";
+    }
+
+
+    // --- FLOW 6: REVISAR DOCUMENTACION ---
     if (lastAiMessage.includes('listado de los archivos que hay dentro de la carpeta')) {
         return `Entendido. He encontrado que el "Reglamento de Propiedad Horizontal.pdf" trata sobre las normas de convivencia, el uso de áreas comunes y las responsabilidades de los propietarios. ¿Desea un resumen de alguna sección en particular o el enlace para abrir el documento?`;
     }
@@ -332,7 +351,7 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return `Claro, aquí tienes el enlace para que puedas revisarlo en detalle: [link_al_documento.pdf]. ¿Hay algo más que necesites?`;
     }
 
-    // --- FLOW 6: ACTUALIZAR BASE DE DATOS (NOW FUNCTIONAL) ---
+    // --- FLOW 7: ACTUALIZAR BASE DE DATOS ---
     if (lastAiMessage.includes('confirma si deseas continuar')) {
         if (lowerCasePrompt === '1' || lowerCasePrompt.includes('proceder')) {
             return "¿Cuál base de datos quiere modificar? 1. Residentes, 2. Proveedores, o 3. Internos.";
@@ -404,8 +423,9 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
     const option2Keywords = ['mantenimiento', 'plomero', 'electricista', 'carpintero', 'vidrios', 'problema en el 305', 'reportar una falla', 'solicitud de proveedor', 'opción 2', /^2$/];
     const option3Keywords = ['gimnasio', 'reservar', 'salón social', 'agendar el bbq', 'hacer una reserva', 'alquiler de zonas comunes', 'opción 3', /^3$/];
     const option4Keywords = ['comunicado', 'comunicación a residentes', 'enviar un correo', 'segmentación inteligente', 'mandar un aviso', 'opción 4', /^4$/];
-    const option5Keywords = ['documentación', 'reglamento', 'buscar en los archivos', 'documentación del conjunto', 'manual', 'opción 5', /^5$/];
-    const option6Keywords = ['actualizar la base de datos', 'cambiar un residente', 'modificar proveedor', 'actualizar datos', 'modificar un registro', 'opción 6', /^6$/];
+    const option5Keywords = ['mis tareas', 'qué tengo pendiente', 'lista de tareas', 'ya hice', 'completé', 'recuérdame', 'anota', 'agrega una tarea', 'opción 5', /^5$/];
+    const option6Keywords = ['documentación', 'reglamento', 'buscar en los archivos', 'documentación del conjunto', 'manual', 'opción 6', /^6$/];
+    const option7Keywords = ['actualizar la base de datos', 'cambiar un residente', 'modificar proveedor', 'actualizar datos', 'modificar un registro', 'opción 7', /^7$/];
 
     const matchesKeyword = (keywords: (string | RegExp)[]) => keywords.some(keyword => 
         typeof keyword === 'string' ? lowerCasePrompt.includes(keyword) : keyword.test(lowerCasePrompt)
@@ -435,6 +455,37 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
         return `Puedo ayudarte a enviar una comunicación. ¿A quién quiere enviar la comunicación? (Opciones: trabajadores internos, proveedores, residentes o alguien en particular).`;
     }
     if (matchesKeyword(option5Keywords)) {
+        // LIST TASKS
+        if (lowerCasePrompt.includes('qué tengo') || lowerCasePrompt.includes('mis tareas') || lowerCasePrompt.includes('lista de')) {
+            const tasks = dataStore.getTasks().filter(t => !t.completed);
+            if (tasks.length === 0) {
+                return "¡Buenas noticias! No tienes ninguna tarea pendiente en tu lista.";
+            }
+            const taskList = tasks.map((t, i) => `${i + 1}. ${t.text} (Vence: ${t.dueDate || 'Sin fecha'})`).join('\n');
+            return `Claro, aquí tienes tus tareas pendientes:\n${taskList}\n\nSi deseas marcar alguna como completada, solo dime el número.`;
+        }
+        // COMPLETE TASK
+        if (lowerCasePrompt.includes('ya hice') || lowerCasePrompt.includes('completé')) {
+             const tasks = dataStore.getTasks().filter(t => !t.completed);
+             // Basic matching, can be improved with fuzzy search
+             const taskToComplete = tasks.find(t => lowerCasePrompt.includes(t.text.toLowerCase().substring(0, 15)));
+             if (taskToComplete) {
+                 dataStore.updateTask({ ...taskToComplete, completed: true });
+                 return `¡Excelente! He marcado la tarea "${taskToComplete.text}" como completada.`;
+             }
+             return "No estoy seguro de a qué tarea te refieres. ¿Puedes ser más específico o decirme la lista de tareas para ver las opciones?";
+        }
+        // ADD TASK
+        if (lowerCasePrompt.includes('recuérdame') || lowerCasePrompt.includes('anota') || lowerCasePrompt.includes('agrega')) {
+            const taskText = prompt.replace(/(recuérdame|anota que|anota|agrega una tarea:|agrega)/i, '').trim();
+            if (taskText) {
+                dataStore.addTask({ text: taskText, dueDate: '', completed: false });
+                return `Entendido. He agregado '${taskText}' a tu lista de tareas. ¿Quieres asignarle una fecha de vencimiento? (Ej: 2024-07-15)`;
+            }
+        }
+        return "Puedo ayudarte con tus tareas. ¿Quieres agregar una nueva, ver tu lista de pendientes o marcar una como completada?";
+    }
+    if (matchesKeyword(option6Keywords)) {
         return `Aquí está el listado de los archivos que hay dentro de la carpeta de documentación:
 1. Reglamento de Propiedad Horizontal.pdf
 2. Acta de Asamblea General 2023.pdf
@@ -442,7 +493,7 @@ Por favor, seleccione el proveedor al que desea enviar la solicitud.`;
 
 ¿Cuál de ellos quiere revisar?`;
     }
-    if (matchesKeyword(option6Keywords)) {
+    if (matchesKeyword(option7Keywords)) {
         return `¡Atención! Estás a punto de modificar la base de datos central. Los cambios son importantes y afectarán la información de la plataforma.
 Por favor, confirma si deseas continuar:
 1. proceder 

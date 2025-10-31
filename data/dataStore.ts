@@ -1,10 +1,11 @@
-import { Resident, AccountStatus, Booking, CommonArea, DueDate } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
     newResidentsData,
     newAccountStatusDetailsData,
     dueDatesData as initialDueDates,
+    tasksData as initialTasks,
 } from './mockData';
 
 type Listener = () => void;
@@ -32,6 +33,7 @@ const getNextColor = () => {
 let currentResidents: Resident[] = [...initialResidents];
 let currentAccountStatus: AccountStatus[] = [...initialAccountStatus];
 let currentDueDates: DueDate[] = [...initialDueDates];
+let currentTasks: Task[] = [...initialTasks];
 let currentBookings: Booking[] = [
     { day: 5, time: '12pm-4pm', event: 'BBQ', user: 'Apt 101' },
     { day: 12, time: '6pm-9pm', event: 'Salón Social', user: 'Apt 202' },
@@ -95,6 +97,30 @@ export const dataStore = {
         );
         notifyListeners();
     },
+
+    // --- Task Management ---
+    getTasks: (): Task[] => {
+        return [...currentTasks];
+    },
+
+    addTask: (newTask: Omit<Task, 'id'>): void => {
+        const taskWithId: Task = { ...newTask, id: Date.now() };
+        currentTasks.unshift(taskWithId);
+        notifyListeners();
+    },
+
+    updateTask: (updatedTask: Task): void => {
+        currentTasks = currentTasks.map(t =>
+            t.id === updatedTask.id ? updatedTask : t
+        );
+        notifyListeners();
+    },
+
+    deleteTask: (id: number): void => {
+        currentTasks = currentTasks.filter(t => t.id !== id);
+        notifyListeners();
+    },
+    // --- End Task Management ---
 
     getBookings: (): Booking[] => {
         return [...currentBookings];

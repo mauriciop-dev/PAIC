@@ -72,3 +72,10 @@ export interface DueDate {
     dueDate: string;
     status: 'Pendiente' | 'Vencido' | 'Pagado';
 }
+
+export interface Task {
+    id: number;
+    text: string;
+    dueDate: string;
+    completed: boolean;
+}
