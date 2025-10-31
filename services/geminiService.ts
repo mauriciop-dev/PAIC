@@ -8,17 +8,10 @@ import {
 import { Message } from '../types';
 import { dataStore } from '../data/dataStore';
 
-// FIX: Corrected a startup crash by making the environment variable access more robust.
-// Switched to `import.meta?.env?.` to safely handle cases where `import.meta` or `import.meta.env` might be undefined,
-// preventing the "Cannot read properties of undefined" error and ensuring the app loads reliably.
-const apiKey = import.meta?.env?.VITE_GEMINI_API_KEY;
-
-// The AI client is initialized conditionally. If the API key is missing,
-// the app will no longer crash. Instead, it will show an error message in the chat.
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-if (!apiKey) {
-    console.error("Gemini API key is missing. Please set the VITE_GEMINI_API_KEY environment variable.");
-}
+// Per coding guidelines, the API key is obtained exclusively from `process.env.API_KEY`.
+// The execution environment is expected to provide this value.
+// @ts-ignore - Assuming process.env is available in the execution environment.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
 // --- Function Declarations for Gemini ---
@@ -102,9 +95,6 @@ export const getChatResponse = async (
   fullHistory: Message[],
   userName?: string
 ): Promise<string> => {
-  if (!ai) {
-    return "Error: La clave de API de Gemini no está configurada. Por favor, contacta al administrador.";
-  }
   
   const today = new Date().toISOString().split('T')[0];
   const residents = dataStore.getResidents();
