@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
@@ -29,12 +30,13 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, userProfile })
   }, [userProfile.role]);
 
   useEffect(() => {
-    if (userProfile.role !== UserRole.Admin) return;
+    if (userProfile.role !== UserRole.Admin || !userProfile.conjuntoId) return;
 
     const updateSliderItems = async () => {
+      // FIX: Pass conjuntoId to apiService calls.
       const [dueDates, tasks] = await Promise.all([
-        apiService.fetchDueDates(),
-        apiService.fetchTasks(),
+        apiService.fetchDueDates(userProfile.conjuntoId!),
+        apiService.fetchTasks(userProfile.conjuntoId!),
       ]);
       
       const today = new Date();
@@ -101,7 +103,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab, userProfile })
     const intervalId = setInterval(updateSliderItems, 60000); // Refresh every minute
     return () => clearInterval(intervalId);
 
-  }, [userProfile.role]);
+  }, [userProfile.role, userProfile.conjuntoId]);
 
   useEffect(() => {
     if (sliderItems.length <= 1) return;

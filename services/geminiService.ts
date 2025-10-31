@@ -1,6 +1,8 @@
 
+
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
+import { DueDate } from "../types";
 
 // Per instructions, API key must be from process.env.API_KEY
 const apiKey = process.env.API_KEY;
@@ -14,17 +16,19 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 const model = 'gemini-2.5-flash';
 
 let chat: Chat | null = null;
+let currentConjuntoId: string | null = null;
 
-const getSystemPrompt = async (): Promise<string> => {
+const getSystemPrompt = async (conjuntoId: string): Promise<string> => {
     // Fetching fresh data each time can be slow. For a real app, consider caching.
+    // FIX: Pass conjuntoId to all apiService calls to fetch tenant-specific data.
     const [residents, accounts, providers, internalStaff, commonAreas, dueDates, tasks] = await Promise.all([
-        apiService.fetchResidents(),
-        apiService.fetchAccountStatus(),
-        apiService.fetchProviders(),
-        apiService.fetchInternalStaff(),
-        apiService.fetchCommonAreas(),
-        apiService.fetchDueDates(),
-        apiService.fetchTasks()
+        apiService.fetchResidents(conjuntoId),
+        apiService.fetchAccountStatus(conjuntoId),
+        apiService.fetchProviders(conjuntoId),
+        apiService.fetchInternalStaff(conjuntoId),
+        apiService.fetchCommonAreas(conjuntoId),
+        apiService.fetchDueDates(conjuntoId),
+        apiService.fetchTasks(conjuntoId)
     ]);
 
     // This prompt engineering is crucial for the chatbot's performance.
@@ -64,10 +68,10 @@ For any other query, provide a helpful text response based on the provided data 
     return context;
 }
 
-const initializeChat = async () => {
+const initializeChat = async (conjuntoId: string) => {
     if (!ai) return;
     try {
-        const systemInstruction = await getSystemPrompt();
+        const systemInstruction = await getSystemPrompt(conjuntoId);
         chat = ai.chats.create({
             model: model,
             config: {
@@ -85,20 +89,29 @@ const processApiResponse = async (response: string): Promise<string> => {
         // The model might wrap JSON in markdown ```json ... ```
         const cleanResponse = response.replace(/```json/g, '').replace(/```/g, '').trim();
         const action = JSON.parse(cleanResponse);
-        if (action.function && action.payload) {
+        if (action.function && action.payload && currentConjuntoId) {
             switch (action.function) {
                 case 'addTask':
-                    await apiService.addTask(action.payload);
-                    await initializeChat(); 
+                    // FIX: Pass conjuntoId to addTask.
+                    await apiService.addTask(currentConjuntoId, action.payload);
+                    await initializeChat(currentConjuntoId); 
                     return "Tarea agregada exitosamente. ¿Necesitas algo más?";
                 case 'addBooking':
-                    await apiService.addBooking(action.payload);
-                    await initializeChat();
+                    // FIX: Pass conjuntoId to addBooking.
+                    await apiService.addBooking(currentConjuntoId, action.payload);
+                    await initializeChat(currentConjuntoId);
                     return `¡Listo! He agendado "${action.payload.event}" para ${action.payload.user}. ¿Algo más?`;
-                case 'updateDueDateStatus':
-                    await apiService.updateDueDateStatus(action.payload.id, 'Pagado');
-                    await initializeChat();
-                    return "El estado del pago ha sido actualizado a 'Pagado'. ¿Te ayudo con otra cosa?";
+                case 'updateDueDateStatus': {
+                    // FIX: 'updateDueDateStatus' does not exist. Implement logic to fetch, update, and save using 'updateDueDate'.
+                    const allDueDates = await apiService.fetchDueDates(currentConjuntoId);
+                    const dueDateToUpdate = allDueDates.find(d => d.id === action.payload.id);
+                    if (dueDateToUpdate) {
+                        await apiService.updateDueDate(currentConjuntoId, { ...dueDateToUpdate, status: action.payload.status as DueDate['status'] });
+                        await initializeChat(currentConjuntoId);
+                        return `El estado del pago ha sido actualizado a '${action.payload.status}'. ¿Te ayudo con otra cosa?`;
+                    }
+                    return "No pude encontrar el vencimiento que mencionaste.";
+                }
                 default:
                     return "No pude reconocer la acción solicitada. ¿Puedes intentarlo de otra manera?";
             }
@@ -128,13 +141,17 @@ const runStandaloneQuery = async (systemInstruction: string, prompt: string): Pr
 }
 
 export const geminiService = {
-  runChat: async (prompt: string): Promise<string> => {
+  runChat: async (prompt: string, conjuntoId: string | undefined): Promise<string> => {
     if (!apiKey || !ai) {
         return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.";
     }
+    if (!conjuntoId) {
+        return "No se ha podido identificar el conjunto residencial. No puedo procesar tu solicitud.";
+    }
       
-    if (!chat) {
-      await initializeChat();
+    if (!chat || currentConjuntoId !== conjuntoId) {
+      currentConjuntoId = conjuntoId;
+      await initializeChat(conjuntoId);
     }
     
     if (!chat) {

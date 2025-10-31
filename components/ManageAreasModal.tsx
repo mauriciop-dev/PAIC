@@ -1,20 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/apiService';
-import { CommonArea } from '../types';
+import { CommonArea, UserProfile } from '../types';
 import { Icon } from './ui/Icon';
 
 interface ManageAreasModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAreaUpdate: () => void; // Callback to refresh parent component
+  userProfile: UserProfile;
 }
 
-const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, onAreaUpdate }) => {
+const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, onAreaUpdate, userProfile }) => {
   const [areas, setAreas] = useState<CommonArea[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
 
   const fetchAreas = async () => {
-    const fetchedAreas = await apiService.fetchCommonAreas();
+    if (!userProfile.conjuntoId) return;
+    // FIX: Pass conjuntoId to fetchCommonAreas.
+    const fetchedAreas = await apiService.fetchCommonAreas(userProfile.conjuntoId);
     setAreas(fetchedAreas);
   };
 
@@ -27,8 +31,9 @@ const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, on
   if (!isOpen) return null;
 
   const handleAddArea = async () => {
-    if (newAreaName.trim()) {
-      await apiService.addCommonArea(newAreaName.trim());
+    if (newAreaName.trim() && userProfile.conjuntoId) {
+      // FIX: Pass conjuntoId to addCommonArea.
+      await apiService.addCommonArea(userProfile.conjuntoId, newAreaName.trim());
       setNewAreaName('');
       fetchAreas(); // Refresh list
       onAreaUpdate(); // Notify parent
@@ -36,8 +41,9 @@ const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, on
   };
 
   const handleRemoveArea = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta área?')) {
-      await apiService.removeCommonArea(id);
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta área?') && userProfile.conjuntoId) {
+      // FIX: Pass conjuntoId to removeCommonArea.
+      await apiService.removeCommonArea(userProfile.conjuntoId, id);
       fetchAreas(); // Refresh list
       onAreaUpdate(); // Notify parent
     }

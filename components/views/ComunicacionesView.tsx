@@ -1,12 +1,18 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiService } from '../../services/apiService';
 import { geminiService } from '../../services/geminiService';
-import { AccountStatus, Resident, InternalStaff } from '../../types';
+import { AccountStatus, Resident, InternalStaff, UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
 
 type TargetAudience = 'all' | 'in_debt' | 'up_to_date';
 
-const ComunicacionesView: React.FC = () => {
+interface ComunicacionesViewProps {
+    userProfile: UserProfile;
+}
+
+const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) => {
     const [target, setTarget] = useState<TargetAudience>('all');
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
@@ -26,17 +32,19 @@ const ComunicacionesView: React.FC = () => {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!userProfile.conjuntoId) return;
+            // FIX: Pass conjuntoId to apiService calls.
             const [fetchedResidents, fetchedAccounts, fetchedStaff] = await Promise.all([
-                apiService.fetchResidents(),
-                apiService.fetchAccountStatus(),
-                apiService.fetchInternalStaff(),
+                apiService.fetchResidents(userProfile.conjuntoId),
+                apiService.fetchAccountStatus(userProfile.conjuntoId),
+                apiService.fetchInternalStaff(userProfile.conjuntoId),
             ]);
             setResidents(fetchedResidents);
             setAccounts(fetchedAccounts);
             setInternalStaff(fetchedStaff);
         };
         fetchData();
-    }, []);
+    }, [userProfile.conjuntoId]);
 
     const audienceCounts = useMemo(() => {
         const inDebtApts = new Set(accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment));

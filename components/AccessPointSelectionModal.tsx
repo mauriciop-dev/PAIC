@@ -6,18 +6,20 @@ import { Icon } from './ui/Icon';
 interface AccessPointSelectionModalProps {
     isOpen: boolean;
     onClose: () => void;
+    conjuntoId: string;
 }
 
-const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ isOpen, onClose }) => {
+const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ isOpen, onClose, conjuntoId }) => {
     const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
     const [selectedPoint, setSelectedPoint] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!conjuntoId) return;
             setIsLoading(true);
             try {
-                const data = await apiService.fetchAccessPoints();
+                const data = await apiService.fetchAccessPoints(conjuntoId);
                 setAccessPoints(data);
                 if (data.length > 0) {
                     setSelectedPoint(String(data[0].id));
@@ -31,7 +33,7 @@ const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ i
         if(isOpen) {
             fetchData();
         }
-    }, [isOpen]);
+    }, [isOpen, conjuntoId]);
 
     if (!isOpen) return null;
 
@@ -42,7 +44,7 @@ const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ i
             return;
         }
         // In a real app, you might save this selection to a session or global state.
-        console.log(`User selected access point ID: ${selectedPoint}`);
+        console.log(`User at conjunto ${conjuntoId} selected access point ID: ${selectedPoint}`);
         onClose();
     };
 

@@ -1,8 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { Task } from '../../types';
+import { Task, UserProfile } from '../../types';
 
-const PendingTasksView: React.FC = () => {
+interface PendingTasksViewProps {
+    userProfile: UserProfile;
+}
+
+const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [newTaskText, setNewTaskText] = useState('');
@@ -10,9 +15,11 @@ const PendingTasksView: React.FC = () => {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
 
     const fetchData = async () => {
+        if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
-            const fetchedTasks = await apiService.fetchTasks();
+            // FIX: Pass conjuntoId to fetchTasks.
+            const fetchedTasks = await apiService.fetchTasks(userProfile.conjuntoId);
             setTasks(fetchedTasks);
         } catch(error) {
             console.error("Failed to fetch tasks:", error);
@@ -23,36 +30,41 @@ const PendingTasksView: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [userProfile.conjuntoId]);
 
     const handleAddTask = async () => {
-        if (!newTaskText.trim()) return;
+        if (!newTaskText.trim() || !userProfile.conjuntoId) return;
         const newTask: Omit<Task, 'id'> = {
             text: newTaskText,
             dueDate: newTaskDate,
             completed: false,
         };
-        await apiService.addTask(newTask);
+        // FIX: Pass conjuntoId to addTask.
+        await apiService.addTask(userProfile.conjuntoId, newTask);
         setNewTaskText('');
         setNewTaskDate('');
         fetchData();
     };
     
     const handleUpdateTask = async () => {
-        if (!editingTask || !editingTask.text.trim()) return;
-        await apiService.updateTask(editingTask);
+        if (!editingTask || !editingTask.text.trim() || !userProfile.conjuntoId) return;
+        // FIX: Pass conjuntoId to updateTask.
+        await apiService.updateTask(userProfile.conjuntoId, editingTask);
         setEditingTask(null);
         fetchData();
     }
 
     const handleToggleComplete = async (task: Task) => {
-        await apiService.updateTask({ ...task, completed: !task.completed });
+        if (!userProfile.conjuntoId) return;
+        // FIX: Pass conjuntoId to updateTask.
+        await apiService.updateTask(userProfile.conjuntoId, { ...task, completed: !task.completed });
         fetchData();
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
-            await apiService.deleteTask(id);
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta tarea?') && userProfile.conjuntoId) {
+            // FIX: Pass conjuntoId to deleteTask.
+            await apiService.deleteTask(userProfile.conjuntoId, id);
             fetchData();
         }
     };

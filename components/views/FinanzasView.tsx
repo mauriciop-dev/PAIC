@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { apiService } from '../../services/apiService';
-import { Expense, Provider, ExpenseCategory, ChartData } from '../../types';
+import { Expense, Provider, ExpenseCategory, ChartData, UserProfile } from '../../types';
 import { monthlyCollectionData, monthlyBudget } from '../../data/mockData';
 
 type FinanzasTab = 'Resumen' | 'Gastos';
@@ -14,7 +15,11 @@ const StatCard: React.FC<{ title: string; value: string; description: string; }>
     </div>
 );
 
-const FinanzasView: React.FC = () => {
+interface FinanzasViewProps {
+    userProfile: UserProfile;
+}
+
+const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [activeTab, setActiveTab] = useState<FinanzasTab>('Resumen');
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
@@ -30,11 +35,13 @@ const FinanzasView: React.FC = () => {
     const [feedback, setFeedback] = useState<string | null>(null);
 
     const fetchData = async () => {
+        if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
+            // FIX: Pass conjuntoId to apiService calls.
             const [fetchedExpenses, fetchedProviders] = await Promise.all([
-                apiService.fetchExpenses(),
-                apiService.fetchProviders(),
+                apiService.fetchExpenses(userProfile.conjuntoId),
+                apiService.fetchProviders(userProfile.conjuntoId),
             ]);
             setExpenses(fetchedExpenses);
             setProviders(fetchedProviders);
@@ -47,11 +54,11 @@ const FinanzasView: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [userProfile.conjuntoId]);
 
     const handleAddExpense = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!description || !amount) {
+        if (!description || !amount || !userProfile.conjuntoId) {
             setFeedback("Por favor completa la descripción y el monto.");
             return;
         }
@@ -64,7 +71,8 @@ const FinanzasView: React.FC = () => {
             providerId: providerId ? parseInt(providerId) : undefined,
         };
 
-        await apiService.addExpense(newExpense);
+        // FIX: Pass conjuntoId to addExpense.
+        await apiService.addExpense(userProfile.conjuntoId, newExpense);
         
         // Reset form
         setDescription('');
@@ -80,8 +88,9 @@ const FinanzasView: React.FC = () => {
     };
     
     const handleDeleteExpense = async (id: number) => {
-        if(window.confirm('¿Estás seguro de que quieres eliminar este gasto?')) {
-            await apiService.deleteExpense(id);
+        if(window.confirm('¿Estás seguro de que quieres eliminar este gasto?') && userProfile.conjuntoId) {
+            // FIX: Pass conjuntoId to deleteExpense.
+            await apiService.deleteExpense(userProfile.conjuntoId, id);
             fetchData();
         }
     }

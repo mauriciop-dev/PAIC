@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Icon } from './ui/Icon';
 import { ConjuntoInfo } from '../types';
@@ -6,10 +5,11 @@ import { ConjuntoInfo } from '../types';
 interface InitialSetupModalProps {
   onClose: () => void;
   onSaveSetup: (info: ConjuntoInfo) => void;
+  conjuntoId: string;
 }
 
-const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSetup }) => {
-  const [formData, setFormData] = useState<ConjuntoInfo>({
+const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSetup, conjuntoId }) => {
+  const [formData, setFormData] = useState<Omit<ConjuntoInfo, 'id' | 'subscriptionPlan'>>({
     name: '',
     nit: '',
     address: '',
@@ -25,7 +25,12 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSetup(formData);
+    const completeInfo: ConjuntoInfo = {
+        ...formData,
+        id: conjuntoId,
+        subscriptionPlan: 'Free', // Default plan
+    };
+    onSaveSetup(completeInfo);
     onClose(); 
   };
 

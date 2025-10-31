@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile, ConjuntoInfo, AccessPoint } from '../types';
 import { Icon } from './ui/Icon';
@@ -31,13 +32,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     const fetchAccessPoints = async () => {
-        if (activeTab === 'Puntos de Acceso') {
-            const data = await apiService.fetchAccessPoints();
+        if (activeTab === 'Puntos de Acceso' && userProfile.conjuntoId) {
+            // FIX: Pass conjuntoId to fetchAccessPoints.
+            const data = await apiService.fetchAccessPoints(userProfile.conjuntoId);
             setAccessPoints(data);
         }
     };
     fetchAccessPoints();
-  }, [activeTab]);
+  }, [activeTab, userProfile.conjuntoId]);
 
 
   if (!isOpen) return null;
@@ -55,18 +57,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
   
   const handleAddAccessPoint = async () => {
-      if (newAccessPointName.trim()) {
-          await apiService.addAccessPoint(newAccessPointName.trim());
+      if (newAccessPointName.trim() && userProfile.conjuntoId) {
+          // FIX: Pass conjuntoId to addAccessPoint.
+          await apiService.addAccessPoint(userProfile.conjuntoId, newAccessPointName.trim());
           setNewAccessPointName('');
-          const data = await apiService.fetchAccessPoints(); // Refresh
+          // FIX: Pass conjuntoId to fetchAccessPoints.
+          const data = await apiService.fetchAccessPoints(userProfile.conjuntoId); // Refresh
           setAccessPoints(data);
       }
   };
 
   const handleDeleteAccessPoint = async (id: number) => {
-      if(window.confirm('¿Estás seguro de que quieres eliminar este punto de acceso?')) {
-          await apiService.deleteAccessPoint(id);
-          const data = await apiService.fetchAccessPoints(); // Refresh
+      if(window.confirm('¿Estás seguro de que quieres eliminar este punto de acceso?') && userProfile.conjuntoId) {
+          // FIX: Pass conjuntoId to deleteAccessPoint.
+          await apiService.deleteAccessPoint(userProfile.conjuntoId, id);
+          // FIX: Pass conjuntoId to fetchAccessPoints.
+          const data = await apiService.fetchAccessPoints(userProfile.conjuntoId); // Refresh
           setAccessPoints(data);
       }
   };

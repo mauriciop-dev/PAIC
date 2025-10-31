@@ -1,10 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { VisitorLog, PackageLog, Resident } from '../../types';
+import { VisitorLog, PackageLog, Resident, UserProfile } from '../../types';
 
 type SeguridadTab = 'Visitantes' | 'Paquetes';
 
-const SeguridadView: React.FC = () => {
+interface SeguridadViewProps {
+    userProfile: UserProfile;
+}
+
+const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [activeTab, setActiveTab] = useState<SeguridadTab>('Visitantes');
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
     const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
@@ -12,12 +17,14 @@ const SeguridadView: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = async () => {
+        if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
+            // FIX: Pass conjuntoId to apiService calls.
             const [visitors, packages, res] = await Promise.all([
-                apiService.fetchVisitorLogs(),
-                apiService.fetchPackageLogs(),
-                apiService.fetchResidents(),
+                apiService.fetchVisitorLogs(userProfile.conjuntoId),
+                apiService.fetchPackageLogs(userProfile.conjuntoId),
+                apiService.fetchResidents(userProfile.conjuntoId),
             ]);
             setVisitorLogs(visitors);
             setPackageLogs(packages);
@@ -31,7 +38,7 @@ const SeguridadView: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [userProfile.conjuntoId]);
     
     const getStatusChipStyle = (status: VisitorLog['status'] | PackageLog['status']) => {
         switch (status) {

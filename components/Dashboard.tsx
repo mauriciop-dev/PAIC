@@ -18,25 +18,30 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile }) => {
   const renderContent = () => {
+    // A guard in case user profile or conjuntoId is not available yet.
+    if (!userProfile.conjuntoId) {
+        return <div className="text-center p-10">Cargando información del conjunto...</div>;
+    }
+      
     switch (activeTab) {
       case Tab.Dashboard:
-        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} />;
+        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} userProfile={userProfile} />;
       case Tab.Database:
         return <DatabaseView userProfile={userProfile} />;
       case Tab.CommonAreas:
-        return <CommonAreasView />;
+        return <CommonAreasView userProfile={userProfile} />;
       case Tab.DueDates:
-        return <DueDatesView />;
+        return <DueDatesView userProfile={userProfile} />;
       case Tab.PendingTasks:
-          return <PendingTasksView />;
+          return <PendingTasksView userProfile={userProfile} />;
       case Tab.Comunicaciones:
-          return <ComunicacionesView />;
+          return <ComunicacionesView userProfile={userProfile} />;
       case Tab.Finanzas:
-          return <FinanzasView />;
+          return <FinanzasView userProfile={userProfile} />;
       case Tab.Seguridad:
-          return <SeguridadView />;
+          return <SeguridadView userProfile={userProfile} />;
       default:
-        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} />;
+        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} userProfile={userProfile} />;
     }
   };
 

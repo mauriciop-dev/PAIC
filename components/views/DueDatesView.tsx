@@ -1,11 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { DueDate } from '../../types';
+import { DueDate, UserProfile } from '../../types';
 import DueDateModal from '../DueDateModal';
 
 type StatusFilter = 'Todos' | 'Pendiente' | 'Vencido' | 'Pagado';
 
-const DueDatesView: React.FC = () => {
+interface DueDatesViewProps {
+    userProfile: UserProfile;
+}
+
+const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   const [allDueDates, setAllDueDates] = useState<DueDate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>('Todos');
@@ -13,9 +18,11 @@ const DueDatesView: React.FC = () => {
   const [editingDueDate, setEditingDueDate] = useState<DueDate | null>(null);
 
   const fetchData = async () => {
+    if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
-        const data = await apiService.fetchDueDates();
+        // FIX: Pass conjuntoId to fetchDueDates.
+        const data = await apiService.fetchDueDates(userProfile.conjuntoId);
         setAllDueDates(data);
     } catch(error) {
         console.error("Failed to fetch due dates:", error);
@@ -26,7 +33,7 @@ const DueDatesView: React.FC = () => {
   
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [userProfile.conjuntoId]);
   
   const handleOpenAddModal = () => {
       setEditingDueDate(null);
@@ -44,19 +51,23 @@ const DueDatesView: React.FC = () => {
   };
   
   const handleSaveDueDate = async (dueDate: DueDate) => {
+      if (!userProfile.conjuntoId) return;
       if (editingDueDate) {
-          await apiService.updateDueDate(dueDate);
+          // FIX: Pass conjuntoId to updateDueDate.
+          await apiService.updateDueDate(userProfile.conjuntoId, dueDate);
       } else {
           const { id, ...newDueDateData } = dueDate;
-          await apiService.addDueDate(newDueDateData);
+          // FIX: Pass conjuntoId to addDueDate.
+          await apiService.addDueDate(userProfile.conjuntoId, newDueDateData);
       }
       fetchData(); // Refresh data
       handleCloseModal();
   };
   
   const handleDelete = async (id: number) => {
-      if (window.confirm('¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer.')) {
-          await apiService.deleteDueDate(id);
+      if (window.confirm('¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer.') && userProfile.conjuntoId) {
+          // FIX: Pass conjuntoId to deleteDueDate.
+          await apiService.deleteDueDate(userProfile.conjuntoId, id);
           fetchData(); // Refresh data
       }
   };

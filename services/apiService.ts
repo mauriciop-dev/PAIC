@@ -1,22 +1,44 @@
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, SuperAdminProfile, UserRole } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const apiService = {
+  // --- Super Admin ---
+  authenticateSuperAdmin: async (email: string, pass: string): Promise<SuperAdminProfile | null> => {
+      await delay(500);
+      const admin = dataStore.authenticateSuperAdmin(email, pass);
+      if (admin) {
+          return { ...admin, name: 'Platform Owner' }; // Name is static for now
+      }
+      return null;
+  },
+  fetchAllConjuntos: async (): Promise<ConjuntoInfo[]> => {
+      await delay(300);
+      return dataStore.getAllConjuntos();
+  },
+  fetchConjuntoInfo: async (id: string): Promise<ConjuntoInfo | null> => {
+      await delay(100);
+      return dataStore.getConjuntoInfo(id);
+  },
+
   // --- Auth & User Management ---
   authenticateUser: async (email: string, pass: string): Promise<PlatformUser | null> => {
       await delay(500);
       return dataStore.authenticateUser(email, pass);
   },
-  fetchUsers: async (): Promise<PlatformUser[]> => {
+  findUserByEmail: async (email: string): Promise<PlatformUser | null> => {
       await delay(200);
-      return dataStore.getUsers();
+      return dataStore.findUserByEmail(email);
   },
-  addUser: async (user: Omit<PlatformUser, 'id'>): Promise<void> => {
+  fetchUsers: async (conjuntoId: string): Promise<PlatformUser[]> => {
+      await delay(200);
+      return dataStore.getUsers(conjuntoId);
+  },
+  addUser: async (conjuntoId: string, user: Omit<PlatformUser, 'id' | 'conjuntoId'>): Promise<void> => {
       await delay(300);
-      dataStore.addUser(user);
+      dataStore.addUser(conjuntoId, user);
   },
   updateUser: async (user: PlatformUser): Promise<void> => {
       await delay(300);
@@ -28,153 +50,97 @@ export const apiService = {
   },
   
   // --- Access Point Management ---
-  fetchAccessPoints: async (): Promise<AccessPoint[]> => {
+  fetchAccessPoints: async (conjuntoId: string): Promise<AccessPoint[]> => {
       await delay(200);
-      return dataStore.getAccessPoints();
+      return dataStore.getAccessPoints(conjuntoId);
   },
-  addAccessPoint: async (name: string): Promise<void> => {
+  addAccessPoint: async (conjuntoId: string, name: string): Promise<void> => {
       await delay(300);
-      dataStore.addAccessPoint(name);
+      dataStore.addAccessPoint(conjuntoId, name);
   },
-  deleteAccessPoint: async (id: number): Promise<void> => {
+  deleteAccessPoint: async (conjuntoId: string, id: number): Promise<void> => {
       await delay(300);
-      dataStore.deleteAccessPoint(id);
+      dataStore.deleteAccessPoint(conjuntoId, id);
   },
 
-  // --- Fetching Data ---
-  fetchResidents: async (): Promise<Resident[]> => {
+  // --- Fetching Data (Tenant-Aware) ---
+  fetchResidents: async (conjuntoId: string): Promise<Resident[]> => {
     await delay(200);
-    return dataStore.getResidents();
+    return dataStore.getResidents(conjuntoId);
   },
-  fetchAccountStatus: async (): Promise<AccountStatus[]> => {
+  fetchAccountStatus: async (conjuntoId: string): Promise<AccountStatus[]> => {
     await delay(200);
-    return dataStore.getAccountStatus();
+    return dataStore.getAccountStatus(conjuntoId);
   },
-  fetchProviders: async (): Promise<Provider[]> => {
+  fetchProviders: async (conjuntoId: string): Promise<Provider[]> => {
     await delay(200);
-    return dataStore.getProviders();
+    return dataStore.getProviders(conjuntoId);
   },
-  fetchInternalStaff: async (): Promise<InternalStaff[]> => {
+  fetchInternalStaff: async (conjuntoId: string): Promise<InternalStaff[]> => {
     await delay(200);
-    return dataStore.getInternalStaff();
+    return dataStore.getInternalStaff(conjuntoId);
   },
-  fetchDueDates: async (): Promise<DueDate[]> => {
+  fetchDueDates: async (conjuntoId: string): Promise<DueDate[]> => {
     await delay(200);
-    return dataStore.getDueDates();
+    return dataStore.getDueDates(conjuntoId);
   },
-  fetchTasks: async (): Promise<Task[]> => {
+  fetchTasks: async (conjuntoId: string): Promise<Task[]> => {
     await delay(200);
-    return dataStore.getTasks();
+    return dataStore.getTasks(conjuntoId);
   },
-  fetchBookings: async (): Promise<Booking[]> => {
+  fetchBookings: async (conjuntoId: string): Promise<Booking[]> => {
     await delay(200);
-    return dataStore.getBookings();
+    return dataStore.getBookings(conjuntoId);
   },
-  fetchCommonAreas: async (): Promise<CommonArea[]> => {
+  fetchCommonAreas: async (conjuntoId: string): Promise<CommonArea[]> => {
     await delay(200);
-    return dataStore.getCommonAreas();
+    return dataStore.getCommonAreas(conjuntoId);
   },
-  fetchExpenses: async (): Promise<Expense[]> => {
+  fetchExpenses: async (conjuntoId: string): Promise<Expense[]> => {
       await delay(200);
-      return dataStore.getExpenses();
+      return dataStore.getExpenses(conjuntoId);
   },
-  fetchVisitorLogs: async (): Promise<VisitorLog[]> => {
+  fetchVisitorLogs: async (conjuntoId: string): Promise<VisitorLog[]> => {
       await delay(200);
-      return dataStore.getVisitorLogs();
+      return dataStore.getVisitorLogs(conjuntoId);
   },
-  fetchPackageLogs: async (): Promise<PackageLog[]> => {
+  fetchPackageLogs: async (conjuntoId: string): Promise<PackageLog[]> => {
       await delay(200);
-      return dataStore.getPackageLogs();
+      return dataStore.getPackageLogs(conjuntoId);
   },
 
-  fetchDashboardSummary: async (): Promise<DashboardSummary> => {
+  fetchDashboardSummary: async (conjuntoId: string): Promise<DashboardSummary> => {
     await delay(400); // Simulate a more complex query
-    const accounts = dataStore.getAccountStatus();
-    const tasks = dataStore.getTasks();
-    const dueDates = dataStore.getDueDates();
-    const packages = dataStore.getPackageLogs();
+    const accounts = dataStore.getAccountStatus(conjuntoId);
+    const tasks = dataStore.getTasks(conjuntoId);
+    const dueDates = dataStore.getDueDates(conjuntoId);
+    const packages = dataStore.getPackageLogs(conjuntoId);
     
+    // ... (rest of the logic is the same)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const notifications: NotificationItem[] = [];
-
-    // Process due dates
     dueDates.forEach(d => {
-        if (d.status === 'Vencido') {
-            notifications.push({
-                id: `due-${d.id}`,
-                type: 'due-date',
-                text: `Pago Vencido: ${d.item}`,
-                details: `Venció el ${d.dueDate}.`,
-                urgency: 'high',
-                linkTo: Tab.DueDates
-            });
-        } else if (d.status === 'Pendiente') {
-            const dueDate = new Date(d.dueDate);
-            const timeDiff = dueDate.getTime() - today.getTime();
-            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-            if (dayDiff >= 0 && dayDiff <= 3) {
-                 notifications.push({
-                    id: `due-${d.id}`,
-                    type: 'due-date',
-                    text: `Pago Próximo: ${d.item}`,
-                    details: `Vence en ${dayDiff} día(s).`,
-                    urgency: 'medium',
-                    linkTo: Tab.DueDates
-                });
-            }
+        if (d.status === 'Vencido') notifications.push({ id: `due-${d.id}`, type: 'due-date', text: `Pago Vencido: ${d.item}`, details: `Venció el ${d.dueDate}.`, urgency: 'high', linkTo: Tab.DueDates });
+        else if (d.status === 'Pendiente') {
+            const dayDiff = Math.ceil((new Date(d.dueDate).getTime() - today.getTime()) / (1000 * 3600 * 24));
+            if (dayDiff >= 0 && dayDiff <= 3) notifications.push({ id: `due-${d.id}`, type: 'due-date', text: `Pago Próximo: ${d.item}`, details: `Vence en ${dayDiff} día(s).`, urgency: 'medium', linkTo: Tab.DueDates });
         }
     });
-
-    // Process tasks
     tasks.forEach(t => {
         if (!t.completed && t.dueDate) {
-            const dueDate = new Date(t.dueDate);
-            const timeDiff = dueDate.getTime() - today.getTime();
-            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-             if (dayDiff < 0) {
-                 notifications.push({
-                    id: `task-${t.id}`,
-                    type: 'task',
-                    text: `Tarea Atrasada: ${t.text}`,
-                    details: `Venció hace ${Math.abs(dayDiff)} día(s).`,
-                    urgency: 'high',
-                    linkTo: Tab.PendingTasks
-                });
-             } else if (dayDiff <= 3) {
-                  notifications.push({
-                    id: `task-${t.id}`,
-                    type: 'task',
-                    text: `Tarea Urgente: ${t.text}`,
-                    details: `Vence en ${dayDiff} día(s).`,
-                    urgency: 'medium',
-                    linkTo: Tab.PendingTasks
-                });
-             }
+            const dayDiff = Math.ceil((new Date(t.dueDate).getTime() - today.getTime()) / (1000 * 3600 * 24));
+            if (dayDiff < 0) notifications.push({ id: `task-${t.id}`, type: 'task', text: `Tarea Atrasada: ${t.text}`, details: `Venció hace ${Math.abs(dayDiff)} día(s).`, urgency: 'high', linkTo: Tab.PendingTasks });
+            else if (dayDiff <= 3) notifications.push({ id: `task-${t.id}`, type: 'task', text: `Tarea Urgente: ${t.text}`, details: `Vence en ${dayDiff} día(s).`, urgency: 'medium', linkTo: Tab.PendingTasks });
         }
     });
-    
-    // Process packages
     packages.forEach(p => {
-        if (p.status === 'En recepción') {
-            notifications.push({
-                id: `pkg-${p.id}`,
-                type: 'package',
-                text: `Paquete para Apto ${p.apartment}`,
-                details: `Recibido de ${p.courier} el ${p.receivedDate}.`,
-                urgency: 'low',
-                linkTo: Tab.Seguridad
-            });
-        }
+        if (p.status === 'En recepción') notifications.push({ id: `pkg-${p.id}`, type: 'package', text: `Paquete para Apto ${p.apartment}`, details: `Recibido de ${p.courier} el ${p.receivedDate}.`, urgency: 'low', linkTo: Tab.Seguridad });
     });
-    
-    // Sort notifications: high -> medium -> low
     notifications.sort((a, b) => {
-        const urgencyOrder = { high: 0, medium: 1, low: 2 };
-        return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+        const order = { high: 0, medium: 1, low: 2 };
+        return order[a.urgency] - order[b.urgency];
     });
-
 
     return {
         stats: {
@@ -183,83 +149,64 @@ export const apiService = {
             overduePayments: dueDates.filter(d => d.status === 'Vencido').length,
             packagesToDeliver: packages.filter(p => p.status === 'En recepción').length,
         },
-        notifications: notifications.slice(0, 5) // Return top 5 most urgent notifications
+        notifications: notifications.slice(0, 5)
     };
   },
   
-  // --- Modifying Data ---
-  updateResident: async (resident: Resident): Promise<void> => {
+  // --- Modifying Data (Tenant-Aware) ---
+  updateResident: async (conjuntoId: string, resident: Resident): Promise<void> => {
     await delay(300);
-    dataStore.updateResident(resident);
+    dataStore.updateResident(conjuntoId, resident);
   },
-  addBooking: async (booking: Booking): Promise<void> => {
+  addBooking: async (conjuntoId: string, booking: Booking): Promise<void> => {
     await delay(300);
-    dataStore.addBooking(booking);
+    dataStore.addBooking(conjuntoId, booking);
   },
-  addCommonArea: async (name: string): Promise<void> => {
+  addCommonArea: async (conjuntoId: string, name: string): Promise<void> => {
     await delay(300);
-    dataStore.addCommonArea(name);
+    dataStore.addCommonArea(conjuntoId, name);
   },
-  removeCommonArea: async (id: string): Promise<void> => {
+  removeCommonArea: async (conjuntoId: string, id: string): Promise<void> => {
     await delay(300);
-    dataStore.removeCommonArea(id);
-  },
-  
-  // Tasks
-  addTask: async (task: Omit<Task, 'id'>): Promise<void> => {
-    await delay(300);
-    dataStore.addTask(task);
-  },
-  updateTask: async (task: Task): Promise<void> => {
-    await delay(300);
-    dataStore.updateTask(task);
-  },
-  deleteTask: async (id: number): Promise<void> => {
-    await delay(300);
-    dataStore.deleteTask(id);
+    dataStore.removeCommonArea(conjuntoId, id);
   },
   
-  // Due Dates
-  addDueDate: async (dueDate: Omit<DueDate, 'id'>): Promise<void> => {
+  addTask: async (conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> => {
     await delay(300);
-    dataStore.addDueDate(dueDate);
+    dataStore.addTask(conjuntoId, task);
   },
-  updateDueDate: async (dueDate: DueDate): Promise<void> => {
+  updateTask: async (conjuntoId: string, task: Task): Promise<void> => {
     await delay(300);
-    dataStore.updateDueDate(dueDate);
+    dataStore.updateTask(conjuntoId, task);
   },
-  deleteDueDate: async (id: number): Promise<void> => {
+  deleteTask: async (conjuntoId: string, id: number): Promise<void> => {
     await delay(300);
-    dataStore.deleteDueDate(id);
-  },
-  updateDueDateStatus: async (id: number, status: 'Pagado'): Promise<void> => {
-    await delay(300);
-    dataStore.updateDueDateStatus(id, status);
+    dataStore.deleteTask(conjuntoId, id);
   },
   
-  // Expenses
-  addExpense: async (expense: Omit<Expense, 'id'>): Promise<void> => {
+  addDueDate: async (conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> => {
     await delay(300);
-    dataStore.addExpense(expense);
+    dataStore.addDueDate(conjuntoId, dueDate);
   },
-  updateExpense: async (expense: Expense): Promise<void> => {
+  updateDueDate: async (conjuntoId: string, dueDate: DueDate): Promise<void> => {
     await delay(300);
-    dataStore.updateExpense(expense);
+    dataStore.updateDueDate(conjuntoId, dueDate);
   },
-  deleteExpense: async (id: number): Promise<void> => {
+  deleteDueDate: async (conjuntoId: string, id: number): Promise<void> => {
     await delay(300);
-    dataStore.deleteExpense(id);
+    dataStore.deleteDueDate(conjuntoId, id);
   },
   
-  // --- Data Loading Simulation ---
-  loadNewData: async (dataType: 'Residentes' | 'Estado de Cuentas' | 'Proveedores' | 'Internos'): Promise<void> => {
-    await delay(1500); // Simulate upload and processing time
-    const mapType = {
-        'Residentes': 'Residents',
-        'Estado de Cuentas': 'AccountStatus',
-        'Proveedores': 'Providers',
-        'Internos': 'InternalStaff',
-    }
-    dataStore.loadNewData(mapType[dataType] as any);
+  addExpense: async (conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> => {
+    await delay(300);
+    dataStore.addExpense(conjuntoId, expense);
+  },
+  updateExpense: async (conjuntoId: string, expense: Expense): Promise<void> => {
+    await delay(300);
+    dataStore.updateExpense(conjuntoId, expense);
+  },
+  deleteExpense: async (conjuntoId: string, id: number): Promise<void> => {
+    await delay(300);
+    dataStore.deleteExpense(conjuntoId, id);
   },
 };

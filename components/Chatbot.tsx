@@ -36,7 +36,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     setIsLoading(true);
 
     try {
-      const aiResponseText = await geminiService.runChat(currentInput);
+      // FIX: Pass userProfile.conjuntoId to runChat for tenant-specific context.
+      const aiResponseText = await geminiService.runChat(currentInput, userProfile?.conjuntoId);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {

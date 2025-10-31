@@ -1,11 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { Booking, CommonArea } from '../../types';
+import { Booking, CommonArea, UserProfile } from '../../types';
 import ManageAreasModal from '../ManageAreasModal';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-const CommonAreasView: React.FC = () => {
+interface CommonAreasViewProps {
+  userProfile: UserProfile;
+}
+
+const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -13,11 +18,13 @@ const CommonAreasView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
+    if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
+        // FIX: Pass conjuntoId to apiService calls.
         const [fetchedBookings, fetchedAreas] = await Promise.all([
-            apiService.fetchBookings(),
-            apiService.fetchCommonAreas(),
+            apiService.fetchBookings(userProfile.conjuntoId),
+            apiService.fetchCommonAreas(userProfile.conjuntoId),
         ]);
         setBookings(fetchedBookings);
         setCommonAreas(fetchedAreas);
@@ -30,7 +37,7 @@ const CommonAreasView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [userProfile.conjuntoId]);
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -149,6 +156,7 @@ const CommonAreasView: React.FC = () => {
             isOpen={isManageModalOpen} 
             onClose={() => setIsManageModalOpen(false)} 
             onAreaUpdate={fetchData}
+            userProfile={userProfile}
         />
       )}
     </div>

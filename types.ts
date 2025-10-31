@@ -12,6 +12,7 @@ export enum Tab {
 export enum UserRole {
   Admin = 'Administrador',
   Guard = 'Portero',
+  SuperAdmin = 'SuperAdmin',
 }
 
 export interface PlatformUser {
@@ -20,6 +21,7 @@ export interface PlatformUser {
   email: string;
   role: UserRole;
   password?: string;
+  conjuntoId: string;
 }
 
 export interface AccessPoint {
@@ -42,7 +44,6 @@ export interface ChartData {
     gastos?: number;
 }
 
-// Actualizado según requerimientos
 export interface Resident {
     apartment: string;
     name: string;
@@ -50,7 +51,6 @@ export interface Resident {
     phone: string;
 }
 
-// Actualizado según requerimientos
 export interface AccountStatus {
     apartment: string;
     lastPaymentDate: string;
@@ -60,7 +60,6 @@ export interface AccountStatus {
     outstandingBalance: number;
 }
 
-// Nuevo tipo
 export interface Provider {
     id: number;
     company: string;
@@ -69,7 +68,6 @@ export interface Provider {
     phone: string;
 }
 
-// Nuevo tipo
 export interface InternalStaff {
     id: number;
     name: string;
@@ -97,16 +95,25 @@ export interface UserProfile {
     picture?: string;
     phone?: string;
     role: UserRole;
+    conjuntoId?: string;
 }
 
-// Nuevo tipo para la configuración inicial
+export interface SuperAdminProfile {
+    name: string;
+    email: string;
+    role: UserRole.SuperAdmin;
+}
+
+
 export interface ConjuntoInfo {
+    id: string;
     name: string;
     nit: string;
     address: string;
     adminName: string;
     adminEmail: string;
     adminPhone: string;
+    subscriptionPlan: 'Free' | 'Paid';
 }
 
 export interface DueDate {
@@ -124,7 +131,6 @@ export interface Task {
     completed: boolean;
 }
 
-// Nuevo tipo para la sección de Finanzas
 export type ExpenseCategory = 'Servicios' | 'Mantenimiento' | 'Nómina' | 'Administrativos' | 'Otros';
 export interface Expense {
     id: number;
@@ -135,7 +141,6 @@ export interface Expense {
     providerId?: number;
 }
 
-// Nuevos tipos para el Módulo de Seguridad
 export interface VisitorLog {
     id: number;
     apartment: string;
@@ -155,7 +160,6 @@ export interface PackageLog {
     status: 'En recepción' | 'Entregado';
 }
 
-// Nuevos tipos para Dashboard View
 export interface NotificationItem {
     id: number | string;
     type: 'due-date' | 'task' | 'package';

@@ -1,7 +1,9 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { apiService } from '../../services/apiService';
-import { ChartData, DashboardSummary, NotificationItem, Tab } from '../../types';
+import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
 import { 
     monthlyCollectionData, 
     pendingPaymentsData,
@@ -11,6 +13,7 @@ import { Icon } from '../ui/Icon';
 interface DashboardViewProps {
     conjuntoName: string;
     setActiveTab: (tab: Tab) => void;
+    userProfile: UserProfile;
 }
 
 const StatCard: React.FC<{ title: string; value: number; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
@@ -70,15 +73,17 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
 };
 
 
-const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTab }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTab, userProfile }) => {
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!userProfile.conjuntoId) return;
             setIsLoading(true);
             try {
-                const summaryData = await apiService.fetchDashboardSummary();
+                // FIX: Pass conjuntoId to fetchDashboardSummary.
+                const summaryData = await apiService.fetchDashboardSummary(userProfile.conjuntoId);
                 setSummary(summaryData);
             } catch (error) {
                 console.error("Failed to fetch dashboard summary", error);
@@ -87,7 +92,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
             }
         };
         fetchData();
-    }, []);
+    }, [userProfile.conjuntoId]);
 
     if (isLoading) {
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
