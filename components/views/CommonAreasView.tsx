@@ -66,7 +66,7 @@ const CommonAreasView: React.FC = () => {
             Consulta las reservas. Para agendar, usa el asistente de IA.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
             {Object.keys(eventColors).filter(k => k !== 'Default').map(event => (
                 <div key={event} className="flex items-center gap-1">
                     <div className={`w-3 h-3 rounded-full ${eventColors[event].bg} border ${eventColors[event].border}`}></div>
@@ -92,7 +92,7 @@ const CommonAreasView: React.FC = () => {
           {calendarDays.map((day, i) => {
             const isToday = day === today.getDate() && currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
             return (
-              <div key={i} className={`h-32 border border-gray-100 rounded-md p-1 overflow-y-auto ${!day ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+              <div key={i} className={`h-32 border border-gray-100 rounded-md p-1 ${!day ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
                 {day && (
                   <span className={`font-medium flex items-center justify-center w-7 h-7 ${isToday ? 'bg-blue-600 text-white rounded-full' : 'text-gray-700'}`}>
                     {day}
@@ -107,10 +107,11 @@ const CommonAreasView: React.FC = () => {
                                   <p className="font-semibold truncate">{booking.event}</p>
                                   <p className="truncate">{booking.user}</p>
                               </div>
-                              <div className="absolute z-10 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none -mt-24 ml-4">
+                              <div className="absolute z-10 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
                                   <p><span className="font-bold">Evento:</span> {booking.event}</p>
                                   <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
                                   <p><span className="font-bold">Horario:</span> {booking.time}</p>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
                               </div>
                           </div>
                         )
