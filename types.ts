@@ -16,7 +16,6 @@ export enum Tab {
   CommonAreas = 'Áreas comunes',
   DueDates = 'Vencimientos',
   PendingTasks = 'Tareas pendientes',
-  Status = 'Estado',
 }
 
 export interface Message {

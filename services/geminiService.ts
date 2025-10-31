@@ -15,7 +15,7 @@ if (!apiKey) {
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 // This is a mock service to simulate a stateful Gemini API response based on the new, detailed rules.
-const getInitialGreeting = (userName?: string) => {
+export const getInitialGreeting = (userName?: string) => {
     const name = userName ? `, ${userName.split(' ')[0]}` : '';
     return `¡Hola${name}! Soy PAIC, tu asistente virtual. Puedo ayudarte con las siguientes tareas:
 
@@ -75,6 +75,11 @@ export const getChatResponse = async (prompt: string, messages: Message[], userN
     const lowerCasePrompt = prompt.toLowerCase().trim();
     const lastAiMessage = messages.filter(m => m.sender === 'ai').pop()?.text.toLowerCase() || '';
     const initialGreeting = getInitialGreeting(userName);
+
+    // --- NEW: MENU COMMAND ---
+    if (lowerCasePrompt === 'menu') {
+        return `Claro, aquí están las opciones principales:\n\n${initialGreeting.split('\n\n')[1]}`;
+    }
 
     // --- NEW: CONTEXT-AWARE QUERY ENGINE ---
     const queryKeywords = ['cuándo', 'quien', 'quién', 'muéstrame', 'mostrar', 'ver las reservas', 'está ocupado', 'reservas de'];

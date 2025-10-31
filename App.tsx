@@ -70,7 +70,7 @@ const App: React.FC = () => {
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
       <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} />
       
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[35%]' : 'ml-4 md:ml-8'}`}>
+      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-8 md:ml-10'}`}>
         <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} />
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <Dashboard activeTab={activeTab} />

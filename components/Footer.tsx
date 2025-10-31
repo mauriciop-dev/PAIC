@@ -11,7 +11,6 @@ interface FooterProps {
 const tabs = [
   { id: Tab.Dashboard, label: 'Dashboard', icon: 'dashboard' },
   { id: Tab.Database, label: 'Base de datos', icon: 'database' },
-  { id: Tab.Status, label: 'Estado', icon: 'dollarSign' },
   { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar' },
   { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock' },
   { id: Tab.PendingTasks, label: 'Tareas pendientes', icon: 'checkSquare' },

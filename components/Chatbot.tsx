@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { getChatResponse } from '../services/geminiService';
+import { getChatResponse, getInitialGreeting } from '../services/geminiService';
 import { Message, UserProfile } from '../types';
 import { Icon } from './ui/Icon';
 
@@ -13,7 +13,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'ai',
-      text: `¡Hola, ${userProfile?.name.split(' ')[0]}! Soy PAIC, tu asistente inteligente. ¿Cómo puedo ayudarte a administrar tu conjunto residencial hoy?`,
+      text: getInitialGreeting(userProfile?.name),
     },
   ]);
   const [input, setInput] = useState('');
@@ -51,6 +51,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
   };
   
@@ -66,7 +67,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     const parts = text.split(linkRegex);
     
     return (
-        <p className="text-sm whitespace-pre-wrap">
+        <p className="text-base whitespace-pre-wrap">
             {parts.map((part, i) => {
                 // Every 3rd part is the link text, and the 4th is the URL
                 if (i % 3 === 1) {
@@ -98,7 +99,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-0 left-0 h-full w-4 md:w-5 bg-blue-600 hover:bg-blue-700 z-50 transition-all duration-300 ease-in-out flex items-center justify-center animate-subtle-pulse"
+        className="fixed top-0 left-0 h-full w-6 md:w-7 bg-blue-600 hover:bg-blue-700 z-50 transition-all duration-300 ease-in-out flex items-center justify-center animate-subtle-pulse"
         aria-label="Open Chatbot"
       >
         <span className="text-white font-bold text-xs transform -rotate-90 whitespace-nowrap">PAIC IA</span>
@@ -108,7 +109,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
 
   return (
     <div id="chatbot-overlay" onClick={handleOutsideClick} className="fixed inset-0 bg-black bg-opacity-50 z-40 flex">
-      <div className="bg-white w-full md:w-[35%] h-full flex flex-col shadow-2xl">
+      <div className="bg-white w-full md:w-[30%] h-full flex flex-col shadow-2xl">
         <header className="p-4 bg-blue-600 text-white flex justify-between items-center">
           <h2 className="text-lg font-semibold">Asistente Inteligente PAIC</h2>
           <button onClick={() => setIsOpen(false)} className="p-1 rounded-full hover:bg-blue-700">
