@@ -97,25 +97,31 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
   };
 
   const handleSelectKeyAndRetry = async () => {
-    // FIX: Added a check for `window.aistudio` to handle its optional nature and provide a clear error message if it's missing.
-    if (!window.aistudio) {
-      console.error("AI Studio environment not detected, cannot open key selection.");
-      const errorMessage: Message = { sender: 'ai', text: 'El entorno de AI Studio no está disponible para seleccionar una clave.' };
-      setMessages((prev) => [...prev, errorMessage]);
+    if (!window.aistudio || isLoading) {
       return;
     }
+    
+    setIsLoading(true);
+
     try {
       await window.aistudio.openSelectKey();
       if (lastUserMessageForRetry) {
         // Optimistically remove the API key request message from UI
         setMessages(prev => prev.filter(m => !m.isApiKeyRequest));
-        // Retry the message
-        await sendMessageAndGetResponse(lastUserMessageForRetry);
+        
+        // Introduce a delay to allow the environment to update with the new API key
+        setTimeout(async () => {
+            await sendMessageAndGetResponse(lastUserMessageForRetry);
+        }, 500); // 500ms delay
+
+      } else {
+          setIsLoading(false); // No message to retry, so reset state
       }
     } catch (e) {
       console.error("Error opening select key dialog", e);
        const errorMessage: Message = { sender: 'ai', text: 'No se pudo completar la selección de clave. Por favor, inténtalo de nuevo.' };
        setMessages((prev) => [...prev, errorMessage]);
+       setIsLoading(false); // Reset on error
     }
   };
 
@@ -153,9 +159,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
           {content}
           <button
             onClick={handleSelectKeyAndRetry}
-            className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            disabled={isLoading}
+            className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300"
           >
-            Seleccionar Clave de API
+            {isLoading ? 'Procesando...' : 'Seleccionar Clave de API'}
           </button>
         </div>
       );
