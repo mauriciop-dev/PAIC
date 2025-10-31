@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiService } from '../../services/apiService';
 import { geminiService } from '../../services/geminiService';
-import { AccountStatus, Resident } from '../../types';
+import { AccountStatus, Resident, InternalStaff } from '../../types';
 import { Icon } from '../ui/Icon';
 
 type TargetAudience = 'all' | 'in_debt' | 'up_to_date';
@@ -10,9 +10,13 @@ const ComunicacionesView: React.FC = () => {
     const [target, setTarget] = useState<TargetAudience>('all');
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
+    const [additionalEmails, setAdditionalEmails] = useState('');
+    const [copyToAdmin, setCopyToAdmin] = useState(false);
+    const [copyToAccountant, setCopyToAccountant] = useState(false);
     
     const [residents, setResidents] = useState<Resident[]>([]);
     const [accounts, setAccounts] = useState<AccountStatus[]>([]);
+    const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
     
     const [isSubjectLoading, setIsSubjectLoading] = useState(false);
     const [isBodyLoading, setIsBodyLoading] = useState(false);
@@ -22,12 +26,14 @@ const ComunicacionesView: React.FC = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            const [fetchedResidents, fetchedAccounts] = await Promise.all([
+            const [fetchedResidents, fetchedAccounts, fetchedStaff] = await Promise.all([
                 apiService.fetchResidents(),
                 apiService.fetchAccountStatus(),
+                apiService.fetchInternalStaff(),
             ]);
             setResidents(fetchedResidents);
             setAccounts(fetchedAccounts);
+            setInternalStaff(fetchedStaff);
         };
         fetchData();
     }, []);
@@ -40,6 +46,12 @@ const ComunicacionesView: React.FC = () => {
             up_to_date: residents.length - inDebtApts.size,
         };
     }, [residents, accounts]);
+
+    const { admin, accountant } = useMemo(() => {
+        const admin = internalStaff.find(s => s.position.toLowerCase() === 'administrador');
+        const accountant = internalStaff.find(s => s.position.toLowerCase() === 'contadora');
+        return { admin, accountant };
+    }, [internalStaff]);
 
     const handleSuggestSubject = async () => {
         if (!body.trim()) {
@@ -82,14 +94,32 @@ const ComunicacionesView: React.FC = () => {
         }
         setIsSending(true);
         setFeedbackMessage(null);
-        // Simulate sending
+
+        const additionalRecipients = [];
+        if (copyToAdmin && admin) additionalRecipients.push('Administrador');
+        if (copyToAccountant && accountant) additionalRecipients.push('Contadora');
+        if (additionalEmails.trim()) {
+            const emailCount = additionalEmails.split(',').filter(e => e.trim()).length;
+            if (emailCount > 0) {
+                additionalRecipients.push(`${emailCount} correo(s) adicional(es)`);
+            }
+        }
+        
+        let feedbackExtra = '';
+        if (additionalRecipients.length > 0) {
+            feedbackExtra = ` e incluido a: ${additionalRecipients.join(', ')}`;
+        }
+
         setTimeout(() => {
             const count = audienceCounts[target];
-            setFeedbackMessage(`¡Comunicación enviada exitosamente a ${count} residente(s)!`);
+            setFeedbackMessage(`¡Comunicación enviada exitosamente a ${count} residente(s)${feedbackExtra}!`);
             setIsSending(false);
             setSubject('');
             setBody('');
-            setTimeout(() => setFeedbackMessage(null), 5000);
+            setAdditionalEmails('');
+            setCopyToAdmin(false);
+            setCopyToAccountant(false);
+            setTimeout(() => setFeedbackMessage(null), 7000);
         }, 1500);
     };
 
@@ -130,6 +160,44 @@ const ComunicacionesView: React.FC = () => {
                             ))}
                         </div>
                     </div>
+                    
+                    {/* Additional Recipients */}
+                    <div>
+                        <label htmlFor="additional-emails" className="block text-sm font-medium text-gray-700 mb-2">Paso 1.5: Destinatarios Adicionales (Opcional)</label>
+                        <input
+                            id="additional-emails"
+                            type="email"
+                            placeholder="ej: correo1@ejemplo.com, correo2@ejemplo.com"
+                            value={additionalEmails}
+                            onChange={(e) => setAdditionalEmails(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Separa múltiples correos con comas.</p>
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
+                            {admin && (
+                                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={copyToAdmin}
+                                        onChange={(e) => setCopyToAdmin(e.target.checked)}
+                                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                                    />
+                                    <span className="ml-2">Incluir al Administrador</span>
+                                </label>
+                            )}
+                            {accountant && (
+                                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={copyToAccountant}
+                                        onChange={(e) => setCopyToAccountant(e.target.checked)}
+                                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                                    />
+                                    <span className="ml-2">Incluir a la Contadora</span>
+                                </label>
+                            )}
+                        </div>
+                    </div>
 
                     {/* Subject */}
                     <div>
@@ -168,7 +236,7 @@ const ComunicacionesView: React.FC = () => {
                                 disabled={isBodyLoading}
                             />
                              {isBodyLoading && (
-                                <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-md">
                                     <p className="text-indigo-700 font-semibold">Mejorando texto...</p>
                                 </div>
                             )}
@@ -186,7 +254,7 @@ const ComunicacionesView: React.FC = () => {
                     </div>
                     
                     {/* Send Button */}
-                    <div className="border-t pt-6 flex items-center justify-between">
+                    <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                          <button 
                             onClick={handleSend}
                             disabled={isSending}
@@ -195,7 +263,7 @@ const ComunicacionesView: React.FC = () => {
                             {isSending ? 'Enviando...' : 'Enviar Comunicado'}
                         </button>
                          {feedbackMessage && (
-                            <p className="text-sm text-green-700 font-semibold text-right flex-1">
+                            <p className="text-sm text-green-700 font-semibold text-center sm:text-right flex-1">
                                 {feedbackMessage}
                             </p>
                         )}

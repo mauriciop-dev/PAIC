@@ -78,6 +78,7 @@ export const internalStaffData: InternalStaff[] = [
     { id: 1, name: 'Pedro Pascal', position: 'Todero', email: 'pedro.todero@conjunto.com', phone: '3001112233' },
     { id: 2, name: 'Lucia Mendez', position: 'Contadora', email: 'contadora@conjunto.com', phone: '3203334455' },
     { id: 3, name: 'Jorge Jimenez', position: 'Jardinero', email: 'jorge.jardinero@conjunto.com', phone: '3115556677' },
+    { id: 4, name: 'Admin Principal', position: 'Administrador', email: 'admin@conjunto.com', phone: '3009998877' }
 ];
 
 
