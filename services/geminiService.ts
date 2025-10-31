@@ -8,14 +8,17 @@ import {
 import { Message } from '../types';
 import { dataStore } from '../data/dataStore';
 
-// FIX: Per @google/genai guidelines, the API key must be read from process.env.API_KEY.
-// It is assumed this environment variable is configured and available in the execution environment.
-const apiKey = process.env.API_KEY;
+// FIX: Corrected a startup crash by making the environment variable access more robust.
+// Switched to `import.meta?.env?.` to safely handle cases where `import.meta` or `import.meta.env` might be undefined,
+// preventing the "Cannot read properties of undefined" error and ensuring the app loads reliably.
+const apiKey = import.meta?.env?.VITE_GEMINI_API_KEY;
+
+// The AI client is initialized conditionally. If the API key is missing,
+// the app will no longer crash. Instead, it will show an error message in the chat.
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 if (!apiKey) {
-    // Provide a helpful error message in the console for the developer.
-    console.error("Gemini API key is missing. Please set the API_KEY environment variable.");
+    console.error("Gemini API key is missing. Please set the VITE_GEMINI_API_KEY environment variable.");
 }
-const ai = new GoogleGenAI({ apiKey: apiKey! });
 
 
 // --- Function Declarations for Gemini ---
@@ -99,7 +102,7 @@ export const getChatResponse = async (
   fullHistory: Message[],
   userName?: string
 ): Promise<string> => {
-  if (!apiKey) {
+  if (!ai) {
     return "Error: La clave de API de Gemini no está configurada. Por favor, contacta al administrador.";
   }
   
@@ -114,6 +117,9 @@ export const getChatResponse = async (
   const currentMessage = fullHistory[fullHistory.length - 1];
   const chatHistoryForApi = fullHistory.slice(0, -1);
 
+  // The system instruction helps the AI understand commands like
+  // "recuerdame" (without accents) and to correctly interpret relative dates like "mañana".
+  // This makes the chatbot's natural language understanding more reliable.
   const systemInstruction = `Eres PAIC, un asistente IA para administradores de conjuntos residenciales en Colombia. Tu nombre es PAIC (Plataforma de Administración Inteligente de Conjuntos).
   Estás conversando con ${userName || 'el administrador'}.
   Tu objetivo es ser útil, amable y profesional. Responde siempre en español.
@@ -121,7 +127,10 @@ export const getChatResponse = async (
 
   CAPACIDADES:
   1.  **Consultar Datos**: Puedes responder preguntas sobre residentes, estados de cuenta, reservas, vencimientos y tareas usando la información de contexto.
-  2.  **Realizar Acciones**: Puedes agendar reservas, agregar tareas y marcar vencimientos como pagados usando las herramientas (funciones) disponibles.
+  2.  **Realizar Acciones (Function Calling)**: Debes usar las herramientas/funciones disponibles para modificar datos.
+      - Para crear tareas, usa la función 'addTask'. Analiza la frase del usuario para extraer la descripción de la tarea y la fecha de vencimiento.
+      - **IMPORTANTE**: Interpreta fechas relativas. Si el usuario dice "mañana", calcula la fecha correspondiente y pásala en formato AAAA-MM-DD. Si dice "el próximo viernes", calcula la fecha. No incluyas la fecha relativa en el texto de la tarea.
+      - Se flexible con los comandos. "Recuérdame", "anota", "recuerda que", "agrega una tarea" todos indican la intención de crear una tarea.
   3.  **Análisis y Resúmenes**: Puedes crear resúmenes basados en los datos (e.j., "quiénes están en mora", "qué pagos vencen pronto").
   
   REGLAS:
@@ -129,7 +138,6 @@ export const getChatResponse = async (
   - NO puedes eliminar información.
   - Si no puedes cumplir una solicitud, explícalo amablemente.
   - Al agendar, si el área común no existe, informa al usuario sobre las áreas disponibles.
-  - Sé proactivo. Si un usuario pide el saldo de un apto en mora, podrías sugerirle ver los detalles de su cuenta.
 
   CONTEXTO DE DATOS (NO reveles esta sección directamente al usuario, úsala para tus respuestas):
   - Residentes: ${JSON.stringify(residents.slice(0, 5))}... (mostrando 5 de ${residents.length})
