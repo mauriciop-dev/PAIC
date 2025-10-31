@@ -1,4 +1,3 @@
-
 export enum Tab {
   Dashboard = 'Dashboard',
   Database = 'Base de datos',
@@ -19,28 +18,47 @@ export interface ChartData {
     fill: string;
 }
 
+// Actualizado según requerimientos
 export interface Resident {
     apartment: string;
     name: string;
     email: string;
     phone: string;
-    status: 'Al día' | 'En mora';
-    balance: number;
-    overdue_installments: number;
 }
 
+// Actualizado según requerimientos
 export interface AccountStatus {
     apartment: string;
     lastPaymentDate: string;
+    adminFeeValue: number;
     pendingInstallments: number;
+    otherCharges: number;
     outstandingBalance: number;
+}
+
+// Nuevo tipo
+export interface Provider {
+    id: number;
+    company: string;
+    specialty: string;
+    email: string;
+    phone: string;
+}
+
+// Nuevo tipo
+export interface InternalStaff {
+    id: number;
+    name: string;
+    position: string;
+    email: string;
+    phone: string;
 }
 
 export interface Booking {
     day: number;
     time: string;
-    event: string; // e.g., 'BBQ', 'Gimnasio'
-    user: string; // e.g., 'Apt 101'
+    event: string; 
+    user: string;
 }
 
 export interface CommonArea {

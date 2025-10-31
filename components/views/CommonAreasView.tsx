@@ -1,23 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../data/dataStore';
+import { apiService } from '../../services/apiService';
 import { Booking, CommonArea } from '../../types';
 import ManageAreasModal from '../ManageAreasModal';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 const CommonAreasView: React.FC = () => {
-  const [bookings, setBookings] = useState<Booking[]>(dataStore.getBookings());
-  const [commonAreas, setCommonAreas] = useState<CommonArea[]>(dataStore.getCommonAreas());
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+        const [fetchedBookings, fetchedAreas] = await Promise.all([
+            apiService.fetchBookings(),
+            apiService.fetchCommonAreas(),
+        ]);
+        setBookings(fetchedBookings);
+        setCommonAreas(fetchedAreas);
+    } catch (error) {
+        console.error("Failed to fetch common areas data:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const handleStoreChange = () => {
-      setBookings(dataStore.getBookings());
-      setCommonAreas(dataStore.getCommonAreas());
-    };
-    const unsubscribe = dataStore.subscribe(handleStoreChange);
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
   const handlePrevMonth = () => {
@@ -45,7 +57,7 @@ const CommonAreasView: React.FC = () => {
     for (let day = 1; day <= daysInMonth; day++) {
         calendarDays.push(day);
     }
-    while (calendarDays.length % 7 !== 0 && calendarDays.length < 42) { // Ensure full grid
+    while (calendarDays.length % 7 !== 0 && calendarDays.length < 42) {
         calendarDays.push(null);
     }
     return calendarDays;
@@ -92,46 +104,51 @@ const CommonAreasView: React.FC = () => {
               {currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
             </h3>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-sm">
-          {daysOfWeek.map(day => <div key={day} className="font-semibold text-gray-600 p-2">{day}</div>)}
-          {calendarDays.map((day, i) => {
-            const isToday = day === today.getDate() && currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
-            return (
-              <div key={i} className={`h-32 border border-gray-100 rounded-md p-1 ${!day ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                {day && (
-                  <span className={`font-medium flex items-center justify-center w-7 h-7 ${isToday ? 'bg-blue-600 text-white rounded-full' : 'text-gray-700'}`}>
-                    {day}
-                  </span>
-                )}
-                <div className="space-y-1 mt-1 overflow-y-auto" style={{maxHeight: 'calc(8rem - 2rem)'}}>
-                    {day && bookings.filter(b => b.day === day).map(booking => {
-                        const area = commonAreas.find(a => a.name === booking.event);
-                        const colors = area ? area.color : { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
-                        return (
-                          <div key={booking.event+booking.day+booking.user} className="relative group">
-                              <div className={`${colors.bg} ${colors.text} p-1 rounded-md text-xs text-left cursor-pointer`}>
-                                  <p className="font-semibold truncate">{booking.event}</p>
-                                  <p className="truncate">{booking.user}</p>
+        {isLoading ? (
+            <div className="text-center py-20 text-gray-500">Cargando calendario...</div>
+        ) : (
+            <div className="grid grid-cols-7 gap-1 text-center text-sm">
+              {daysOfWeek.map(day => <div key={day} className="font-semibold text-gray-600 p-2">{day}</div>)}
+              {calendarDays.map((day, i) => {
+                const isToday = day === today.getDate() && currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
+                return (
+                  <div key={i} className={`h-32 border border-gray-100 rounded-md p-1 ${!day ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                    {day && (
+                      <span className={`font-medium flex items-center justify-center w-7 h-7 ${isToday ? 'bg-blue-600 text-white rounded-full' : 'text-gray-700'}`}>
+                        {day}
+                      </span>
+                    )}
+                    <div className="space-y-1 mt-1 overflow-y-auto" style={{maxHeight: 'calc(8rem - 2rem)'}}>
+                        {day && bookings.filter(b => b.day === day).map(booking => {
+                            const area = commonAreas.find(a => a.name === booking.event);
+                            const colors = area ? area.color : { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+                            return (
+                              <div key={booking.event+booking.day+booking.user} className="relative group">
+                                  <div className={`${colors.bg} ${colors.text} p-1 rounded-md text-xs text-left cursor-pointer`}>
+                                      <p className="font-semibold truncate">{booking.event}</p>
+                                      <p className="truncate">{booking.user}</p>
+                                  </div>
+                                  <div className="absolute z-10 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
+                                      <p><span className="font-bold">Evento:</span> {booking.event}</p>
+                                      <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
+                                      <p><span className="font-bold">Horario:</span> {booking.time}</p>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+                                  </div>
                               </div>
-                              <div className="absolute z-10 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
-                                  <p><span className="font-bold">Evento:</span> {booking.event}</p>
-                                  <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
-                                  <p><span className="font-bold">Horario:</span> {booking.time}</p>
-                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
-                              </div>
-                          </div>
-                        )
-                    })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                            )
+                        })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+        )}
       </div>
       {isManageModalOpen && (
         <ManageAreasModal 
             isOpen={isManageModalOpen} 
             onClose={() => setIsManageModalOpen(false)} 
+            onAreaUpdate={fetchData}
         />
       )}
     </div>

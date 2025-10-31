@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../data/dataStore';
+import { apiService } from '../../services/apiService';
 import { DueDate } from '../../types';
 import DueDateModal from '../DueDateModal';
 
 type StatusFilter = 'Todos' | 'Pendiente' | 'Vencido' | 'Pagado';
 
 const DueDatesView: React.FC = () => {
-  const [dueDates, setDueDates] = useState<DueDate[]>(dataStore.getDueDates());
+  const [allDueDates, setAllDueDates] = useState<DueDate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDueDate, setEditingDueDate] = useState<DueDate | null>(null);
 
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+        const data = await apiService.fetchDueDates();
+        setAllDueDates(data);
+    } catch(error) {
+        console.error("Failed to fetch due dates:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    const handleStoreChange = () => {
-      setDueDates(dataStore.getDueDates());
-    };
-    const unsubscribe = dataStore.subscribe(handleStoreChange);
-    return () => unsubscribe();
+    fetchData();
   }, []);
   
   const handleOpenAddModal = () => {
@@ -34,20 +43,21 @@ const DueDatesView: React.FC = () => {
       setEditingDueDate(null);
   };
   
-  const handleSaveDueDate = (dueDate: DueDate) => {
+  const handleSaveDueDate = async (dueDate: DueDate) => {
       if (editingDueDate) {
-          dataStore.updateDueDate(dueDate);
+          await apiService.updateDueDate(dueDate);
       } else {
-          // The store handles adding 'id' and 'status'
-          const { id, status, ...newDueDateData } = dueDate;
-          dataStore.addDueDate(newDueDateData);
+          const { id, ...newDueDateData } = dueDate;
+          await apiService.addDueDate(newDueDateData);
       }
+      fetchData(); // Refresh data
       handleCloseModal();
   };
   
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
       if (window.confirm('¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer.')) {
-          dataStore.deleteDueDate(id);
+          await apiService.deleteDueDate(id);
+          fetchData(); // Refresh data
       }
   };
 
@@ -69,7 +79,7 @@ const DueDatesView: React.FC = () => {
     }
   };
   
-  const filteredDueDates = dueDates.filter(d => filter === 'Todos' || d.status === filter);
+  const filteredDueDates = allDueDates.filter(d => filter === 'Todos' || d.status === filter);
 
   return (
     <div>
@@ -106,30 +116,34 @@ const DueDatesView: React.FC = () => {
       </div>
       
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <ul className="divide-y divide-gray-200">
-          {filteredDueDates.length > 0 ? filteredDueDates.map(payment => (
-            <li key={payment.id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-gray-50">
-              <div className="flex-1">
-                <p className="font-semibold text-gray-800">{payment.item}</p>
-                <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getCategoryChipStyle(payment.category)}`}>{payment.category}</span>
-                    <p className="text-sm text-gray-500">Vence: {payment.dueDate}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className={`px-3 py-1 text-sm font-medium rounded-full w-24 text-center ${getStatusChipStyle(payment.status)}`}>
-                  {payment.status}
-                </span>
-                <button onClick={() => handleOpenEditModal(payment)} className="font-medium text-blue-600 hover:underline text-sm p-1">Editar</button>
-                <button onClick={() => handleDelete(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
-              </div>
-            </li>
-          )) : (
-              <li className="p-6 text-center text-gray-500">
-                  No hay vencimientos que coincidan con el filtro seleccionado.
-              </li>
-          )}
-        </ul>
+        {isLoading ? (
+            <div className="p-6 text-center text-gray-500">Cargando vencimientos...</div>
+        ) : (
+            <ul className="divide-y divide-gray-200">
+              {filteredDueDates.length > 0 ? filteredDueDates.map(payment => (
+                <li key={payment.id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-gray-50">
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-800">{payment.item}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getCategoryChipStyle(payment.category)}`}>{payment.category}</span>
+                        <p className="text-sm text-gray-500">Vence: {payment.dueDate}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className={`px-3 py-1 text-sm font-medium rounded-full w-24 text-center ${getStatusChipStyle(payment.status)}`}>
+                      {payment.status}
+                    </span>
+                    <button onClick={() => handleOpenEditModal(payment)} className="font-medium text-blue-600 hover:underline text-sm p-1">Editar</button>
+                    <button onClick={() => handleDelete(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
+                  </div>
+                </li>
+              )) : (
+                  <li className="p-6 text-center text-gray-500">
+                      No hay vencimientos que coincidan con el filtro seleccionado.
+                  </li>
+              )}
+            </ul>
+        )}
       </div>
       {isModalOpen && (
         <DueDateModal

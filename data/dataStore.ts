@@ -1,9 +1,9 @@
-import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
-    newResidentsData,
-    newAccountStatusDetailsData,
+    providersData as initialProviders,
+    internalStaffData as initialInternalStaff,
     dueDatesData as initialDueDates,
     tasksData as initialTasks,
 } from './mockData';
@@ -32,6 +32,8 @@ const getNextColor = () => {
 // This is a simple in-memory store to ensure both UI and services access the same data state.
 let currentResidents: Resident[] = [...initialResidents];
 let currentAccountStatus: AccountStatus[] = [...initialAccountStatus];
+let currentProviders: Provider[] = [...initialProviders];
+let currentInternalStaff: InternalStaff[] = [...initialInternalStaff];
 let currentDueDates: DueDate[] = [...initialDueDates];
 let currentTasks: Task[] = [...initialTasks];
 let currentBookings: Booking[] = [
@@ -57,17 +59,12 @@ export const dataStore = {
         return () => listeners.delete(listener); // Return an unsubscribe function
     },
 
-    getResidents: (): Resident[] => {
-        return [...currentResidents]; // Return a copy to prevent direct mutation
-    },
-
-    getAccountStatus: (): AccountStatus[] => {
-        return [...currentAccountStatus]; // Return a copy
-    },
+    getResidents: (): Resident[] => [...currentResidents],
+    getAccountStatus: (): AccountStatus[] => [...currentAccountStatus],
+    getProviders: (): Provider[] => [...currentProviders],
+    getInternalStaff: (): InternalStaff[] => [...currentInternalStaff],
     
-    getDueDates: (): DueDate[] => {
-        return [...currentDueDates];
-    },
+    getDueDates: (): DueDate[] => [...currentDueDates],
     
     addDueDate: (newDueDateData: Omit<DueDate, 'id' | 'status'>): void => {
         const newDueDate: DueDate = {
@@ -98,10 +95,7 @@ export const dataStore = {
         notifyListeners();
     },
 
-    // --- Task Management ---
-    getTasks: (): Task[] => {
-        return [...currentTasks];
-    },
+    getTasks: (): Task[] => [...currentTasks],
 
     addTask: (newTask: Omit<Task, 'id'>): void => {
         const taskWithId: Task = { ...newTask, id: Date.now() };
@@ -120,15 +114,10 @@ export const dataStore = {
         currentTasks = currentTasks.filter(t => t.id !== id);
         notifyListeners();
     },
-    // --- End Task Management ---
 
-    getBookings: (): Booking[] => {
-        return [...currentBookings];
-    },
+    getBookings: (): Booking[] => [...currentBookings],
 
-    getCommonAreas: (): CommonArea[] => {
-        return [...commonAreas];
-    },
+    getCommonAreas: (): CommonArea[] => [...commonAreas],
 
     addCommonArea: (name: string): void => {
         const newArea: CommonArea = {
@@ -157,14 +146,24 @@ export const dataStore = {
         notifyListeners();
     },
 
-    // This function simulates the file upload by loading new data
-    loadNewResidentData: (): void => {
-        currentResidents = [...newResidentsData];
-        notifyListeners();
-    },
-
-    loadNewAccountStatusData: (): void => {
-        currentAccountStatus = [...newAccountStatusDetailsData];
+    // --- Simulation of data loading ---
+    loadNewData: (dataType: 'Residents' | 'AccountStatus' | 'Providers' | 'InternalStaff'): void => {
+        // In a real app, this would parse a file and update the store.
+        // Here we just load new mock data.
+        switch (dataType) {
+            case 'Residents':
+                currentResidents = initialResidents.slice(0, 3).concat([{ apartment: '501', name: 'Nuevo Residente', email: 'nuevo@email.com', phone: '3000000000'}]);
+                break;
+            case 'AccountStatus':
+                 currentAccountStatus = initialAccountStatus.slice(0,2).concat([{ apartment: '501', lastPaymentDate: '2024-07-01', adminFeeValue: 150, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 }]);
+                break;
+            case 'Providers':
+                currentProviders = initialProviders.slice(0,1).concat([{ id: 99, company: 'Nuevo Proveedor', specialty: 'Jardinería', email: 'jardin@nuevo.com', phone: '3111111111' }]);
+                break;
+            case 'InternalStaff':
+                currentInternalStaff = initialInternalStaff.slice(0,1).concat([{ id: 99, name: 'Nueva Persona', position: 'Recepcionista', email: 'recepcion@conjunto.com', phone: '3222222222'}]);
+                break;
+        }
         notifyListeners();
     }
 };

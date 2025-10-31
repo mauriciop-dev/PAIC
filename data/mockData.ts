@@ -1,4 +1,4 @@
-import { ChartData, Resident, AccountStatus, DueDate, Task } from "../types";
+import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff } from "../types";
 
 export const accountStatusData: ChartData[] = [
     { name: 'Al día', value: 120, fill: '#34d399' },
@@ -52,43 +52,34 @@ export const securityBillHistoryData = generateMonthlyData(5000, '#64748b');
 
 
 export const residentsData: Resident[] = [
-    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543', status: 'En mora', balance: 50, overdue_installments: 1 },
-    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677', status: 'En mora', balance: 150, overdue_installments: 3 },
-     { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
+    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567' },
+    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543' },
+    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233' },
+    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677' },
+    { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322' },
 ];
-
-// New data for upload simulation
-export const newResidentsData: Resident[] = [
-    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677', status: 'En mora', balance: 200, overdue_installments: 4 },
-    { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322', status: 'Al día', balance: 0, overdue_installments: 0 },
-    { apartment: '302', name: 'Sofia Hernandez', email: 'sofia.h@email.com', phone: '3128889900', status: 'Al día', balance: 0, overdue_installments: 0 }, // New resident
-    { apartment: '401', name: 'Pedro Ramirez', email: 'pedro.r@email.com', phone: '3187776655', status: 'En mora', balance: 50, overdue_installments: 1 }, // New resident
-];
-
 
 export const accountStatusDetailsData: AccountStatus[] = [
-    { apartment: '101', lastPaymentDate: '2024-06-05', pendingInstallments: 0, outstandingBalance: 0 },
-    { apartment: '102', lastPaymentDate: '2024-05-04', pendingInstallments: 1, outstandingBalance: 50 },
-    { apartment: '201', lastPaymentDate: '2024-06-02', pendingInstallments: 0, outstandingBalance: 0 },
-    { apartment: '202', lastPaymentDate: '2024-03-05', pendingInstallments: 3, outstandingBalance: 150 },
-    { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
+    { apartment: '101', lastPaymentDate: '2024-06-05', adminFeeValue: 100, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
+    { apartment: '102', lastPaymentDate: '2024-05-04', adminFeeValue: 100, pendingInstallments: 1, otherCharges: 10, outstandingBalance: 110 },
+    { apartment: '201', lastPaymentDate: '2024-06-02', adminFeeValue: 120, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
+    { apartment: '202', lastPaymentDate: '2024-03-05', adminFeeValue: 120, pendingInstallments: 3, otherCharges: 0, outstandingBalance: 360 },
+    { apartment: '301', lastPaymentDate: '2024-06-01', adminFeeValue: 100, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
 ];
 
-// New data for upload simulation
-export const newAccountStatusDetailsData: AccountStatus[] = [
-    { apartment: '101', lastPaymentDate: '2024-06-05', pendingInstallments: 0, outstandingBalance: 0 },
-    { apartment: '102', lastPaymentDate: '2024-06-04', pendingInstallments: 0, outstandingBalance: 0 }, // Updated
-    { apartment: '201', lastPaymentDate: '2024-06-02', pendingInstallments: 0, outstandingBalance: 0 },
-    { apartment: '202', lastPaymentDate: '2024-02-05', pendingInstallments: 4, outstandingBalance: 200 }, // Updated
-    { apartment: '301', lastPaymentDate: '2024-06-01', pendingInstallments: 0, outstandingBalance: 0 },
-    { apartment: '302', lastPaymentDate: '2024-06-10', pendingInstallments: 0, outstandingBalance: 0 }, // New
-    { apartment: '401', lastPaymentDate: '2024-05-08', pendingInstallments: 1, outstandingBalance: 50 }, // New
+export const providersData: Provider[] = [
+    { id: 1, company: 'Vigilancia Segura SAS', specialty: 'Vigilancia', email: 'contacto@vigilanciasegura.com', phone: '6012345678' },
+    { id: 2, company: 'Aseo Brillante Ltda', specialty: 'Aseo', email: 'ventas@aseobrillante.co', phone: '6018765432' },
+    { id: 3, company: 'Plomería Express', specialty: 'Plomero', email: 'servicio@plomeriaexpress.com', phone: '3151231234' },
+    { id: 4, company: 'Electri-Ya Soluciones', specialty: 'Electricista', email: 'info@electriya.com', phone: '3109879876' },
 ];
+
+export const internalStaffData: InternalStaff[] = [
+    { id: 1, name: 'Pedro Pascal', position: 'Todero', email: 'pedro.todero@conjunto.com', phone: '3001112233' },
+    { id: 2, name: 'Lucia Mendez', position: 'Contadora', email: 'contadora@conjunto.com', phone: '3203334455' },
+    { id: 3, name: 'Jorge Jimenez', position: 'Jardinero', email: 'jorge.jardinero@conjunto.com', phone: '3115556677' },
+];
+
 
 export const dueDatesData: DueDate[] = [
     { id: 1, item: 'Servicio de Vigilancia', category: 'Servicios', dueDate: '2024-06-30', status: 'Pendiente' },

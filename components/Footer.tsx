@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tab } from '../types';
 import { Icon } from './ui/Icon';
-import { dataStore } from '../data/dataStore';
+import { apiService } from '../services/apiService';
 
 interface FooterProps {
   activeTab: Tab;
@@ -21,9 +21,12 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
   const [currentItem, setCurrentItem] = useState(0);
 
   useEffect(() => {
-    const updateSliderItems = () => {
-      const dueDates = dataStore.getDueDates();
-      const tasks = dataStore.getTasks();
+    const updateSliderItems = async () => {
+      const [dueDates, tasks] = await Promise.all([
+        apiService.fetchDueDates(),
+        apiService.fetchTasks(),
+      ]);
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -83,8 +86,11 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
     };
 
     updateSliderItems();
-    const unsubscribe = dataStore.subscribe(updateSliderItems);
-    return () => unsubscribe();
+    
+    // Set an interval to refresh the notifications periodically
+    const intervalId = setInterval(updateSliderItems, 60000); // Refresh every minute
+    return () => clearInterval(intervalId);
+
   }, []);
 
   useEffect(() => {
@@ -96,7 +102,7 @@ const Footer: React.FC<FooterProps> = ({ activeTab, setActiveTab }) => {
   }, [sliderItems]);
   
   if (sliderItems.length === 0) {
-      return null; // Don't render footer content if there's nothing to show
+      return null;
   }
   
   const trafficLightColor = {

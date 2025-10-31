@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { dataStore } from '../../data/dataStore';
-import { ChartData } from '../../types';
+import { apiService } from '../../services/apiService';
+import { ChartData, Resident } from '../../types';
 import { 
     monthlyCollectionData, 
     pendingPaymentsData,
@@ -48,19 +48,24 @@ const ChartCard: React.FC<{title: string; data: ChartData[], type: 'pie' | 'bar'
 const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName }) => {
     const [charts, setCharts] = useState<Array<{ title: string; data: ChartData[], type: 'pie' | 'bar' }>>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [residents, setResidents] = useState<Resident[]>([]);
 
     const getChartsPerPage = () => {
-        if (window.innerWidth >= 1280) return 4; // For xl screens and larger
-        return 2; // For md and lg screens
+        if (window.innerWidth >= 1280) return 4;
+        return 2;
     };
 
     const [chartsPerPage, setChartsPerPage] = useState(getChartsPerPage());
 
     useEffect(() => {
+        apiService.fetchResidents().then(setResidents);
+    }, []);
+
+    useEffect(() => {
         const handleResize = () => {
             const newChartsPerPage = getChartsPerPage();
             if (chartsPerPage !== newChartsPerPage) {
-                setCurrentIndex(0); // Reset index when layout changes
+                setCurrentIndex(0);
                 setChartsPerPage(newChartsPerPage);
             }
         };
@@ -70,50 +75,50 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName }) => {
 
 
     useEffect(() => {
-        const updateCharts = () => {
-            const residents = dataStore.getResidents();
+        if(residents.length === 0) return;
 
-            const allCharts = [
-                // Page 1
-                {
-                    title: 'Estado de Cartera',
-                    data: [
-                        { name: 'Al día', value: residents.filter(r => r.status === 'Al día').length, fill: '#34d399' },
-                        { name: 'En mora', value: residents.filter(r => r.status === 'En mora').length, fill: '#f87171' },
-                    ],
-                    type: 'pie' as const
-                },
-                {
-                    title: 'Cuotas Vencidas por Apartamento',
-                    data: [
-                        { name: '1 cuota', value: residents.filter(r => r.overdue_installments === 1).length, fill: '#fde047' },
-                        { name: '2 cuotas', value: residents.filter(r => r.overdue_installments === 2).length, fill: '#f59e0b' },
-                        { name: '3+ cuotas', value: residents.filter(r => r.overdue_installments >= 3).length, fill: '#ef4444' },
-                    ],
-                    type: 'pie' as const
-                },
-                { title: 'Recaudo del Mes (Últimos 6 meses)', data: monthlyCollectionData, type: 'bar' as const },
-                { title: 'Pagos Pendientes de la Administración', data: pendingPaymentsData, type: 'bar' as const },
-                
-                // Page 2
-                { title: 'Resumen Semanal de Chatbot', data: weeklyChatbotSummaryData, type: 'pie' as const },
-                { title: 'Histórico Pago Agua', data: waterBillHistoryData, type: 'bar' as const },
-                { title: 'Histórico Pago Luz', data: electricityBillHistoryData, type: 'bar' as const },
-                { title: 'Histórico Pago Gas', data: gasBillHistoryData, type: 'bar' as const },
-                
-                // Page 3
-                { title: 'Histórico Pago Teléfono/Internet', data: phoneBillHistoryData, type: 'bar' as const },
-                { title: 'Histórico Pago Mantenimiento', data: maintenanceHistoryData, type: 'bar' as const },
-                { title: 'Histórico Pago Vigilancia', data: securityBillHistoryData, type: 'bar' as const },
-            ];
+        // In a real scenario, account status would be fetched and joined with residents
+        // For now, we simulate this based on the length of mock data.
+        const residentsInDebt = Math.floor(residents.length / 4); 
+        const residentsUpToDate = residents.length - residentsInDebt;
 
-            setCharts(allCharts);
-        };
+        const allCharts = [
+            // Page 1
+            {
+                title: 'Estado de Cartera',
+                data: [
+                    { name: 'Al día', value: residentsUpToDate, fill: '#34d399' },
+                    { name: 'En mora', value: residentsInDebt, fill: '#f87171' },
+                ],
+                type: 'pie' as const
+            },
+            {
+                title: 'Cuotas Vencidas (Simulado)',
+                data: [
+                    { name: '1 cuota', value: Math.floor(residentsInDebt * 0.5), fill: '#fde047' },
+                    { name: '2 cuotas', value: Math.floor(residentsInDebt * 0.3), fill: '#f59e0b' },
+                    { name: '3+ cuotas', value: Math.ceil(residentsInDebt * 0.2), fill: '#ef4444' },
+                ],
+                type: 'pie' as const
+            },
+            { title: 'Recaudo del Mes (Últimos 6 meses)', data: monthlyCollectionData, type: 'bar' as const },
+            { title: 'Pagos Pendientes de la Administración', data: pendingPaymentsData, type: 'bar' as const },
+            
+            // Page 2
+            { title: 'Resumen Semanal de Chatbot', data: weeklyChatbotSummaryData, type: 'pie' as const },
+            { title: 'Histórico Pago Agua', data: waterBillHistoryData, type: 'bar' as const },
+            { title: 'Histórico Pago Luz', data: electricityBillHistoryData, type: 'bar' as const },
+            { title: 'Histórico Pago Gas', data: gasBillHistoryData, type: 'bar' as const },
+            
+            // Page 3
+            { title: 'Histórico Pago Teléfono/Internet', data: phoneBillHistoryData, type: 'bar' as const },
+            { title: 'Histórico Pago Mantenimiento', data: maintenanceHistoryData, type: 'bar' as const },
+            { title: 'Histórico Pago Vigilancia', data: securityBillHistoryData, type: 'bar' as const },
+        ];
 
-        updateCharts();
-        const unsubscribe = dataStore.subscribe(updateCharts);
-        return () => unsubscribe();
-    }, []);
+        setCharts(allCharts);
+
+    }, [residents]);
     
     if (charts.length === 0) {
         return <div className="text-center p-10 text-gray-500">Cargando gráficos...</div>;

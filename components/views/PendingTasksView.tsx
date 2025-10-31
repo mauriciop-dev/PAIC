@@ -1,46 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../data/dataStore';
+import { apiService } from '../../services/apiService';
 import { Task } from '../../types';
 
 const PendingTasksView: React.FC = () => {
-    const [tasks, setTasks] = useState<Task[]>(dataStore.getTasks());
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [newTaskText, setNewTaskText] = useState('');
     const [newTaskDate, setNewTaskDate] = useState('');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+            const fetchedTasks = await apiService.fetchTasks();
+            setTasks(fetchedTasks);
+        } catch(error) {
+            console.error("Failed to fetch tasks:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const handleStoreChange = () => {
-            setTasks(dataStore.getTasks());
-        };
-        const unsubscribe = dataStore.subscribe(handleStoreChange);
-        return () => unsubscribe();
+        fetchData();
     }, []);
 
-    const handleAddTask = () => {
+    const handleAddTask = async () => {
         if (!newTaskText.trim()) return;
         const newTask: Omit<Task, 'id'> = {
             text: newTaskText,
             dueDate: newTaskDate,
             completed: false,
         };
-        dataStore.addTask(newTask);
+        await apiService.addTask(newTask);
         setNewTaskText('');
         setNewTaskDate('');
+        fetchData();
     };
     
-    const handleUpdateTask = () => {
+    const handleUpdateTask = async () => {
         if (!editingTask || !editingTask.text.trim()) return;
-        dataStore.updateTask(editingTask);
+        await apiService.updateTask(editingTask);
         setEditingTask(null);
+        fetchData();
     }
 
-    const handleToggleComplete = (task: Task) => {
-        dataStore.updateTask({ ...task, completed: !task.completed });
+    const handleToggleComplete = async (task: Task) => {
+        await apiService.updateTask({ ...task, completed: !task.completed });
+        fetchData();
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: number) => {
         if (window.confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
-            dataStore.deleteTask(id);
+            await apiService.deleteTask(id);
+            fetchData();
         }
     };
     
@@ -50,6 +63,8 @@ const PendingTasksView: React.FC = () => {
 
     const sortedTasks = [...tasks].sort((a, b) => {
         if (a.completed === b.completed) {
+            if (!a.dueDate) return 1;
+            if (!b.dueDate) return -1;
             return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
         }
         return a.completed ? 1 : -1;
@@ -87,48 +102,51 @@ const PendingTasksView: React.FC = () => {
             </div>
         </div>
       
-      <div className="space-y-3">
-        {sortedTasks.map(task => (
-            <div key={task.id} className={`p-4 rounded-lg flex items-start gap-4 transition-colors ${task.completed ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
-                <input 
-                    type="checkbox" 
-                    checked={task.completed} 
-                    onChange={() => handleToggleComplete(task)}
-                    className="h-5 w-5 mt-1 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer flex-shrink-0"
-                />
-                <div className="flex-1">
-                    {editingTask?.id === task.id ? (
-                        <input
-                            type="text"
-                            value={editingTask.text}
-                            onChange={(e) => setEditingTask({...editingTask, text: e.target.value})}
-                            onBlur={handleUpdateTask}
-                            onKeyPress={(e) => e.key === 'Enter' && handleUpdateTask()}
-                            className="font-medium text-gray-800 bg-yellow-100 p-1 rounded-md w-full focus:outline-none"
-                            autoFocus
-                        />
-                    ) : (
-                        <p 
-                            className={`font-medium cursor-pointer ${task.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}
-                            onClick={() => !task.completed && startEditing(task)}
+        <div className="space-y-3">
+        {isLoading ? (
+            <div className="text-center py-10 text-gray-500 bg-white rounded-lg shadow-sm">Cargando tareas...</div>
+        ) : sortedTasks.length > 0 ? (
+            sortedTasks.map(task => (
+                <div key={task.id} className={`p-4 rounded-lg flex items-start gap-4 transition-colors ${task.completed ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
+                    <input 
+                        type="checkbox" 
+                        checked={task.completed} 
+                        onChange={() => handleToggleComplete(task)}
+                        className="h-5 w-5 mt-1 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                        {editingTask?.id === task.id ? (
+                            <input
+                                type="text"
+                                value={editingTask.text}
+                                onChange={(e) => setEditingTask({...editingTask, text: e.target.value})}
+                                onBlur={handleUpdateTask}
+                                onKeyPress={(e) => e.key === 'Enter' && handleUpdateTask()}
+                                className="font-medium text-gray-800 bg-yellow-100 p-1 rounded-md w-full focus:outline-none"
+                                autoFocus
+                            />
+                        ) : (
+                            <p 
+                                className={`font-medium cursor-pointer ${task.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}
+                                onClick={() => !task.completed && startEditing(task)}
+                            >
+                                {task.text}
+                            </p>
+                        )}
+                        <p className={`text-sm ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>{task.dueDate ? `Vence: ${task.dueDate}` : 'Sin fecha'}</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => handleDelete(task.id)}
+                            className="text-sm text-gray-400 hover:text-red-600"
+                            aria-label="Eliminar tarea"
                         >
-                            {task.text}
-                        </p>
-                    )}
-                    <p className={`text-sm ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>{task.dueDate ? `Vence: ${task.dueDate}` : 'Sin fecha'}</p>
+                            Eliminar
+                        </button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => handleDelete(task.id)}
-                        className="text-sm text-gray-400 hover:text-red-600"
-                        aria-label="Eliminar tarea"
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            </div>
-        ))}
-        {sortedTasks.length === 0 && (
+            ))
+        ) : (
             <div className="text-center py-10 text-gray-500 bg-white rounded-lg shadow-sm">
                 <p>¡No hay tareas pendientes! Agrega una nueva para empezar.</p>
             </div>

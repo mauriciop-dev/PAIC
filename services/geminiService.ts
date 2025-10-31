@@ -6,7 +6,8 @@ import {
   Content,
 } from "@google/genai";
 import { Message } from '../types';
-import { dataStore } from '../data/dataStore';
+import { apiService } from './apiService';
+
 
 // --- Function Declarations for Gemini ---
 
@@ -54,23 +55,25 @@ const markDueDateAsPaidDeclaration: FunctionDeclaration = {
 // --- Function Implementations ---
 
 const availableFunctions: { [key: string]: (...args: any[]) => any } = {
-  addBooking: ({ day, time, event, user }: { day: number, time: string, event: string, user: string }) => {
-    const commonAreas = dataStore.getCommonAreas().map(a => a.name.toLowerCase());
-    if (!commonAreas.includes(event.toLowerCase())) {
-        return `Error: El área común "${event}" no existe. Las áreas disponibles son: ${dataStore.getCommonAreas().map(a => a.name).join(', ')}.`;
+  addBooking: async ({ day, time, event, user }: { day: number, time: string, event: string, user: string }) => {
+    const commonAreas = await apiService.fetchCommonAreas();
+    const commonAreaNames = commonAreas.map(a => a.name.toLowerCase());
+    
+    if (!commonAreaNames.includes(event.toLowerCase())) {
+        return `Error: El área común "${event}" no existe. Las áreas disponibles son: ${commonAreas.map(a => a.name).join(', ')}.`;
     }
-    dataStore.addBooking({ day, time, event, user });
+    await apiService.addBooking({ day, time, event, user });
     return `Reserva para "${event}" el día ${day} a las ${time} para ${user} ha sido agendada exitosamente.`;
   },
-  addTask: ({ text, dueDate }: { text: string, dueDate?: string }) => {
-    dataStore.addTask({ text, dueDate: dueDate || '', completed: false });
+  addTask: async ({ text, dueDate }: { text: string, dueDate?: string }) => {
+    await apiService.addTask({ text, dueDate: dueDate || '', completed: false });
     return `Tarea "${text}" agregada exitosamente.`;
   },
-  markDueDateAsPaid: ({ itemDescription }: { itemDescription: string }) => {
-    const dueDates = dataStore.getDueDates();
+  markDueDateAsPaid: async ({ itemDescription }: { itemDescription: string }) => {
+    const dueDates = await apiService.fetchDueDates();
     const dueDateToUpdate = dueDates.find(d => d.item.toLowerCase().includes(itemDescription.toLowerCase()) && d.status !== 'Pagado');
     if (dueDateToUpdate) {
-        dataStore.updateDueDateStatus(dueDateToUpdate.id, 'Pagado');
+        await apiService.updateDueDateStatus(dueDateToUpdate.id, 'Pagado');
         return `El vencimiento "${dueDateToUpdate.item}" ha sido marcado como "Pagado".`;
     }
     return `Error: No se encontró un vencimiento pendiente o vencido que coincida con "${itemDescription}".`;
@@ -92,7 +95,6 @@ const getAiClient = (): GoogleGenAI => {
     return ai;
   }
   
-  // FIX: Adhere to guideline to use process.env.API_KEY and fix import.meta.env error.
   const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
@@ -115,12 +117,16 @@ export const getChatResponse = async (
     const aiClient = getAiClient();
 
     const today = new Date().toISOString().split('T')[0];
-    const residents = dataStore.getResidents();
-    const accountStatus = dataStore.getAccountStatus();
-    const bookings = dataStore.getBookings();
-    const commonAreas = dataStore.getCommonAreas();
-    const dueDates = dataStore.getDueDates();
-    const tasks = dataStore.getTasks();
+    
+    // Fetch all context data asynchronously
+    const [residents, accountStatus, bookings, commonAreas, dueDates, tasks] = await Promise.all([
+        apiService.fetchResidents(),
+        apiService.fetchAccountStatus(),
+        apiService.fetchBookings(),
+        apiService.fetchCommonAreas(),
+        apiService.fetchDueDates(),
+        apiService.fetchTasks(),
+    ]);
     
     const chatHistoryForApi = fullHistory.slice(0, -1);
 
@@ -173,7 +179,7 @@ export const getChatResponse = async (
         for (const call of functionCalls) {
             const { name, args, id } = call;
             if (availableFunctions[name]) {
-                const result = availableFunctions[name](args);
+                const result = await availableFunctions[name](args);
                 functionCallResponses.push({
                     functionResponse: {
                         id,
@@ -195,17 +201,14 @@ export const getChatResponse = async (
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
-        // Provide a more user-friendly error message for configuration issues.
         if (error.message.includes("API key not valid") || error.message.includes("API key is missing")) {
             return "Error de configuración: La Clave de API para el servicio de IA no es válida o no se ha proporcionado. Por favor, contacta al soporte técnico.";
         }
          if (error.message.includes("La configuración de la Clave de API no se encontró")) {
             return error.message;
         }
-        // Re-throw other errors to be displayed as a message in the chat.
         throw error;
     }
-    // Handle non-Error objects.
     throw new Error("Lo siento, tuve un problema inesperado para procesar tu solicitud.");
   }
 };

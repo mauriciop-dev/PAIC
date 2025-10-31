@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../data/dataStore';
-import { Resident, AccountStatus } from '../../types';
+import { apiService } from '../../services/apiService';
+import { Resident, AccountStatus, Provider, InternalStaff } from '../../types';
 import EditResidentModal from '../EditResidentModal';
 
 enum DbTab {
@@ -11,22 +11,41 @@ enum DbTab {
 }
 
 const DatabaseView: React.FC = () => {
-  const [residents, setResidents] = useState<Resident[]>(dataStore.getResidents());
-  const [accountStatus, setAccountStatus] = useState<AccountStatus[]>(dataStore.getAccountStatus());
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [accountStatus, setAccountStatus] = useState<AccountStatus[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [activeDbTab, setActiveDbTab] = useState<DbTab>(DbTab.Residents);
   
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [res, acc, prov, staff] = await Promise.all([
+        apiService.fetchResidents(),
+        apiService.fetchAccountStatus(),
+        apiService.fetchProviders(),
+        apiService.fetchInternalStaff(),
+      ]);
+      setResidents(res);
+      setAccountStatus(acc);
+      setProviders(prov);
+      setInternalStaff(staff);
+    } catch (error) {
+      console.error("Failed to fetch data", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const handleStoreChange = () => {
-        setResidents(dataStore.getResidents());
-        setAccountStatus(dataStore.getAccountStatus());
-    };
-    const unsubscribe = dataStore.subscribe(handleStoreChange);
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
   const handleEditClick = (resident: Resident) => {
@@ -39,31 +58,39 @@ const DatabaseView: React.FC = () => {
     setSelectedResident(null);
   };
 
-  const handleSaveChanges = (updatedResident: Resident) => {
-    dataStore.updateResident(updatedResident);
+  const handleSaveChanges = async (updatedResident: Resident) => {
+    await apiService.updateResident(updatedResident);
+    fetchData(); // Refresh data
     handleCloseModal();
   };
 
-  const handleSimulateUpload = () => {
-    setIsLoading(true);
+  const handleSimulateUpload = async () => {
+    setIsUploading(true);
     setFeedbackMessage(null);
-
-    // Simulate file processing
-    setTimeout(() => {
-      if (activeDbTab === DbTab.Residents) {
-        dataStore.loadNewResidentData();
-      } else if (activeDbTab === DbTab.AccountStatus) {
-        dataStore.loadNewAccountStatusData();
-      }
-      
-      setIsLoading(false);
+    try {
+      await apiService.loadNewData(activeDbTab);
+      await fetchData(); // Refresh data from the "API"
       setFeedbackMessage({type: 'success', text: `¡Datos de ${activeDbTab} actualizados exitosamente!`});
-      // Clear message after some time
+    } catch (error) {
+      setFeedbackMessage({type: 'error', text: `Error al cargar datos.`});
+    } finally {
+      setIsUploading(false);
       setTimeout(() => setFeedbackMessage(null), 5000);
-    }, 1500);
+    }
   };
   
   const renderContent = () => {
+      if (isLoading) {
+          return <div className="text-center p-10 text-gray-500">Cargando datos...</div>;
+      }
+      
+      const renderTableActions = () => (
+          <div className="space-x-2">
+              <button className="text-xs font-medium text-blue-600 hover:underline">Editar</button>
+              <button className="text-xs font-medium text-red-600 hover:underline">Eliminar</button>
+          </div>
+      );
+
       switch (activeDbTab) {
           case DbTab.Residents:
               return (
@@ -74,25 +101,17 @@ const DatabaseView: React.FC = () => {
                               <th scope="col" className="px-6 py-3">Nombre</th>
                               <th scope="col" className="px-6 py-3">Correo</th>
                               <th scope="col" className="px-6 py-3">Teléfono</th>
-                              <th scope="col" className="px-6 py-3">Estado</th>
-                              <th scope="col" className="px-6 py-3">Acciones</th>
+                              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
                       </thead>
                       <tbody>
-                          {residents.map((resident: Resident) => (
+                          {residents.map((resident) => (
                               <tr key={resident.apartment} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{resident.apartment}</td>
                                   <td className="px-6 py-4">{resident.name}</td>
                                   <td className="px-6 py-4">{resident.email}</td>
                                   <td className="px-6 py-4">{resident.phone}</td>
-                                  <td className="px-6 py-4">
-                                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${resident.status === 'Al día' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                          {resident.status}
-                                      </span>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <button onClick={() => handleEditClick(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                  </td>
+                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
                               </tr>
                           ))}
                       </tbody>
@@ -105,27 +124,77 @@ const DatabaseView: React.FC = () => {
                           <tr>
                               <th scope="col" className="px-6 py-3">Apartamento</th>
                               <th scope="col" className="px-6 py-3">Fecha último pago</th>
+                              <th scope="col" className="px-6 py-3">Valor Cuota</th>
                               <th scope="col" className="px-6 py-3">Cuotas pendientes</th>
+                              <th scope="col" className="px-6 py-3">Otros Cobros</th>
                               <th scope="col" className="px-6 py-3">Saldo pendiente</th>
+                              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
                       </thead>
                       <tbody>
-                          {accountStatus.map((account: AccountStatus) => (
+                          {accountStatus.map((account) => (
                               <tr key={account.apartment} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{account.apartment}</td>
                                   <td className="px-6 py-4">{account.lastPaymentDate}</td>
+                                  <td className="px-6 py-4">${account.adminFeeValue.toLocaleString()}</td>
                                   <td className="px-6 py-4">{account.pendingInstallments}</td>
-                                  <td className="px-6 py-4">${account.outstandingBalance.toLocaleString()}</td>
+                                  <td className="px-6 py-4">${account.otherCharges.toLocaleString()}</td>
+                                  <td className="px-6 py-4 font-semibold">${account.outstandingBalance.toLocaleString()}</td>
+                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
                               </tr>
                           ))}
                       </tbody>
                   </table>
               );
-          default:
+            case DbTab.Providers:
               return (
-                <div className="text-center py-10 text-gray-500">
-                    <p>La funcionalidad para {activeDbTab} estará disponible próximamente.</p>
-                </div>
+                   <table className="w-full text-sm text-left text-gray-500">
+                      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                          <tr>
+                              <th scope="col" className="px-6 py-3">Nombre o Empresa</th>
+                              <th scope="col" className="px-6 py-3">Especialidad</th>
+                              <th scope="col" className="px-6 py-3">Correo</th>
+                              <th scope="col" className="px-6 py-3">Teléfono</th>
+                              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {providers.map((provider) => (
+                              <tr key={provider.id} className="bg-white border-b hover:bg-gray-50">
+                                  <td className="px-6 py-4 font-medium text-gray-900">{provider.company}</td>
+                                  <td className="px-6 py-4">{provider.specialty}</td>
+                                  <td className="px-6 py-4">{provider.email}</td>
+                                  <td className="px-6 py-4">{provider.phone}</td>
+                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              );
+            case DbTab.Internal:
+              return (
+                   <table className="w-full text-sm text-left text-gray-500">
+                      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                          <tr>
+                              <th scope="col" className="px-6 py-3">Nombre</th>
+                              <th scope="col" className="px-6 py-3">Cargo</th>
+                              <th scope="col" className="px-6 py-3">Correo</th>
+                              <th scope="col" className="px-6 py-3">Teléfono</th>
+                              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {internalStaff.map((staff) => (
+                              <tr key={staff.id} className="bg-white border-b hover:bg-gray-50">
+                                  <td className="px-6 py-4 font-medium text-gray-900">{staff.name}</td>
+                                  <td className="px-6 py-4">{staff.position}</td>
+                                  <td className="px-6 py-4">{staff.email}</td>
+                                  <td className="px-6 py-4">{staff.phone}</td>
+                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
               );
       }
   };
@@ -137,17 +206,20 @@ const DatabaseView: React.FC = () => {
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Base de Datos</h2>
       
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">Simular Carga de Información</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">Gestión de Información</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Haz clic en el botón para simular una carga de datos y actualizar la tabla de <span className="font-semibold">{activeDbTab}</span> con nueva información de ejemplo.
+          Utiliza estas herramientas para cargar o actualizar la información de <span className="font-semibold">{activeDbTab}</span> de forma masiva.
         </p>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+            <button className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                Descargar Plantilla
+            </button>
             <button 
                 onClick={handleSimulateUpload} 
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={isLoading || (activeDbTab !== DbTab.Residents && activeDbTab !== DbTab.AccountStatus)}
+                disabled={isUploading}
             >
-                {isLoading ? 'Cargando...' : 'Simular Carga de Datos'}
+                {isUploading ? 'Cargando...' : `Cargar Información (${activeDbTab})`}
             </button>
         </div>
         {feedbackMessage && (
@@ -176,6 +248,11 @@ const DatabaseView: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="flex justify-end p-2 border-b">
+           <button className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md font-semibold hover:bg-blue-200 transition-colors text-xs">
+              + Agregar Registro
+            </button>
+        </div>
         <div className="overflow-x-auto">
             {renderContent()}
         </div>

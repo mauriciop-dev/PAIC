@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../data/dataStore';
+import { apiService } from '../services/apiService';
 import { CommonArea } from '../types';
 import { Icon } from './ui/Icon';
 
 interface ManageAreasModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAreaUpdate: () => void; // Callback to refresh parent component
 }
 
-const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose }) => {
-  const [areas, setAreas] = useState<CommonArea[]>(dataStore.getCommonAreas());
+const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, onAreaUpdate }) => {
+  const [areas, setAreas] = useState<CommonArea[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
+
+  const fetchAreas = async () => {
+    const fetchedAreas = await apiService.fetchCommonAreas();
+    setAreas(fetchedAreas);
+  };
 
   useEffect(() => {
     if (isOpen) {
-      const handleStoreChange = () => {
-        setAreas(dataStore.getCommonAreas());
-      };
-      const unsubscribe = dataStore.subscribe(handleStoreChange);
-      return () => unsubscribe();
+      fetchAreas();
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleAddArea = () => {
+  const handleAddArea = async () => {
     if (newAreaName.trim()) {
-      dataStore.addCommonArea(newAreaName.trim());
+      await apiService.addCommonArea(newAreaName.trim());
       setNewAreaName('');
+      fetchAreas(); // Refresh list
+      onAreaUpdate(); // Notify parent
     }
   };
 
-  const handleRemoveArea = (id: string) => {
-    // Basic confirmation dialog
+  const handleRemoveArea = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta área?')) {
-      dataStore.removeCommonArea(id);
+      await apiService.removeCommonArea(id);
+      fetchAreas(); // Refresh list
+      onAreaUpdate(); // Notify parent
     }
   };
 
@@ -61,6 +66,7 @@ const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose }) 
                     onChange={(e) => setNewAreaName(e.target.value)}
                     placeholder="Nombre del área (ej. Parque Infantil)"
                     className="flex-1 p-2 border border-gray-300 rounded-md"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddArea()}
                 />
                 <button
                     onClick={handleAddArea}
