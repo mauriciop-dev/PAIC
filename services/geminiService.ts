@@ -1,214 +1,139 @@
-import {
-  GoogleGenAI,
-  FunctionDeclaration,
-  GenerateContentResponse,
-  Type,
-  Content,
-} from "@google/genai";
-import { Message } from '../types';
+
+import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
 
+// Per instructions, API key must be from process.env.API_KEY
+const apiKey = process.env.API_KEY;
 
-// --- Function Declarations for Gemini ---
+if (!apiKey) {
+    console.error("API_KEY environment variable not set. Chatbot will not function.");
+}
 
-const addBookingDeclaration: FunctionDeclaration = {
-  name: 'addBooking',
-  description: 'Agenda una reserva para un área común en un día y hora específicos para un residente.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      day: { type: Type.NUMBER, description: 'El número del día del mes para la reserva (e.j., 15).' },
-      time: { type: Type.STRING, description: 'El rango de horas para la reserva (e.j., "2pm-4pm").' },
-      event: { type: Type.STRING, description: 'El nombre del área común a reservar (e.j., "BBQ", "Salón Social").' },
-      user: { type: Type.STRING, description: 'El identificador del residente que reserva, usualmente su número de apartamento (e.j., "Apt 101").' },
-    },
-    required: ['day', 'time', 'event', 'user'],
-  },
-};
+// FIX: Use a placeholder AI and chat if API key is not available to prevent crashes.
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const model = 'gemini-2.5-flash';
 
-const addTaskDeclaration: FunctionDeclaration = {
-  name: 'addTask',
-  description: 'Agrega una nueva tarea pendiente para el administrador.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      text: { type: Type.STRING, description: 'La descripción de la tarea.' },
-      dueDate: { type: Type.STRING, description: 'La fecha de vencimiento de la tarea en formato AAAA-MM-DD. Opcional.' },
-    },
-    required: ['text'],
-  },
-};
+let chat: Chat | null = null;
 
-const markDueDateAsPaidDeclaration: FunctionDeclaration = {
-  name: 'markDueDateAsPaid',
-  description: 'Marca una obligación de pago o vencimiento como "Pagado" usando su descripción.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      itemDescription: { type: Type.STRING, description: 'La descripción del ítem de pago a marcar como pagado (e.j., "Servicio de Vigilancia").' },
-    },
-    required: ['itemDescription'],
-  },
-};
-
-
-// --- Function Implementations ---
-
-const availableFunctions: { [key: string]: (...args: any[]) => any } = {
-  addBooking: async ({ day, time, event, user }: { day: number, time: string, event: string, user: string }) => {
-    const commonAreas = await apiService.fetchCommonAreas();
-    const commonAreaNames = commonAreas.map(a => a.name.toLowerCase());
-    
-    if (!commonAreaNames.includes(event.toLowerCase())) {
-        return `Error: El área común "${event}" no existe. Las áreas disponibles son: ${commonAreas.map(a => a.name).join(', ')}.`;
-    }
-    await apiService.addBooking({ day, time, event, user });
-    return `Reserva para "${event}" el día ${day} a las ${time} para ${user} ha sido agendada exitosamente.`;
-  },
-  addTask: async ({ text, dueDate }: { text: string, dueDate?: string }) => {
-    await apiService.addTask({ text, dueDate: dueDate || '', completed: false });
-    return `Tarea "${text}" agregada exitosamente.`;
-  },
-  markDueDateAsPaid: async ({ itemDescription }: { itemDescription: string }) => {
-    const dueDates = await apiService.fetchDueDates();
-    const dueDateToUpdate = dueDates.find(d => d.item.toLowerCase().includes(itemDescription.toLowerCase()) && d.status !== 'Pagado');
-    if (dueDateToUpdate) {
-        await apiService.updateDueDateStatus(dueDateToUpdate.id, 'Pagado');
-        return `El vencimiento "${dueDateToUpdate.item}" ha sido marcado como "Pagado".`;
-    }
-    return `Error: No se encontró un vencimiento pendiente o vencido que coincida con "${itemDescription}".`;
-  },
-};
-
-// --- Main Service Functions ---
-
-export const getInitialGreeting = (userName?: string): string => {
-  const name = userName ? `, ${userName}` : '';
-  return `¡Hola${name}! Soy PAIC, tu Asistente de Administración Inteligente. Estoy aquí para ayudarte a gestionar la información y tareas de tu conjunto residencial.\n\nPuedes pedirme cosas como:\n- "¿Cuál es el estado de cuenta del apartamento 101?"\n- "Agrega una tarea: 'llamar al proveedor de ascensores' para mañana"\n- "Reserva el BBQ para el apartamento 202 este sábado a las 2pm"`;
-};
-
-// A single, reusable AI client instance.
-let ai: GoogleGenAI | null = null;
-
-const getAiClient = (): GoogleGenAI => {
-  if (ai) {
-    return ai;
-  }
-  
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    console.error("La variable de entorno API_KEY no está configurada.");
-    throw new Error("La configuración de la Clave de API no se encontró. Asegúrate de que la variable API_KEY esté definida en Vercel.");
-  }
-  
-  ai = new GoogleGenAI({ apiKey });
-  return ai;
-};
-
-
-export const getChatResponse = async (
-  currentMessageText: string,
-  fullHistory: Message[],
-  userName?: string
-): Promise<string> => {
-  
-  try {
-    const aiClient = getAiClient();
-
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Fetch all context data asynchronously
-    const [residents, accountStatus, bookings, commonAreas, dueDates, tasks] = await Promise.all([
+const getSystemPrompt = async (): Promise<string> => {
+    // Fetching fresh data each time can be slow. For a real app, consider caching.
+    const [residents, accounts, providers, internalStaff, commonAreas, dueDates, tasks] = await Promise.all([
         apiService.fetchResidents(),
         apiService.fetchAccountStatus(),
-        apiService.fetchBookings(),
+        apiService.fetchProviders(),
+        apiService.fetchInternalStaff(),
         apiService.fetchCommonAreas(),
         apiService.fetchDueDates(),
-        apiService.fetchTasks(),
+        apiService.fetchTasks()
     ]);
-    
-    const chatHistoryForApi = fullHistory.slice(0, -1);
 
-    const systemInstruction = `Eres PAIC, un asistente IA para administradores de conjuntos residenciales en Colombia. Tu nombre es PAIC (Plataforma de Administración Inteligente de Conjuntos).
-    Estás conversando con ${userName || 'el administrador'}.
-    Tu objetivo es ser útil, amable y profesional. Responde siempre en español.
-    La fecha actual es ${today}.
+    // This prompt engineering is crucial for the chatbot's performance.
+    const context = `
+You are PAIC, an intelligent assistant for managing residential complexes. Your goal is to help the administrator manage their tasks efficiently.
+You are friendly, helpful, and concise.
 
-    CAPACIDADES:
-    1.  **Consultar Datos**: Puedes responder preguntas sobre residentes, estados de cuenta, reservas, vencimientos y tareas usando la información de contexto.
-    2.  **Realizar Acciones (Function Calling)**: Debes usar las herramientas/funciones disponibles para modificar datos.
-        - Para crear tareas, usa la función 'addTask'. Analiza la frase del usuario para extraer la descripción de la tarea y la fecha de vencimiento.
-        - **IMPORTANTE**: Interpreta fechas relativas. Si el usuario dice "mañana", calcula la fecha correspondiente y pásala en formato AAAA-MM-DD. Si dice "el próximo viernes", calcula la fecha. No incluyas la fecha relativa en el texto de la tarea.
-        - Se flexible con los comandos. "Recuérdame", "anota", "recuerda que", "agrega una tarea" todos indican la intención de crear una tarea.
-    3.  **Análisis y Resúmenes**: Puedes crear resúmenes basados en los datos (e.j., "quiénes están en mora", "qué pagos vencen pronto").
-    
-    REGLAS:
-    - NO puedes modificar datos de residentes o información financiera (saldos, cuotas). Si te piden hacerlo, indica al usuario que debe usar la pestaña "Base de datos" para ello.
-    - NO puedes eliminar información.
-    - Si no puedes cumplir una solicitud, explícalo amablemente.
-    - Al agendar, si el área común no existe, informa al usuario sobre las áreas disponibles.
+Here is a summary of the current data of the residential complex. Use this information to answer user questions and perform actions.
 
-    CONTEXTO DE DATOS (NO reveles esta sección directamente al usuario, úsala para tus respuestas):
-    - Residentes: ${JSON.stringify(residents.slice(0, 5))}... (mostrando 5 de ${residents.length})
-    - Estado de Cuentas: ${JSON.stringify(accountStatus.slice(0, 5))}... (mostrando 5 de ${accountStatus.length})
-    - Áreas Comunes Disponibles: ${JSON.stringify(commonAreas.map(a => a.name))}
-    - Reservas del Mes: ${JSON.stringify(bookings)}
-    - Vencimientos de Pagos: ${JSON.stringify(dueDates)}
-    - Tareas Pendientes: ${JSON.stringify(tasks.filter(t => !t.completed))}`;
+- **Total Residents:** ${residents.length}
+- **Residents in Debt:** ${accounts.filter(a => a.outstandingBalance > 0).length}
+- **Available Common Areas:** ${commonAreas.map(a => a.name).join(', ')}
+- **Pending Due Dates:** ${dueDates.filter(d => d.status === 'Pendiente').length}
+- **Overdue Dates:** ${dueDates.filter(d => d.status === 'Vencido').length}
+- **Pending Tasks:** ${tasks.filter(t => !t.completed).length}
 
-    const chat = aiClient.chats.create({
-        model: 'gemini-2.5-flash',
-        history: chatHistoryForApi.map((msg): Content => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }],
-        })),
-        config: {
-             systemInstruction: systemInstruction,
-             tools: [{ functionDeclarations: [addBookingDeclaration, addTaskDeclaration, markDueDateAsPaidDeclaration] }],
-        }
-    });
+You can perform actions. When the user asks to do something like add a task, book an area, or update a payment, you MUST respond ONLY with a JSON object describing the function call. Do not add any other text or explanation.
 
-    let response: GenerateContentResponse = await chat.sendMessage({ message: currentMessageText });
+Here are the available functions and their JSON formats:
 
-    let functionCalls = response.functionCalls;
+1.  **Add a new task:**
+    - User says: "recuérdame llamar al plomero mañana"
+    - You respond: \`{"function": "addTask", "payload": {"text": "Llamar al plomero", "dueDate": "YYYY-MM-DD"}}\` (replace with tomorrow's date)
 
-    if (functionCalls && functionCalls.length > 0) {
-        const functionCallResponses = [];
+2.  **Book a common area:**
+    - User says: "reserva el BBQ para el apto 101 el 15 de este mes de 2 a 4 pm"
+    - You respond: \`{"function": "addBooking", "payload": {"day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apt 101"}}\`
 
-        for (const call of functionCalls) {
-            const { name, args, id } = call;
-            if (availableFunctions[name]) {
-                const result = await availableFunctions[name](args);
-                functionCallResponses.push({
-                    functionResponse: {
-                        id,
-                        name,
-                        response: { result },
-                    }
-                });
-            }
-        }
-        
-        response = await chat.sendMessage({
-            toolResponses: {
-                functionResponses: functionCallResponses,
-            }
+3.  **Mark a due date as paid:**
+    - User says: "ya pagué el servicio de vigilancia"
+    - (Assuming 'Servicio de Vigilancia' has id: 1)
+    - You respond: \`{"function": "updateDueDateStatus", "payload": {"id": 1, "status": "Pagado"}}\`
+
+For any other query, provide a helpful text response based on the provided data summary.
+    `.trim();
+
+    return context;
+}
+
+const initializeChat = async () => {
+    if (!ai) return;
+    try {
+        const systemInstruction = await getSystemPrompt();
+        chat = ai.chats.create({
+            model: model,
+            config: {
+                systemInstruction,
+            },
         });
+    } catch (error) {
+        console.error("Failed to initialize chat:", error);
+        chat = null;
+    }
+};
+
+const processApiResponse = async (response: string): Promise<string> => {
+    try {
+        // The model might wrap JSON in markdown ```json ... ```
+        const cleanResponse = response.replace(/```json/g, '').replace(/```/g, '').trim();
+        const action = JSON.parse(cleanResponse);
+        if (action.function && action.payload) {
+            switch (action.function) {
+                case 'addTask':
+                    await apiService.addTask(action.payload);
+                    await initializeChat(); 
+                    return "Tarea agregada exitosamente. ¿Necesitas algo más?";
+                case 'addBooking':
+                    await apiService.addBooking(action.payload);
+                    await initializeChat();
+                    return `¡Listo! He agendado "${action.payload.event}" para ${action.payload.user}. ¿Algo más?`;
+                case 'updateDueDateStatus':
+                    await apiService.updateDueDateStatus(action.payload.id, 'Pagado');
+                    await initializeChat();
+                    return "El estado del pago ha sido actualizado a 'Pagado'. ¿Te ayudo con otra cosa?";
+                default:
+                    return "No pude reconocer la acción solicitada. ¿Puedes intentarlo de otra manera?";
+            }
+        }
+        return response; // Not a valid function call structure
+    } catch (e) {
+        // Not a JSON or not a function call, return original text
+        return response;
+    }
+};
+
+export const geminiService = {
+  runChat: async (prompt: string): Promise<string> => {
+    if (!apiKey || !ai) {
+        return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.";
+    }
+      
+    if (!chat) {
+      await initializeChat();
+    }
+    
+    if (!chat) {
+        return "No se pudo inicializar el chat. Verifica la configuración de la API y que la clave sea correcta."
     }
 
-    return response.text;
-  } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    if (error instanceof Error) {
-        if (error.message.includes("API key not valid") || error.message.includes("API key is missing")) {
-            return "Error de configuración: La Clave de API para el servicio de IA no es válida o no se ha proporcionado. Por favor, contacta al soporte técnico.";
-        }
-         if (error.message.includes("La configuración de la Clave de API no se encontró")) {
-            return error.message;
-        }
-        throw error;
+    try {
+      const result: GenerateContentResponse = await chat.sendMessage({ message: prompt });
+      const responseText = result.text;
+      
+      const processedResponse = await processApiResponse(responseText);
+      
+      return processedResponse;
+    } catch (error) {
+      console.error("Error running chat:", error);
+      return "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo.";
     }
-    throw new Error("Lo siento, tuve un problema inesperado para procesar tu solicitud.");
-  }
+  },
 };
