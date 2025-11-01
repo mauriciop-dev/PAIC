@@ -1,26 +1,47 @@
-
-
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
 import { DueDate } from "../types";
 
-// Per instructions, API key must be from process.env.API_KEY
-const apiKey = process.env.API_KEY;
-
-if (!apiKey) {
-    console.error("API_KEY environment variable not set. Chatbot will not function.");
-}
-
-// FIX: Use a placeholder AI and chat if API key is not available to prevent crashes.
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-const model = 'gemini-2.5-flash';
-
+let ai: GoogleGenAI | null = null;
 let chat: Chat | null = null;
 let currentConjuntoId: string | null = null;
+let isInitializing = false;
+
+const model = 'gemini-2.5-flash';
+
+// Asynchronously initialize the GoogleGenAI client
+const getAiClient = async (): Promise<GoogleGenAI | null> => {
+    if (ai) {
+        return ai;
+    }
+    if (isInitializing) {
+        // Wait for the ongoing initialization to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return ai;
+    }
+
+    try {
+        isInitializing = true;
+        // FIX: The API key must be obtained from process.env.API_KEY as per the guidelines.
+        // This also resolves the TypeScript errors with window.aistudio.
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            throw new Error("API key not found. Make sure API_KEY environment variable is set.");
+        }
+        ai = new GoogleGenAI({ apiKey });
+        return ai;
+    } catch (e) {
+        console.error("Could not initialize AI client:", e);
+        ai = null; // Ensure AI is null if initialization fails
+        return null;
+    } finally {
+        isInitializing = false;
+    }
+};
+
 
 const getSystemPrompt = async (conjuntoId: string): Promise<string> => {
     // Fetching fresh data each time can be slow. For a real app, consider caching.
-    // FIX: Pass conjuntoId to all apiService calls to fetch tenant-specific data.
     const [residents, accounts, providers, internalStaff, commonAreas, dueDates, tasks] = await Promise.all([
         apiService.fetchResidents(conjuntoId),
         apiService.fetchAccountStatus(conjuntoId),
@@ -69,15 +90,17 @@ For any other query, provide a helpful text response based on the provided data 
 }
 
 const initializeChat = async (conjuntoId: string) => {
-    if (!ai) return;
+    const aiClient = await getAiClient();
+    if (!aiClient) return;
     try {
         const systemInstruction = await getSystemPrompt(conjuntoId);
-        chat = ai.chats.create({
+        chat = aiClient.chats.create({
             model: model,
             config: {
                 systemInstruction,
             },
         });
+        currentConjuntoId = conjuntoId;
     } catch (error) {
         console.error("Failed to initialize chat:", error);
         chat = null;
@@ -92,17 +115,14 @@ const processApiResponse = async (response: string): Promise<string> => {
         if (action.function && action.payload && currentConjuntoId) {
             switch (action.function) {
                 case 'addTask':
-                    // FIX: Pass conjuntoId to addTask.
                     await apiService.addTask(currentConjuntoId, action.payload);
                     await initializeChat(currentConjuntoId); 
                     return "Tarea agregada exitosamente. ¿Necesitas algo más?";
                 case 'addBooking':
-                    // FIX: Pass conjuntoId to addBooking.
                     await apiService.addBooking(currentConjuntoId, action.payload);
                     await initializeChat(currentConjuntoId);
                     return `¡Listo! He agendado "${action.payload.event}" para ${action.payload.user}. ¿Algo más?`;
                 case 'updateDueDateStatus': {
-                    // FIX: 'updateDueDateStatus' does not exist. Implement logic to fetch, update, and save using 'updateDueDate'.
                     const allDueDates = await apiService.fetchDueDates(currentConjuntoId);
                     const dueDateToUpdate = allDueDates.find(d => d.id === action.payload.id);
                     if (dueDateToUpdate) {
@@ -124,11 +144,12 @@ const processApiResponse = async (response: string): Promise<string> => {
 };
 
 const runStandaloneQuery = async (systemInstruction: string, prompt: string): Promise<string> => {
-    if (!apiKey || !ai) {
+    const aiClient = await getAiClient();
+    if (!aiClient) {
         return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada.";
     }
     try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const response: GenerateContentResponse = await aiClient.models.generateContent({
             model: model,
             contents: prompt,
             config: { systemInstruction },
@@ -142,7 +163,8 @@ const runStandaloneQuery = async (systemInstruction: string, prompt: string): Pr
 
 export const geminiService = {
   runChat: async (prompt: string, conjuntoId: string | undefined): Promise<string> => {
-    if (!apiKey || !ai) {
+    const aiClient = await getAiClient();
+    if (!aiClient) {
         return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.";
     }
     if (!conjuntoId) {
@@ -150,7 +172,6 @@ export const geminiService = {
     }
       
     if (!chat || currentConjuntoId !== conjuntoId) {
-      currentConjuntoId = conjuntoId;
       await initializeChat(conjuntoId);
     }
     
