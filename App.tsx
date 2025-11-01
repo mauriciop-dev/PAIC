@@ -206,7 +206,13 @@ const App: React.FC = () => {
       </main>
 
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} />}
-      {isInitialSetupModalOpen && userProfile.conjuntoId && <InitialSetupModal onClose={() => setIsInitialSetupModalOpen(false)} onSaveSetup={handleSaveSetup} conjuntoId={userProfile.conjuntoId} />}
+      {isInitialSetupModalOpen && (
+        <InitialSetupModal 
+            onClose={() => setIsInitialSetupModalOpen(false)} 
+            onSaveSetup={handleSaveSetup} 
+            conjuntoId={userProfile.conjuntoId || 'conj-123'} 
+        />
+      )}
       {isSettingsModalOpen && userProfile.role === UserRole.Admin && conjuntoInfo && (
           <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} onSave={handleSaveSettings} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       )}
