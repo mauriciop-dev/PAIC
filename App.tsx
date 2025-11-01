@@ -112,6 +112,36 @@ const App: React.FC = () => {
 
     loadSession();
   }, [handleLogout]);
+  
+  // Effect to handle post-payment redirection
+  useEffect(() => {
+    const handlePaymentSuccess = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment_status');
+
+      if (paymentStatus === 'success' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
+        try {
+          // Clean the URL to prevent re-triggering on refresh
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          const updatedConjunto = { ...conjuntoInfo, subscriptionPlan: 'Paid' as const, planPrice: 140000 };
+          
+          await apiService.updateConjuntoInfo(updatedConjunto);
+          
+          setConjuntoInfo(updatedConjunto);
+          localStorage.setItem('paic_conjuntoInfo', JSON.stringify(updatedConjunto));
+          
+          setNotification('¡Suscripción exitosa! Has mejorado al Plan Pro.');
+
+        } catch (error) {
+            console.error("Failed to update subscription status:", error);
+            setNotification('Error al actualizar tu suscripción. Contacta a soporte.');
+        }
+      }
+    };
+
+    handlePaymentSuccess();
+  }, [userProfile, conjuntoInfo]);
 
   useEffect(() => {
       if (userProfile?.role === UserRole.Admin && userProfile.conjuntoId) {

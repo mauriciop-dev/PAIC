@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, ConjuntoInfo, AccessPoint } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
+import { boldService } from '../services/boldService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,7 +13,7 @@ interface SettingsModalProps {
   conjuntoInfo: ConjuntoInfo;
 }
 
-type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso';
+type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -40,6 +41,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     };
     fetchAccessPoints();
   }, [activeTab, userProfile.conjuntoId]);
+
+  useEffect(() => {
+      // When the modal re-opens or conjuntoInfo from parent updates (e.g., after payment),
+      // sync the local state.
+      setConjuntoData(conjuntoInfo);
+  }, [conjuntoInfo, isOpen])
 
 
   if (!isOpen) return null;
@@ -148,11 +155,52 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
   );
 
+  const renderSubscriptionTab = () => (
+    <div>
+        {conjuntoData.subscriptionPlan === 'Paid' ? (
+            <div className="text-center p-8 bg-green-50 border border-green-200 rounded-lg">
+                <Icon name="shield-check" className="w-12 h-12 mx-auto text-green-500" />
+                <h3 className="text-xl font-bold text-green-800 mt-4">Plan Pro Activo</h3>
+                <p className="text-gray-600 mt-2">
+                    Tu suscripción está activa. Disfruta de todas las funcionalidades de PAIC sin límites.
+                </p>
+                <p className="text-sm text-gray-500 mt-4">
+                    Precio: ${conjuntoData.planPrice?.toLocaleString('es-CO')} COP / Mes
+                </p>
+            </div>
+        ) : (
+            <div className="border border-gray-200 rounded-lg p-6">
+                 <h3 className="text-xl font-bold text-gray-800">Mejora al Plan Pro</h3>
+                 <p className="text-gray-600 mt-2">
+                    Desbloquea todo el potencial de PAIC con nuestro plan Pro.
+                 </p>
+                 <div className="my-6 text-center">
+                    <span className="text-4xl font-extrabold text-blue-600">$140.000</span>
+                    <span className="text-lg font-medium text-gray-500"> COP / mes</span>
+                 </div>
+                 <ul className="space-y-2 text-sm text-gray-700">
+                    <li className="flex items-center gap-2"><Icon name="checkSquare" className="w-4 h-4 text-green-500" /> Asistente IA sin límites</li>
+                    <li className="flex items-center gap-2"><Icon name="checkSquare" className="w-4 h-4 text-green-500" /> Módulos completos de gestión</li>
+                    <li className="flex items-center gap-2"><Icon name="checkSquare" className="w-4 h-4 text-green-500" /> Soporte prioritario</li>
+                 </ul>
+                 <button
+                    type="button"
+                    onClick={() => boldService.redirectToCheckout(conjuntoData)}
+                    className="mt-6 w-full px-4 py-3 text-white bg-blue-600 rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+                 >
+                    <Icon name="credit-card" className="w-5 h-5" />
+                    Mejorar Plan Ahora
+                 </button>
+                 <p className="text-xs text-gray-500 mt-2 text-center">Serás redirigido a la pasarela de pagos segura de Bold.</p>
+            </div>
+        )}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
       <div
-        className="bg-white rounded-lg shadow-2xl w-11/12 md:w-1/2 lg:w-1/3 relative flex flex-col max-h-[90vh]"
+        className="bg-white rounded-lg shadow-2xl w-11/12 md:w-1/2 lg:w-[40rem] relative flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="p-6 border-b border-gray-200">
@@ -166,7 +214,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-6 overflow-y-auto">
                 <div className="mb-6 border-b border-gray-200">
                     <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                        {(['Perfil', 'Conjunto', 'Puntos de Acceso'] as SettingsTab[]).map(tab => (
+                        {(['Perfil', 'Conjunto', 'Puntos de Acceso', 'Suscripción'] as SettingsTab[]).map(tab => (
                             <button
                                 key={tab}
                                 type="button"
@@ -186,24 +234,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {activeTab === 'Perfil' && renderProfileTab()}
                 {activeTab === 'Conjunto' && renderConjuntoTab()}
                 {activeTab === 'Puntos de Acceso' && renderAccessPointsTab()}
+                {activeTab === 'Suscripción' && renderSubscriptionTab()}
             </div>
             
-            <footer className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-4">
-                <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-                >
-                Cancelar
-                </button>
-                <button
-                type="submit"
-                disabled={!hasChanges}
-                className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                >
-                Guardar Cambios
-                </button>
-            </footer>
+            {(activeTab === 'Perfil' || activeTab === 'Conjunto') && (
+                <footer className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-4">
+                    <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                    Cancelar
+                    </button>
+                    <button
+                    type="submit"
+                    disabled={!hasChanges}
+                    className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    >
+                    Guardar Cambios
+                    </button>
+                </footer>
+            )}
         </form>
       </div>
     </div>
