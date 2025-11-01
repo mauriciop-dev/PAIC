@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -17,6 +18,8 @@ import { supabase } from './services/supabaseClient';
 import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 
+// FIX: Removed deprecated `aistudio` property from the global Window type to resolve a conflict.
+// The API key is now handled via environment variables as per updated guidelines.
 declare global {
   interface Window {
     google: any;

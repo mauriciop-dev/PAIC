@@ -2,40 +2,34 @@ import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
 import { DueDate } from "../types";
 
-let ai: GoogleGenAI | null = null;
+// This promise will hold the initialized AI client. It's created once and reused
+// to prevent multiple initialization attempts.
+let aiPromise: Promise<GoogleGenAI> | null = null;
 let chat: Chat | null = null;
 let currentConjuntoId: string | null = null;
-let isInitializing = false;
 
 const model = 'gemini-2.5-flash';
 
-// Asynchronously initialize the GoogleGenAI client
-const getAiClient = async (): Promise<GoogleGenAI | null> => {
-    if (ai) {
-        return ai;
+/**
+ * Initializes and returns a singleton promise for the GoogleGenAI client.
+ * This is the correct, robust way to handle async initialization.
+ */
+// FIX: Updated to use `process.env.API_KEY` as per coding guidelines. The `window.aistudio.getApiKey` method is deprecated.
+const getAiClient = (): Promise<GoogleGenAI> => {
+    if (!aiPromise) {
+        aiPromise = new Promise((resolve, reject) => {
+            try {
+                if (!process.env.API_KEY) {
+                    return reject(new Error("La variable de entorno API_KEY no está configurada."));
+                }
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                resolve(ai);
+            } catch (error) {
+                reject(error);
+            }
+        });
     }
-    if (isInitializing) {
-        // Wait for the ongoing initialization to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return ai;
-    }
-
-    try {
-        isInitializing = true;
-        // FIX: Read the API key from process.env as required by the environment.
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-            throw new Error("API key no encontrada. Asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.");
-        }
-        ai = new GoogleGenAI({ apiKey });
-        return ai;
-    } catch (e) {
-        console.error("Could not initialize AI client:", e);
-        ai = null; // Ensure AI is null if initialization fails
-        return null;
-    } finally {
-        isInitializing = false;
-    }
+    return aiPromise;
 };
 
 
@@ -89,9 +83,8 @@ For any other query, provide a helpful text response based on the provided data 
 }
 
 const initializeChat = async (conjuntoId: string) => {
-    const aiClient = await getAiClient();
-    if (!aiClient) return;
     try {
+        const aiClient = await getAiClient();
         const systemInstruction = await getSystemPrompt(conjuntoId);
         chat = aiClient.chats.create({
             model: model,
@@ -108,7 +101,6 @@ const initializeChat = async (conjuntoId: string) => {
 
 const processApiResponse = async (response: string): Promise<string> => {
     try {
-        // The model might wrap JSON in markdown ```json ... ```
         const cleanResponse = response.replace(/```json/g, '').replace(/```/g, '').trim();
         const action = JSON.parse(cleanResponse);
         if (action.function && action.payload && currentConjuntoId) {
@@ -135,37 +127,31 @@ const processApiResponse = async (response: string): Promise<string> => {
                     return "No pude reconocer la acción solicitada. ¿Puedes intentarlo de otra manera?";
             }
         }
-        return response; // Not a valid function call structure
+        return response;
     } catch (e) {
-        // Not a JSON or not a function call, return original text
         return response;
     }
 };
 
 const runStandaloneQuery = async (systemInstruction: string, prompt: string): Promise<string> => {
     const aiClient = await getAiClient();
-    if (!aiClient) {
-        return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada.";
-    }
-    try {
-        const response: GenerateContentResponse = await aiClient.models.generateContent({
-            model: model,
-            contents: prompt,
-            config: { systemInstruction },
-        });
-        return response.text;
-    } catch (error) {
-        console.error("Error in standalone query:", error);
-        throw new Error("No se pudo obtener una respuesta de la IA.");
-    }
+    const response: GenerateContentResponse = await aiClient.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: { systemInstruction },
+    });
+    return response.text;
 }
 
 export const geminiService = {
   runChat: async (prompt: string, conjuntoId: string | undefined): Promise<string> => {
-    const aiClient = await getAiClient();
-    if (!aiClient) {
-        return "El servicio de IA no está configurado. Por favor, asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.";
+    try {
+        await getAiClient();
+    } catch (error: any) {
+        console.error("AI Client Initialization failed:", error);
+        return `Error de configuración: ${error.message || 'No se pudo inicializar el servicio de IA'}. Por favor, asegúrate de que la clave de API de Gemini esté configurada en el entorno.`;
     }
+
     if (!conjuntoId) {
         return "No se ha podido identificar el conjunto residencial. No puedo procesar tu solicitud.";
     }
@@ -193,11 +179,21 @@ export const geminiService = {
 
   generateSubject: async (messageBody: string): Promise<string> => {
     const systemInstruction = "Eres un experto en comunicación. Tu tarea es crear un asunto de correo electrónico corto, claro y efectivo (máximo 10 palabras) para el siguiente mensaje. Responde únicamente con el texto del asunto.";
-    return runStandaloneQuery(systemInstruction, `Crea un asunto para este mensaje: "${messageBody}"`);
+    try {
+        return await runStandaloneQuery(systemInstruction, `Crea un asunto para este mensaje: "${messageBody}"`);
+    } catch (error) {
+        console.error("Error in generateSubject:", error);
+        return "Asunto no disponible";
+    }
   },
 
   improveWriting: async (messageBody: string): Promise<string> => {
     const systemInstruction = "Eres un asistente de redacción profesional. Tu tarea es mejorar el siguiente texto para que sea más claro, profesional y amigable, manteniendo el mensaje central. No agregues saludos ni despedidas, solo mejora el cuerpo del mensaje. Responde únicamente con el texto mejorado.";
-    return runStandaloneQuery(systemInstruction, `Mejora la redacción de este mensaje: "${messageBody}"`);
+    try {
+        return await runStandaloneQuery(systemInstruction, `Mejora la redacción de este mensaje: "${messageBody}"`);
+    } catch (error) {
+        console.error("Error in improveWriting:", error);
+        return messageBody; // Return original text on failure
+    }
   },
 };
