@@ -19,8 +19,8 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile, conjuntoInfo }) => {
   const renderContent = () => {
-    // FIX: Wait for the full conjuntoInfo object to be loaded, not just the ID on the user profile.
-    // This makes the loading state more accurate on page refresh.
+    // The loading/setup state is now handled by the parent App component, making this one cleaner.
+    // We can assume conjuntoInfo is valid when this component's content is rendered.
     if (!conjuntoInfo) {
         return <div className="text-center p-10">Cargando información del conjunto...</div>;
     }

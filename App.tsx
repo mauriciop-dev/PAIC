@@ -32,6 +32,18 @@ const App: React.FC = () => {
   const [superAdminProfile, setSuperAdminProfile] = useState<SuperAdminProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
 
+  const handleLogout = useCallback(() => {
+    setUserProfile(null);
+    setSuperAdminProfile(null);
+    setConjuntoInfo(null);
+    localStorage.removeItem('paic_userProfile');
+    localStorage.removeItem('paic_superAdminProfile');
+    localStorage.removeItem('paic_conjuntoInfo');
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+        window.google.accounts.id.disableAutoSelect();
+    }
+  }, []);
+
   useEffect(() => {
     const loadSession = async () => {
         const storedUser = localStorage.getItem('paic_userProfile');
@@ -50,20 +62,18 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
-                // FIX: This robust logic handles corrupted or invalid JSON in localStorage.
                 let infoToSet: ConjuntoInfo | null = null;
                 const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
 
                 if (storedConjuntoRaw) {
                     try {
                         const parsed = JSON.parse(storedConjuntoRaw);
-                        // Ensure we have a valid object, not just `null` or other primitives
                         if (parsed && typeof parsed === 'object') {
                             infoToSet = parsed;
                         }
                     } catch (error) {
                         console.error('Could not parse conjuntoInfo from localStorage, fetching from API.', error);
-                        localStorage.removeItem('paic_conjuntoInfo'); // Clear corrupted data
+                        localStorage.removeItem('paic_conjuntoInfo');
                     }
                 }
 
@@ -74,8 +84,15 @@ const App: React.FC = () => {
                     if (infoFromApi) {
                         setConjuntoInfo(infoFromApi);
                         localStorage.setItem('paic_conjuntoInfo', JSON.stringify(infoFromApi));
-                    } else if (parsedUser.role === UserRole.Admin) {
-                        setIsInitialSetupModalOpen(true);
+                    } else {
+                        // If info couldn't be fetched from API...
+                        if (parsedUser.role === UserRole.Admin) {
+                            setIsInitialSetupModalOpen(true);
+                        } else {
+                            // For non-admins, this is a critical error. They can't proceed.
+                            console.error(`Could not fetch conjuntoInfo for non-admin user ${parsedUser.email}. Logging out.`);
+                            handleLogout();
+                        }
                     }
                 }
             } else if (parsedUser.role === UserRole.Admin) {
@@ -85,7 +102,7 @@ const App: React.FC = () => {
     };
 
     loadSession();
-  }, []);
+  }, [handleLogout]);
   
   const handleAuthSuccess = async (profile: UserProfile) => {
     setUserProfile(profile);
@@ -120,7 +137,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // In a real app, backend would find or create user and return their profile with conjuntoId
     const existingUser = await apiService.findUserByEmail(profileObject.email);
 
     const newUserProfile: UserProfile = {
@@ -128,21 +144,9 @@ const App: React.FC = () => {
       email: profileObject.email,
       picture: profileObject.picture,
       role: UserRole.Admin,
-      conjuntoId: existingUser?.conjuntoId || 'conj-123' // Fallback to mock conjunto for demo
+      conjuntoId: existingUser?.conjuntoId || 'conj-123'
     };
     handleAuthSuccess(newUserProfile);
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    setUserProfile(null);
-    setSuperAdminProfile(null);
-    setConjuntoInfo(null);
-    localStorage.removeItem('paic_userProfile');
-    localStorage.removeItem('paic_superAdminProfile');
-    localStorage.removeItem('paic_conjuntoInfo');
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-        window.google.accounts.id.disableAutoSelect();
-    }
   }, []);
 
   const handleSaveSetup = (info: ConjuntoInfo) => {
@@ -168,6 +172,7 @@ const App: React.FC = () => {
   }
   
   const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";
+  const needsAdminSetup = userProfile.role === UserRole.Admin && !conjuntoInfo;
 
   return (
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
@@ -185,9 +190,19 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (userProfile.role === UserRole.Admin ? 'ml-8' : 'ml-0')}`}>
         <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} onSettingsClick={() => setIsSettingsModalOpen(true)} />
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+          {needsAdminSetup ? (
+             <div className="text-center p-10 text-gray-600">
+                <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
+                <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
+                <p className="mt-2">
+                    Bienvenido a PAIC. Por favor, completa la información de tu conjunto en el diálogo que ha aparecido.
+                </p>
+            </div>
+          ) : (
+            <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+          )}
         </div>
-        <Footer activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />
+        {!needsAdminSetup && <Footer activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
       </main>
 
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} />}
