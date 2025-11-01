@@ -50,9 +50,9 @@ export const apiService = {
       const { count: totalResidents } = await supabase.from('residents').select('*', { count: 'exact', head: true });
       const { data: paidConjuntosData } = await supabase.from('conjuntos').select('plan_price').eq('subscription_plan', 'Paid');
       // FIX: Add explicit type to the result of fromSupabase
-      const paidConjuntos = fromSupabase(paidConjuntosData) as { planPrice?: number }[];
+      const paidConjuntos = fromSupabase(paidConjuntosData) as { planPrice?: number }[] | null;
 
-      const monthlyRecurringRevenue = paidConjuntos?.reduce((sum: number, c: any) => sum + (c.planPrice || 0), 0) || 0;
+      const monthlyRecurringRevenue = paidConjuntos?.reduce((sum: number, c) => sum + (c.planPrice || 0), 0) || 0;
 
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -170,7 +170,7 @@ export const apiService = {
     const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchCommonAreas') || [];
     const areas = fromSupabase(data) as any[];
-    return areas?.map((area: any) => ({ ...area, color: JSON.parse(area.color) })) || [];
+    return areas?.map((area: any) => ({ ...area, color: typeof area.color === 'string' ? JSON.parse(area.color) : area.color })) || [];
   },
   fetchExpenses: async (conjuntoId: string): Promise<Expense[]> => {
       const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
