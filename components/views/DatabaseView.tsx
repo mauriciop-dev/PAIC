@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser } from '../../types';
 import EditResidentModal from '../EditResidentModal';
 import UserModal from '../UserModal';
 import { Icon } from '../ui/Icon';
 
+declare var XLSX: any;
 
 enum DbTab {
   Residents = 'Residentes',
@@ -35,12 +36,13 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
-      // FIX: Pass conjuntoId to all apiService calls.
       const [res, acc, prov, staff, users] = await Promise.all([
         apiService.fetchResidents(userProfile.conjuntoId),
         apiService.fetchAccountStatus(userProfile.conjuntoId),
@@ -76,7 +78,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
 
   const handleSaveChanges = async (updatedResident: Resident) => {
     if (!userProfile.conjuntoId) return;
-    // FIX: Pass conjuntoId to updateResident.
     await apiService.updateResident(userProfile.conjuntoId, updatedResident);
     fetchData(); // Refresh data
     setIsEditModalOpen(false);
@@ -92,10 +93,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const handleSaveUser = async (user: PlatformUser) => {
       if (!userProfile.conjuntoId) return;
       if(user.id) {
-          // FIX: Pass conjuntoId to updateUser, assuming signature is (conjuntoId, user).
           await apiService.updateUser(userProfile.conjuntoId, user);
       } else {
-          // FIX: Pass conjuntoId to addUser.
           await apiService.addUser(userProfile.conjuntoId, user);
       }
       fetchData();
@@ -105,27 +104,103 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const handleDeleteUser = async (userId: number) => {
       if(window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
           if (!userProfile.conjuntoId) return;
-          // FIX: Pass conjuntoId to deleteUser, assuming signature is (conjuntoId, userId).
           await apiService.deleteUser(userProfile.conjuntoId, userId);
           fetchData();
       }
   };
 
 
-  const handleSimulateUpload = async () => {
-    setIsUploading(true);
-    setFeedbackMessage(null);
-    try {
-      // FIX: This method does not exist in apiService. Simulating a delay instead.
-      await new Promise(res => setTimeout(res, 1000));
-      await fetchData(); // Refresh data from the "API"
-      setFeedbackMessage({type: 'success', text: `¡Datos de ${activeDbTab} actualizados exitosamente!`});
-    } catch (error) {
-      setFeedbackMessage({type: 'error', text: `Error al cargar datos.`});
-    } finally {
-      setIsUploading(false);
-      setTimeout(() => setFeedbackMessage(null), 5000);
-    }
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      setFeedbackMessage(null);
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+          try {
+              const data = new Uint8Array(e.target?.result as ArrayBuffer);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const json = XLSX.utils.sheet_to_json(worksheet);
+
+              if (json.length === 0) {
+                  throw new Error("El archivo está vacío o tiene un formato incorrecto.");
+              }
+              
+              if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
+              
+              switch(activeDbTab) {
+                  case DbTab.Residents:
+                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, json as Resident[]);
+                      break;
+                  case DbTab.AccountStatus:
+                      await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, json as AccountStatus[]);
+                      break;
+                  case DbTab.Providers:
+                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, json as Provider[]);
+                      break;
+                  case DbTab.Internal:
+                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, json as InternalStaff[]);
+                      break;
+                  default:
+                      throw new Error(`La carga masiva para ${activeDbTab} no está implementada.`);
+              }
+              
+              await fetchData();
+              setFeedbackMessage({type: 'success', text: `¡${json.length} registros de ${activeDbTab} cargados exitosamente!`});
+
+          } catch (error: any) {
+              console.error("Error processing file:", error);
+              setFeedbackMessage({type: 'error', text: `Error al cargar: ${error.message}`});
+          } finally {
+              setIsUploading(false);
+              if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+              }
+              setTimeout(() => setFeedbackMessage(null), 7000);
+          }
+      };
+      reader.readAsArrayBuffer(file);
+  };
+
+  const handleDownloadTemplate = () => {
+      const templates = {
+          [DbTab.Residents]: {
+              headers: ['apartment', 'name', 'email', 'phone'],
+              filename: 'plantilla_residentes.xlsx'
+          },
+          [DbTab.AccountStatus]: {
+              headers: ['apartment', 'lastPaymentDate', 'adminFeeValue', 'pendingInstallments', 'otherCharges', 'outstandingBalance'],
+              filename: 'plantilla_estado_de_cuentas.xlsx'
+          },
+          [DbTab.Providers]: {
+              headers: ['company', 'specialty', 'email', 'phone'],
+              filename: 'plantilla_proveedores.xlsx'
+          },
+          [DbTab.Internal]: {
+              headers: ['name', 'position', 'email', 'phone'],
+              filename: 'plantilla_personal_interno.xlsx'
+          },
+          [DbTab.Users]: null 
+      };
+
+      const templateConfig = templates[activeDbTab];
+      if (!templateConfig) {
+          alert(`La descarga de plantilla para ${activeDbTab} no está disponible.`);
+          return;
+      }
+      
+      const ws = XLSX.utils.aoa_to_sheet([templateConfig.headers]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, activeDbTab);
+      XLSX.writeFile(wb, templateConfig.filename);
   };
   
   const renderContent = () => {
@@ -294,16 +369,25 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             Utiliza estas herramientas para cargar o actualizar la información de <span className="font-semibold">{activeDbTab}</span> de forma masiva.
           </p>
           <div className="flex flex-wrap items-center gap-4">
-              <button className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+              <button 
+                  onClick={handleDownloadTemplate}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
                   Descargar Plantilla
               </button>
               <button 
-                  onClick={handleSimulateUpload} 
+                  onClick={handleUploadClick} 
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
                   disabled={isUploading}
               >
                   {isUploading ? 'Cargando...' : `Cargar Información (${activeDbTab})`}
               </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+                accept=".xlsx, .xls, .csv"
+              />
           </div>
           {feedbackMessage && (
             <p className={`text-sm mt-4 ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>

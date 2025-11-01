@@ -7,6 +7,13 @@ const handleApiError = (error: any, context: string) => {
     return null; 
 }
 
+const bulkUpsert = async (tableName: string, conjuntoId: string, data: any[]) => {
+    if (data.length === 0) return;
+    const supabaseData = data.map(item => ({ ...toSupabase(item), conjunto_id: conjuntoId }));
+    const { error } = await supabase.from(tableName).upsert(supabaseData);
+    if (error) handleApiError(error, `bulkUpsert ${tableName}`);
+};
+
 export const apiService = {
   // --- Super Admin ---
   checkIfSuperAdmin: async (email: string): Promise<boolean> => {
@@ -395,5 +402,19 @@ export const apiService = {
   deleteExpense: async (conjuntoId: string, id: number): Promise<void> => {
     const { error } = await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId).eq('id', id);
     if (error) handleApiError(error, 'deleteExpense');
+  },
+  
+  // --- Bulk Data Management ---
+  bulkUpsertResidents: async (conjuntoId: string, residents: Resident[]): Promise<void> => {
+      await bulkUpsert('residents', conjuntoId, residents);
+  },
+  bulkUpsertAccountStatus: async (conjuntoId: string, accounts: AccountStatus[]): Promise<void> => {
+      await bulkUpsert('account_status', conjuntoId, accounts);
+  },
+  bulkUpsertProviders: async (conjuntoId: string, providers: Omit<Provider, 'id'>[]): Promise<void> => {
+      await bulkUpsert('providers', conjuntoId, providers);
+  },
+  bulkUpsertInternalStaff: async (conjuntoId: string, staff: Omit<InternalStaff, 'id'>[]): Promise<void> => {
+      await bulkUpsert('internal_staff', conjuntoId, staff);
   },
 };
