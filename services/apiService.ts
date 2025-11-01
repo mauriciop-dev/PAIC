@@ -1,126 +1,166 @@
-import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats, SuperAdminProfile } from '../types';
+import { supabase } from './supabaseClient';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats, UserRole } from '../types';
 
-// Simulate network delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const handleApiError = (error: any, context: string) => {
+    console.error(`Error in ${context}:`, error.message);
+    // In a real app, you might want to throw the error or return a specific error object.
+    // For now, we return empty arrays or null to prevent crashes.
+    return null;
+}
 
 export const apiService = {
   // --- Super Admin ---
   checkIfSuperAdmin: async (email: string): Promise<boolean> => {
-      await delay(100);
-      return dataStore.isSuperAdmin(email);
+      const { data, error } = await supabase.from('super_admins').select('email').eq('email', email).single();
+      if (error && error.code !== 'PGRST116') handleApiError(error, 'checkIfSuperAdmin');
+      return !!data;
   },
   fetchPlatformStats: async (): Promise<PlatformStats> => {
-      await delay(500);
-      return dataStore.getPlatformStats();
+      const { count: totalConjuntos } = await supabase.from('conjuntos').select('*', { count: 'exact', head: true });
+      const { count: paidSubscriptions } = await supabase.from('conjuntos').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'Paid');
+      const { count: totalResidents } = await supabase.from('residents').select('*', { count: 'exact', head: true });
+      const { data: paidConjuntos } = await supabase.from('conjuntos').select('plan_price').eq('subscription_plan', 'Paid');
+      
+      const monthlyRecurringRevenue = paidConjuntos?.reduce((sum, c) => sum + (c.plan_price || 0), 0) || 0;
+
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const { count: newThisMonth } = await supabase.from('conjuntos').select('*', { count: 'exact', head: true }).gte('registration_date', firstDayOfMonth);
+
+      return {
+          totalConjuntos: totalConjuntos ?? 0,
+          paidSubscriptions: paidSubscriptions ?? 0,
+          totalResidents: totalResidents ?? 0,
+          monthlyRecurringRevenue,
+          newThisMonth: newThisMonth ?? 0,
+      };
   },
   fetchAllConjuntos: async (): Promise<ConjuntoInfo[]> => {
-      await delay(300);
-      return dataStore.getAllConjuntos();
+      const { data, error } = await supabase.from('conjuntos').select('*');
+      if (error) return handleApiError(error, 'fetchAllConjuntos') || [];
+      return data || [];
   },
   fetchConjuntoInfo: async (id: string): Promise<ConjuntoInfo | null> => {
-      await delay(100);
-      return dataStore.getConjuntoInfo(id);
+      const { data, error } = await supabase.from('conjuntos').select('*').eq('id', id).single();
+      if (error) return handleApiError(error, `fetchConjuntoInfo for ${id}`);
+      return data;
   },
   updateConjuntoInfo: async (info: ConjuntoInfo): Promise<void> => {
-      await delay(400); // Simulate saving
-      dataStore.updateConjuntoInfo(info);
+      const { error } = await supabase.from('conjuntos').upsert(info);
+      if (error) handleApiError(error, 'updateConjuntoInfo');
   },
 
   // --- Auth & User Management ---
   authenticateUser: async (email: string, pass: string): Promise<PlatformUser | null> => {
-      await delay(500);
-      return dataStore.authenticateUser(email, pass);
+      const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', pass).single();
+      if (error) return handleApiError(error, 'authenticateUser');
+      return data;
   },
   findUserByEmail: async (email: string): Promise<PlatformUser | null> => {
-      await delay(200);
-      return dataStore.findUserByEmail(email);
+      const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
+      // Don't log "no rows found" as an error for this function
+      if (error && error.code !== 'PGRST116') return handleApiError(error, 'findUserByEmail');
+      return data;
   },
   fetchUsers: async (conjuntoId: string): Promise<PlatformUser[]> => {
-      await delay(200);
-      return dataStore.getUsers(conjuntoId);
+      const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
+      if (error) return handleApiError(error, 'fetchUsers') || [];
+      return data || [];
   },
-  addUser: async (conjuntoId: string, user: Omit<PlatformUser, 'id' | 'conjuntoId'>): Promise<void> => {
-      await delay(300);
-      dataStore.addUser(conjuntoId, user);
+  addUser: async (conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> => {
+      const { error } = await supabase.from('users').insert({ ...user, conjunto_id: conjuntoId });
+      if (error) handleApiError(error, 'addUser');
   },
   updateUser: async (user: PlatformUser): Promise<void> => {
-      await delay(300);
-      dataStore.updateUser(user);
+      const { error } = await supabase.from('users').update(user).eq('id', user.id);
+      if (error) handleApiError(error, 'updateUser');
   },
   deleteUser: async (userId: number): Promise<void> => {
-      await delay(300);
-      dataStore.deleteUser(userId);
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) handleApiError(error, 'deleteUser');
   },
   
   // --- Access Point Management ---
   fetchAccessPoints: async (conjuntoId: string): Promise<AccessPoint[]> => {
-      await delay(200);
-      return dataStore.getAccessPoints(conjuntoId);
+      const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
+      if (error) return handleApiError(error, 'fetchAccessPoints') || [];
+      return data || [];
   },
   addAccessPoint: async (conjuntoId: string, name: string): Promise<void> => {
-      await delay(300);
-      dataStore.addAccessPoint(conjuntoId, name);
+      const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
+      if (error) handleApiError(error, 'addAccessPoint');
   },
   deleteAccessPoint: async (conjuntoId: string, id: number): Promise<void> => {
-      await delay(300);
-      dataStore.deleteAccessPoint(conjuntoId, id);
+      const { error } = await supabase.from('access_points').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+      if (error) handleApiError(error, 'deleteAccessPoint');
   },
 
   // --- Fetching Data (Tenant-Aware) ---
   fetchResidents: async (conjuntoId: string): Promise<Resident[]> => {
-    await delay(200);
-    return dataStore.getResidents(conjuntoId);
+    const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchResidents') || [];
+    return data || [];
   },
   fetchAccountStatus: async (conjuntoId: string): Promise<AccountStatus[]> => {
-    await delay(200);
-    return dataStore.getAccountStatus(conjuntoId);
+    const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchAccountStatus') || [];
+    return data || [];
   },
   fetchProviders: async (conjuntoId: string): Promise<Provider[]> => {
-    await delay(200);
-    return dataStore.getProviders(conjuntoId);
+    const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchProviders') || [];
+    return data || [];
   },
   fetchInternalStaff: async (conjuntoId: string): Promise<InternalStaff[]> => {
-    await delay(200);
-    return dataStore.getInternalStaff(conjuntoId);
+    const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchInternalStaff') || [];
+    return data || [];
   },
   fetchDueDates: async (conjuntoId: string): Promise<DueDate[]> => {
-    await delay(200);
-    return dataStore.getDueDates(conjuntoId);
+    const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchDueDates') || [];
+    return data || [];
   },
   fetchTasks: async (conjuntoId: string): Promise<Task[]> => {
-    await delay(200);
-    return dataStore.getTasks(conjuntoId);
+    const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchTasks') || [];
+    return data || [];
   },
   fetchBookings: async (conjuntoId: string): Promise<Booking[]> => {
-    await delay(200);
-    return dataStore.getBookings(conjuntoId);
+    const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchBookings') || [];
+    return data || [];
   },
   fetchCommonAreas: async (conjuntoId: string): Promise<CommonArea[]> => {
-    await delay(200);
-    return dataStore.getCommonAreas(conjuntoId);
+    const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
+    if (error) return handleApiError(error, 'fetchCommonAreas') || [];
+    // Colors need to be parsed from JSON string in DB
+    return data?.map(area => ({ ...area, color: JSON.parse(area.color) })) || [];
   },
   fetchExpenses: async (conjuntoId: string): Promise<Expense[]> => {
-      await delay(200);
-      return dataStore.getExpenses(conjuntoId);
+      const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
+      if (error) return handleApiError(error, 'fetchExpenses') || [];
+      return data || [];
   },
   fetchVisitorLogs: async (conjuntoId: string): Promise<VisitorLog[]> => {
-      await delay(200);
-      return dataStore.getVisitorLogs(conjuntoId);
+      const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId);
+      if (error) return handleApiError(error, 'fetchVisitorLogs') || [];
+      return data || [];
   },
   fetchPackageLogs: async (conjuntoId: string): Promise<PackageLog[]> => {
-      await delay(200);
-      return dataStore.getPackageLogs(conjuntoId);
+      const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId);
+      if (error) return handleApiError(error, 'fetchPackageLogs') || [];
+      return data || [];
   },
 
   fetchDashboardSummary: async (conjuntoId: string): Promise<DashboardSummary> => {
-    await delay(400); // Simulate a more complex query
-    const accounts = dataStore.getAccountStatus(conjuntoId);
-    const tasks = dataStore.getTasks(conjuntoId);
-    const dueDates = dataStore.getDueDates(conjuntoId);
-    const packages = dataStore.getPackageLogs(conjuntoId);
-    
-    // ... (rest of the logic is the same)
+    const [accounts, tasks, dueDates, packages] = await Promise.all([
+        apiService.fetchAccountStatus(conjuntoId),
+        apiService.fetchTasks(conjuntoId),
+        apiService.fetchDueDates(conjuntoId),
+        apiService.fetchPackageLogs(conjuntoId),
+    ]);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const notifications: NotificationItem[] = [];
@@ -159,62 +199,71 @@ export const apiService = {
   
   // --- Modifying Data (Tenant-Aware) ---
   updateResident: async (conjuntoId: string, resident: Resident): Promise<void> => {
-    await delay(300);
-    dataStore.updateResident(conjuntoId, resident);
+    const { error } = await supabase.from('residents').update(resident).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
+    if (error) handleApiError(error, 'updateResident');
   },
   deleteResident: async (conjuntoId: string, apartment: string): Promise<void> => {
-    await delay(300);
-    dataStore.deleteResident(conjuntoId, apartment);
+    const { error } = await supabase.from('residents').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    if (error) handleApiError(error, 'deleteResident');
   },
   addBooking: async (conjuntoId: string, booking: Booking): Promise<void> => {
-    await delay(300);
-    dataStore.addBooking(conjuntoId, booking);
+    const { error } = await supabase.from('bookings').insert({ ...booking, conjunto_id: conjuntoId });
+    if (error) handleApiError(error, 'addBooking');
   },
   addCommonArea: async (conjuntoId: string, name: string): Promise<void> => {
-    await delay(300);
-    dataStore.addCommonArea(conjuntoId, name);
+    const availableColors = [
+      { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+      { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+      { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+    ];
+    const { count } = await supabase.from('common_areas').select('*', { count: 'exact', head: true }).eq('conjunto_id', conjuntoId);
+    const color = availableColors[ (count || 0) % availableColors.length ];
+
+    const { error } = await supabase.from('common_areas').insert({ name, color: JSON.stringify(color), conjunto_id: conjuntoId });
+    if (error) handleApiError(error, 'addCommonArea');
   },
   removeCommonArea: async (conjuntoId: string, id: string): Promise<void> => {
-    await delay(300);
-    dataStore.removeCommonArea(conjuntoId, id);
+    const { error } = await supabase.from('common_areas').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) handleApiError(error, 'removeCommonArea');
   },
   
   addTask: async (conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> => {
-    await delay(300);
-    dataStore.addTask(conjuntoId, task);
+    const { error } = await supabase.from('tasks').insert({ ...task, conjunto_id: conjuntoId });
+    if (error) handleApiError(error, 'addTask');
   },
   updateTask: async (conjuntoId: string, task: Task): Promise<void> => {
-    await delay(300);
-    dataStore.updateTask(conjuntoId, task);
+    const { error } = await supabase.from('tasks').update(task).eq('conjunto_id', conjuntoId).eq('id', task.id);
+    if (error) handleApiError(error, 'updateTask');
   },
   deleteTask: async (conjuntoId: string, id: number): Promise<void> => {
-    await delay(300);
-    dataStore.deleteTask(conjuntoId, id);
+    const { error } = await supabase.from('tasks').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) handleApiError(error, 'deleteTask');
   },
   
   addDueDate: async (conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> => {
-    await delay(300);
-    dataStore.addDueDate(conjuntoId, dueDate);
+    const { error } = await supabase.from('due_dates').insert({ ...dueDate, conjunto_id: conjuntoId });
+    if (error) handleApiError(error, 'addDueDate');
   },
   updateDueDate: async (conjuntoId: string, dueDate: DueDate): Promise<void> => {
-    await delay(300);
-    dataStore.updateDueDate(conjuntoId, dueDate);
+    const { error } = await supabase.from('due_dates').update(dueDate).eq('conjunto_id', conjuntoId).eq('id', dueDate.id);
+    if (error) handleApiError(error, 'updateDueDate');
   },
   deleteDueDate: async (conjuntoId: string, id: number): Promise<void> => {
-    await delay(300);
-    dataStore.deleteDueDate(conjuntoId, id);
+    const { error } = await supabase.from('due_dates').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) handleApiError(error, 'deleteDueDate');
   },
   
   addExpense: async (conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> => {
-    await delay(300);
-    dataStore.addExpense(conjuntoId, expense);
+    const { error } = await supabase.from('expenses').insert({ ...expense, conjunto_id: conjuntoId });
+    if (error) handleApiError(error, 'addExpense');
   },
   updateExpense: async (conjuntoId: string, expense: Expense): Promise<void> => {
-    await delay(300);
-    dataStore.updateExpense(conjuntoId, expense);
+    const { error } = await supabase.from('expenses').update(expense).eq('conjunto_id', conjuntoId).eq('id', expense.id);
+    if (error) handleApiError(error, 'updateExpense');
   },
   deleteExpense: async (conjuntoId: string, id: number): Promise<void> => {
-    await delay(300);
-    dataStore.deleteExpense(conjuntoId, id);
+    const { error } = await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) handleApiError(error, 'deleteExpense');
   },
 };
