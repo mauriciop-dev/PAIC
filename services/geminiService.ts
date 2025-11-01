@@ -22,11 +22,10 @@ const getAiClient = async (): Promise<GoogleGenAI | null> => {
 
     try {
         isInitializing = true;
-        // FIX: The API key must be obtained from process.env.API_KEY as per the guidelines.
-        // This also resolves the TypeScript errors with window.aistudio.
+        // FIX: Read the API key from process.env as required by the environment.
         const apiKey = process.env.API_KEY;
         if (!apiKey) {
-            throw new Error("API key not found. Make sure API_KEY environment variable is set.");
+            throw new Error("API key no encontrada. Asegúrate de que la clave de API de Gemini esté configurada en las variables de entorno.");
         }
         ai = new GoogleGenAI({ apiKey });
         return ai;
