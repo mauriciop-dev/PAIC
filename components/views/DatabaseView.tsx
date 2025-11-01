@@ -93,7 +93,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       if (!userProfile.conjuntoId) return;
       if(user.id) {
           // FIX: Pass conjuntoId to updateUser, assuming signature is (conjuntoId, user).
-          await apiService.updateUser(user);
+          await apiService.updateUser(userProfile.conjuntoId, user);
       } else {
           // FIX: Pass conjuntoId to addUser.
           await apiService.addUser(userProfile.conjuntoId, user);
@@ -106,7 +106,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       if(window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
           if (!userProfile.conjuntoId) return;
           // FIX: Pass conjuntoId to deleteUser, assuming signature is (conjuntoId, userId).
-          await apiService.deleteUser(userId);
+          await apiService.deleteUser(userProfile.conjuntoId, userId);
           fetchData();
       }
   };

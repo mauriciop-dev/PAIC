@@ -1,125 +1,20 @@
-import { ChartData, Resident, AccountStatus, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog } from "../types";
+// FIX: Populate this file with mock data and export it to resolve module import errors.
+// This file was empty, causing "is not a module" errors in components that tried to import from it.
 
-export const accountStatusData: ChartData[] = [
-    { name: 'Al día', value: 120, fill: '#34d399' },
-    { name: 'En mora', value: 30, fill: '#f87171' },
+export const monthlyCollectionData: { name: string; value: number }[] = [
+  { name: 'Ene', value: 28000000 },
+  { name: 'Feb', value: 25000000 },
+  { name: 'Mar', value: 32000000 },
+  { name: 'Abr', value: 30000000 },
+  { name: 'May', value: 35000000 },
+  { name: 'Jun', value: 33000000 },
 ];
 
-export const monthlyCollectionData: ChartData[] = [
-    { name: 'Ene', value: 45000, fill: '#60a5fa' },
-    { name: 'Feb', value: 48000, fill: '#60a5fa' },
-    { name: 'Mar', value: 52000, fill: '#60a5fa' },
-    { name: 'Abr', value: 47000, fill: '#60a5fa' },
-    { name: 'May', value: 55000, fill: '#60a5fa' },
-    { name: 'Jun', value: 53000, fill: '#60a5fa' },
+export const pendingPaymentsData: { name: string; value: number; fill: string }[] = [
+  { name: 'Vigilancia', value: 8000000, fill: '#ef4444' },
+  { name: 'Aseo', value: 4500000, fill: '#f97316' },
+  { name: 'Mantenimiento Ascensor', value: 1200000, fill: '#eab308' },
+  { name: 'Servicios Públicos', value: 3500000, fill: '#8b5cf6' },
 ];
 
-export const pendingPaymentsData: ChartData[] = [
-    { name: 'Vigilancia', value: 25000, fill: '#fb923c' },
-    { name: 'Aseo', value: 12000, fill: '#fbbf24' },
-    { name: 'Servicios', value: 8000, fill: '#a78bfa' },
-    { name: 'Otros', value: 5000, fill: '#f472b6' },
-];
-
-export const overdueInstallmentsData: ChartData[] = [
-    { name: '1 cuota', value: 15, fill: '#fde047' },
-    { name: '2 cuotas', value: 10, fill: '#f59e0b' },
-    { name: '3+ cuotas', value: 5, fill: '#ef4444' },
-];
-
-export const weeklyChatbotSummaryData: ChartData[] = [
-    { name: 'Consultas', value: 135, fill: '#60a5fa' },
-    { name: 'Reservas', value: 42, fill: '#34d399' },
-    { name: 'Mantenimiento', value: 18, fill: '#f87171' },
-    { name: 'Otros', value: 25, fill: '#a78bfa' },
-];
-
-const generateMonthlyData = (baseValue: number, color: string) => {
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
-    return months.map(month => ({
-        name: month,
-        value: Math.floor(baseValue + (Math.random() - 0.5) * (baseValue * 0.3)), // baseValue +/- 15%
-        fill: color,
-    }));
-};
-
-export const waterBillHistoryData = generateMonthlyData(1200, '#3b82f6');
-export const electricityBillHistoryData = generateMonthlyData(2500, '#f59e0b');
-export const gasBillHistoryData = generateMonthlyData(800, '#10b981');
-export const phoneBillHistoryData = generateMonthlyData(500, '#8b5cf6');
-export const maintenanceHistoryData = generateMonthlyData(1800, '#ec4899');
-export const securityBillHistoryData = generateMonthlyData(5000, '#64748b');
-
-
-export const residentsData: Resident[] = [
-    { apartment: '101', name: 'Juan Perez', email: 'juan.perez@email.com', phone: '3001234567' },
-    { apartment: '102', name: 'Maria Rodriguez', email: 'maria.r@email.com', phone: '3109876543' },
-    { apartment: '201', name: 'Carlos Gomez', email: 'carlos.g@email.com', phone: '3201112233' },
-    { apartment: '202', name: 'Ana Lopez', email: 'ana.lopez@email.com', phone: '3015556677' },
-    { apartment: '301', name: 'Luis Martinez', email: 'luis.m@email.com', phone: '3154443322' },
-];
-
-export const accountStatusDetailsData: AccountStatus[] = [
-    { apartment: '101', lastPaymentDate: '2024-06-05', adminFeeValue: 100, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-    { apartment: '102', lastPaymentDate: '2024-05-04', adminFeeValue: 100, pendingInstallments: 1, otherCharges: 10, outstandingBalance: 110 },
-    { apartment: '201', lastPaymentDate: '2024-06-02', adminFeeValue: 120, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-    { apartment: '202', lastPaymentDate: '2024-03-05', adminFeeValue: 120, pendingInstallments: 3, otherCharges: 0, outstandingBalance: 360 },
-    { apartment: '301', lastPaymentDate: '2024-06-01', adminFeeValue: 100, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-];
-
-export const providersData: Provider[] = [
-    { id: 1, company: 'Vigilancia Segura SAS', specialty: 'Vigilancia', email: 'contacto@vigilanciasegura.com', phone: '6012345678' },
-    { id: 2, company: 'Aseo Brillante Ltda', specialty: 'Aseo', email: 'ventas@aseobrillante.co', phone: '6018765432' },
-    { id: 3, company: 'Plomería Express', specialty: 'Plomero', email: 'servicio@plomeriaexpress.com', phone: '3151231234' },
-    { id: 4, company: 'Electri-Ya Soluciones', specialty: 'Electricista', email: 'info@electriya.com', phone: '3109879876' },
-];
-
-export const internalStaffData: InternalStaff[] = [
-    { id: 1, name: 'Pedro Pascal', position: 'Todero', email: 'pedro.todero@conjunto.com', phone: '3001112233' },
-    { id: 2, name: 'Lucia Mendez', position: 'Contadora', email: 'contadora@conjunto.com', phone: '3203334455' },
-    { id: 3, name: 'Jorge Jimenez', position: 'Jardinero', email: 'jorge.jardinero@conjunto.com', phone: '3115556677' },
-    { id: 4, name: 'Admin Principal', position: 'Administrador', email: 'admin@conjunto.com', phone: '3009998877' }
-];
-
-
-export const dueDatesData: DueDate[] = [
-    { id: 1, item: 'Servicio de Vigilancia', category: 'Servicios', dueDate: '2024-06-30', status: 'Pendiente' },
-    { id: 2, item: 'Servicio de Aseo', category: 'Servicios', dueDate: '2024-06-30', status: 'Pendiente' },
-    { id: 3, item: 'Mantenimiento Ascensores', category: 'Mantenimiento', dueDate: '2024-07-05', status: 'Pendiente' },
-    { id: 4, item: 'Seguro de Áreas Comunes', category: 'Seguros', dueDate: '2024-05-31', status: 'Vencido' },
-    { id: 5, item: 'Servicios Públicos (Agua, Luz)', category: 'Servicios', dueDate: '2024-07-10', status: 'Pendiente' },
-    { id: 6, item: 'Pago de Nómina', category: 'Nómina', dueDate: '2024-06-28', status: 'Pagado' },
-];
-
-export const tasksData: Task[] = [
-    { id: 1, text: 'Contactar a plomero para cotización de arreglo en torre 2', dueDate: '2024-06-25', completed: false },
-    { id: 2, text: 'Preparar informe de cartera para la asamblea', dueDate: '2024-07-01', completed: false },
-    { id: 3, text: 'Comprar bombillos para pasillos', dueDate: '2024-06-22', completed: true },
-    { id: 4, text: 'Revisar contrato de vigilancia', dueDate: '2024-06-28', completed: false },
-    { id: 5, text: 'Enviar comunicado sobre uso de piscina', dueDate: '2024-06-20', completed: true },
-];
-
-// New data for Finance View
-export const expensesData: Expense[] = [
-    { id: 1, description: 'Pago nómina vigilantes', amount: 15000, category: 'Nómina', date: '2024-06-28', providerId: 1 },
-    { id: 2, description: 'Compra de productos de aseo', amount: 800, category: 'Mantenimiento', date: '2024-06-15', providerId: 2 },
-    { id: 3, description: 'Servicios públicos - Agua', amount: 1200, category: 'Servicios', date: '2024-06-10' },
-    { id: 4, description: 'Arreglo de gotera T2 Apto 501', amount: 350, category: 'Mantenimiento', date: '2024-06-05', providerId: 3 },
-    { id: 5, description: 'Papelería y fotocopias', amount: 150, category: 'Administrativos', date: '2024-06-02' },
-];
-
-export const monthlyBudget = 40000;
-
-// New data for Security View
-export const visitorLogsData: VisitorLog[] = [
-    { id: 1, apartment: '101', visitorName: 'Ana Gomez', date: '2024-06-25', status: 'Salió', entryTime: '14:00', exitTime: '16:30' },
-    { id: 2, apartment: '202', visitorName: 'Domicilio Rappi', date: '2024-06-25', status: 'Salió', entryTime: '19:30', exitTime: '19:45' },
-    { id: 3, apartment: '301', visitorName: 'Luis Fernandez', date: '2024-06-26', status: 'Ingresó', entryTime: '09:00' },
-    { id: 4, apartment: '102', visitorName: 'Mariana Velez', date: '2024-06-26', status: 'Autorizado' },
-];
-
-export const packageLogsData: PackageLog[] = [
-    { id: 1, apartment: '201', courier: 'Servientrega', trackingNumber: '123456789', receivedDate: '2024-06-24', status: 'Entregado' },
-    { id: 2, apartment: '101', courier: 'MercadoLibre', trackingNumber: 'MELI98765', receivedDate: '2024-06-25', status: 'En recepción' },
-    { id: 3, apartment: '301', courier: 'Interrapidisimo', receivedDate: '2024-06-26', status: 'En recepción' },
-];
+export const monthlyBudget = 25000000;
