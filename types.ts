@@ -162,6 +162,7 @@ export interface PackageLog {
     trackingNumber?: string;
     receivedDate: string;
     status: 'En recepción' | 'Entregado';
+    conjuntoId?: string;
 }
 
 export interface NotificationItem {

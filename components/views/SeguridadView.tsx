@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { VisitorLog, PackageLog, Resident, UserProfile } from '../../types';
@@ -10,17 +9,24 @@ interface SeguridadViewProps {
 }
 
 const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
-    const [activeTab, setActiveTab] = useState<SeguridadTab>('Visitantes');
+    const [activeTab, setActiveTab] = useState<SeguridadTab>('Paquetes');
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
     const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
     const [residents, setResidents] = useState<Resident[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Package Form State
+    const [pkgApartment, setPkgApartment] = useState('');
+    const [pkgCourier, setPkgCourier] = useState('');
+    const [pkgTracking, setPkgTracking] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedback, setFeedback] = useState<string | null>(null);
+
+
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
-            // FIX: Pass conjuntoId to apiService calls.
             const [visitors, packages, res] = await Promise.all([
                 apiService.fetchVisitorLogs(userProfile.conjuntoId),
                 apiService.fetchPackageLogs(userProfile.conjuntoId),
@@ -29,6 +35,9 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
             setVisitorLogs(visitors);
             setPackageLogs(packages);
             setResidents(res);
+            if (res.length > 0) {
+                setPkgApartment(res[0].apartment);
+            }
         } catch (error) {
             console.error("Failed to fetch security data:", error);
         } finally {
@@ -50,6 +59,42 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
             default: return 'bg-gray-100 text-gray-800';
         }
     };
+
+    const handleRegisterPackage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!pkgApartment || !pkgCourier || !userProfile.conjuntoId) return;
+
+        setIsSubmitting(true);
+        setFeedback(null);
+        try {
+            await apiService.addPackageLog(userProfile.conjuntoId, {
+                apartment: pkgApartment,
+                courier: pkgCourier,
+                trackingNumber: pkgTracking || undefined,
+            });
+            
+            // Reset form
+            setPkgCourier('');
+            setPkgTracking('');
+            
+            setFeedback('¡Paquete registrado exitosamente!');
+            setTimeout(() => setFeedback(null), 3000);
+            
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Error registering package:", error);
+            setFeedback("Error al registrar el paquete.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleMarkDelivered = async (packageId: number) => {
+        if (!userProfile.conjuntoId) return;
+        await apiService.updatePackageLogStatus(userProfile.conjuntoId, packageId, 'Entregado');
+        fetchData();
+    };
+
 
     const renderVisitorForm = () => (
         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -79,24 +124,25 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const renderPackageForm = () => (
          <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Paquete</h3>
-            <form className="space-y-4">
+            <form onSubmit={handleRegisterPackage} className="space-y-4">
                  <div>
                     <label htmlFor="apartmentPackage" className="block text-sm font-medium text-gray-700">Apartamento</label>
-                    <select id="apartmentPackage" className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
+                    <select id="apartmentPackage" value={pkgApartment} onChange={e => setPkgApartment(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
                         {residents.map(r => <option key={r.apartment} value={r.apartment}>Apto {r.apartment} - {r.name}</option>)}
                     </select>
                 </div>
                  <div>
                     <label htmlFor="courier" className="block text-sm font-medium text-gray-700">Empresa de Transporte</label>
-                    <input type="text" id="courier" placeholder="Ej: Servientrega" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                    <input type="text" id="courier" value={pkgCourier} onChange={e => setPkgCourier(e.target.value)} placeholder="Ej: Servientrega" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                 </div>
                 <div>
                     <label htmlFor="trackingNumber" className="block text-sm font-medium text-gray-700">Número de Guía (Opcional)</label>
-                    <input type="text" id="trackingNumber" className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+                    <input type="text" id="trackingNumber" value={pkgTracking} onChange={e => setPkgTracking(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
                 </div>
-                <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                    Registrar Recepción
+                <button type="submit" disabled={isSubmitting} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
+                    {isSubmitting ? 'Registrando...' : 'Registrar Recepción'}
                 </button>
+                {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
             </form>
         </div>
     );
@@ -157,16 +203,22 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                     <tbody>
                         {packageLogs.map(log => (
                             <tr key={log.id} className="bg-white border-b hover:bg-gray-50">
-                                <td className="px-6 py-4">{log.receivedDate}</td>
+                                <td className="px-6 py-4">{new Date(log.receivedDate).toLocaleString('es-CO')}</td>
                                 <td className="px-6 py-4 font-medium text-gray-900">{log.apartment}</td>
                                 <td className="px-6 py-4">{log.courier}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusChipStyle(log.status)}`}>
                                         {log.status}
                                     </span>
+
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
-                                     <button className="font-medium text-green-600 hover:underline text-xs">Marcar Entregado</button>
+                                     <button 
+                                        onClick={() => handleMarkDelivered(log.id)}
+                                        disabled={log.status === 'Entregado'}
+                                        className="font-medium text-green-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
+                                        Marcar Entregado
+                                     </button>
                                 </td>
                             </tr>
                         ))}

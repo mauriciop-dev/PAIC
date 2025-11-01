@@ -235,9 +235,18 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
-        const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId);
+        const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
         if (error) return handleApiError(error, 'fetchPackageLogs') || [];
         return fromSupabase(data) as PackageLog[];
+    },
+    async addPackageLog(conjuntoId: string, pkg: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
+        const payload = { ...pkg, receivedDate: new Date().toISOString(), status: 'En recepción' as const, conjuntoId };
+        const { error } = await supabase.from('package_logs').insert(toSupabase(payload));
+        if (error) handleApiError(error, 'addPackageLog');
+    },
+    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
+        const { error } = await supabase.from('package_logs').update({ status }).eq('id', packageId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'updatePackageLogStatus');
     },
 
     // Settings
@@ -270,24 +279,37 @@ export const apiService = {
     // Dashboard Specific
     async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary | null> {
         // This would be a single RPC call in a real app for efficiency
-        const [debtors, tasks, overdue, packages, dueDates] = await Promise.all([
+        const [debtors, tasks, overdue, packages, dueDates, recentPackages] = await Promise.all([
              supabase.from('account_status').select('apartment', { count: 'exact' }).eq('conjunto_id', conjuntoId).gt('outstanding_balance', 0),
              supabase.from('tasks').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('completed', false),
              supabase.from('due_dates').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'Vencido'),
              supabase.from('package_logs').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'En recepción'),
-             this.fetchDueDates(conjuntoId)
+             this.fetchDueDates(conjuntoId),
+             this.fetchPackageLogs(conjuntoId)
         ]);
 
-        const notifications: NotificationItem[] = dueDates
+        const dueDateNotifications: NotificationItem[] = dueDates
             .filter(d => d.status !== 'Pagado')
-            .slice(0, 3)
+            .slice(0, 2)
             .map(d => ({
-                id: d.id,
+                id: `due-${d.id}`,
                 type: 'due-date',
                 text: `${d.status}: ${d.item}`,
                 details: `Vence el ${d.dueDate}`,
                 urgency: d.status === 'Vencido' ? 'high' : 'medium',
                 linkTo: Tab.DueDates
+            }));
+            
+        const packageNotifications: NotificationItem[] = (fromSupabase(recentPackages) as PackageLog[])
+            .filter(p => p.status === 'En recepción')
+            .slice(0, 2)
+            .map(p => ({
+                id: `pkg-${p.id}`,
+                type: 'package',
+                text: `Paquete para Apto ${p.apartment}`,
+                details: `Recibido de ${p.courier}`,
+                urgency: 'low',
+                linkTo: Tab.Seguridad,
             }));
         
         return {
@@ -297,7 +319,7 @@ export const apiService = {
                 overduePayments: overdue.count ?? 0,
                 packagesToDeliver: packages.count ?? 0,
             },
-            notifications,
+            notifications: [...dueDateNotifications, ...packageNotifications].slice(0,4),
         };
     },
     async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null> {

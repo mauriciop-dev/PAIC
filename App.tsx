@@ -8,11 +8,14 @@ import InitialSetupModal from './components/InitialSetupModal';
 import SettingsModal from './components/SettingsModal';
 import LoginView from './components/views/LoginView';
 import SuperAdminDashboard from './components/views/SuperAdminDashboard';
-import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile } from './types';
+import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 import { Icon } from './components/ui/Icon';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
 import { apiService } from './services/apiService';
+import { supabase } from './services/supabaseClient';
+import NotificationToast from './components/ui/NotificationToast';
+import { fromSupabase } from './utils/dbMappers';
 
 declare global {
   interface Window {
@@ -32,7 +35,10 @@ const App: React.FC = () => {
   const [superAdminProfile, setSuperAdminProfile] = useState<SuperAdminProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
 
+  const [notification, setNotification] = useState<string | null>(null);
+
   const handleLogout = useCallback(() => {
+    supabase.removeAllChannels();
     setUserProfile(null);
     setSuperAdminProfile(null);
     setConjuntoInfo(null);
@@ -103,6 +109,31 @@ const App: React.FC = () => {
 
     loadSession();
   }, [handleLogout]);
+
+  useEffect(() => {
+      if (userProfile?.role === UserRole.Admin && userProfile.conjuntoId) {
+          const channel = supabase
+              .channel('package-notifications')
+              .on(
+                  'postgres_changes',
+                  { 
+                      event: 'INSERT', 
+                      schema: 'public', 
+                      table: 'package_logs',
+                      filter: `conjunto_id=eq.${userProfile.conjuntoId}`
+                  },
+                  (payload) => {
+                      const newPackage = fromSupabase(payload.new) as PackageLog;
+                      setNotification(`Nuevo paquete para Apto ${newPackage.apartment} de ${newPackage.courier}`);
+                  }
+              )
+              .subscribe();
+
+          return () => {
+              supabase.removeChannel(channel);
+          };
+      }
+  }, [userProfile]);
   
   const handleAuthSuccess = async (profile: UserProfile) => {
     setUserProfile(profile);
@@ -194,6 +225,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
+      <NotificationToast message={notification} onClose={() => setNotification(null)} />
       <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} />
       
       {userProfile.role === UserRole.Admin && (
