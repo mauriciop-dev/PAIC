@@ -1,12 +1,41 @@
 import { supabase } from './supabaseClient';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats, UserRole } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats } from '../types';
 
 const handleApiError = (error: any, context: string) => {
-    console.error(`Error in ${context}:`, error.message);
-    // In a real app, you might want to throw the error or return a specific error object.
-    // For now, we return empty arrays or null to prevent crashes.
+    // A log with more details for debugging
+    console.error(`Supabase error in ${context}:`, error);
+    
+    // For functions returning arrays, return empty array to prevent map/filter errors
+    if (Array.isArray(handleApiError.caller.prototype)) {
+        return [];
+    }
+    // For functions returning single objects, return null
     return null;
 }
+
+// Helper to convert Supabase data (snake_case) to our app's types (camelCase)
+const fromSupabase = (data: any) => {
+    if (!data) return null;
+    if (Array.isArray(data)) return data.map(fromSupabase);
+    const camelCased: { [key: string]: any } = {};
+    for (const key in data) {
+        const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+        camelCased[camelKey] = data[key];
+    }
+    return camelCased;
+};
+
+// Helper to convert our app's types (camelCase) to Supabase data (snake_case)
+const toSupabase = (data: any) => {
+    if (!data) return null;
+    const snakeCased: { [key: string]: any } = {};
+    for (const key in data) {
+        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        snakeCased[snakeKey] = data[key];
+    }
+    return snakeCased;
+};
+
 
 export const apiService = {
   // --- Super Admin ---
@@ -19,9 +48,11 @@ export const apiService = {
       const { count: totalConjuntos } = await supabase.from('conjuntos').select('*', { count: 'exact', head: true });
       const { count: paidSubscriptions } = await supabase.from('conjuntos').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'Paid');
       const { count: totalResidents } = await supabase.from('residents').select('*', { count: 'exact', head: true });
-      const { data: paidConjuntos } = await supabase.from('conjuntos').select('plan_price').eq('subscription_plan', 'Paid');
-      
-      const monthlyRecurringRevenue = paidConjuntos?.reduce((sum, c) => sum + (c.plan_price || 0), 0) || 0;
+      const { data: paidConjuntosData } = await supabase.from('conjuntos').select('plan_price').eq('subscription_plan', 'Paid');
+      // FIX: Add explicit type to the result of fromSupabase
+      const paidConjuntos = fromSupabase(paidConjuntosData) as { planPrice?: number }[];
+
+      const monthlyRecurringRevenue = paidConjuntos?.reduce((sum: number, c: any) => sum + (c.planPrice || 0), 0) || 0;
 
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -38,15 +69,17 @@ export const apiService = {
   fetchAllConjuntos: async (): Promise<ConjuntoInfo[]> => {
       const { data, error } = await supabase.from('conjuntos').select('*');
       if (error) return handleApiError(error, 'fetchAllConjuntos') || [];
-      return data || [];
+      // FIX: Add explicit type assertion for the returned array.
+      return fromSupabase(data) as ConjuntoInfo[] || [];
   },
   fetchConjuntoInfo: async (id: string): Promise<ConjuntoInfo | null> => {
       const { data, error } = await supabase.from('conjuntos').select('*').eq('id', id).single();
       if (error) return handleApiError(error, `fetchConjuntoInfo for ${id}`);
-      return data;
+      // FIX: Add explicit type assertion for the returned object.
+      return fromSupabase(data) as ConjuntoInfo | null;
   },
   updateConjuntoInfo: async (info: ConjuntoInfo): Promise<void> => {
-      const { error } = await supabase.from('conjuntos').upsert(info);
+      const { error } = await supabase.from('conjuntos').upsert(toSupabase(info));
       if (error) handleApiError(error, 'updateConjuntoInfo');
   },
 
@@ -54,25 +87,27 @@ export const apiService = {
   authenticateUser: async (email: string, pass: string): Promise<PlatformUser | null> => {
       const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', pass).single();
       if (error) return handleApiError(error, 'authenticateUser');
-      return data;
+      // FIX: Add explicit type assertion for the returned object.
+      return fromSupabase(data) as PlatformUser | null;
   },
   findUserByEmail: async (email: string): Promise<PlatformUser | null> => {
       const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
-      // Don't log "no rows found" as an error for this function
       if (error && error.code !== 'PGRST116') return handleApiError(error, 'findUserByEmail');
-      return data;
+      // FIX: Add explicit type assertion for the returned object.
+      return fromSupabase(data) as PlatformUser | null;
   },
   fetchUsers: async (conjuntoId: string): Promise<PlatformUser[]> => {
       const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
       if (error) return handleApiError(error, 'fetchUsers') || [];
-      return data || [];
+      // FIX: Add explicit type assertion for the returned array.
+      return fromSupabase(data) as PlatformUser[] || [];
   },
-  addUser: async (conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> => {
-      const { error } = await supabase.from('users').insert({ ...user, conjunto_id: conjuntoId });
+  addUser: async (conjuntoId: string, user: Omit<PlatformUser, 'id' | 'conjuntoId'>): Promise<void> => {
+      const { error } = await supabase.from('users').insert({ ...toSupabase(user), conjunto_id: conjuntoId });
       if (error) handleApiError(error, 'addUser');
   },
   updateUser: async (user: PlatformUser): Promise<void> => {
-      const { error } = await supabase.from('users').update(user).eq('id', user.id);
+      const { error } = await supabase.from('users').update(toSupabase(user)).eq('id', user.id);
       if (error) handleApiError(error, 'updateUser');
   },
   deleteUser: async (userId: number): Promise<void> => {
@@ -84,7 +119,7 @@ export const apiService = {
   fetchAccessPoints: async (conjuntoId: string): Promise<AccessPoint[]> => {
       const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
       if (error) return handleApiError(error, 'fetchAccessPoints') || [];
-      return data || [];
+      return fromSupabase(data) as AccessPoint[] || [];
   },
   addAccessPoint: async (conjuntoId: string, name: string): Promise<void> => {
       const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
@@ -99,58 +134,58 @@ export const apiService = {
   fetchResidents: async (conjuntoId: string): Promise<Resident[]> => {
     const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchResidents') || [];
-    return data || [];
+    return fromSupabase(data) as Resident[] || [];
   },
   fetchAccountStatus: async (conjuntoId: string): Promise<AccountStatus[]> => {
     const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchAccountStatus') || [];
-    return data || [];
+    return fromSupabase(data) as AccountStatus[] || [];
   },
   fetchProviders: async (conjuntoId: string): Promise<Provider[]> => {
     const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchProviders') || [];
-    return data || [];
+    return fromSupabase(data) as Provider[] || [];
   },
   fetchInternalStaff: async (conjuntoId: string): Promise<InternalStaff[]> => {
     const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchInternalStaff') || [];
-    return data || [];
+    return fromSupabase(data) as InternalStaff[] || [];
   },
   fetchDueDates: async (conjuntoId: string): Promise<DueDate[]> => {
     const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchDueDates') || [];
-    return data || [];
+    return fromSupabase(data) as DueDate[] || [];
   },
   fetchTasks: async (conjuntoId: string): Promise<Task[]> => {
     const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchTasks') || [];
-    return data || [];
+    return fromSupabase(data) as Task[] || [];
   },
   fetchBookings: async (conjuntoId: string): Promise<Booking[]> => {
     const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchBookings') || [];
-    return data || [];
+    return fromSupabase(data) as Booking[] || [];
   },
   fetchCommonAreas: async (conjuntoId: string): Promise<CommonArea[]> => {
     const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
     if (error) return handleApiError(error, 'fetchCommonAreas') || [];
-    // Colors need to be parsed from JSON string in DB
-    return data?.map(area => ({ ...area, color: JSON.parse(area.color) })) || [];
+    const areas = fromSupabase(data) as any[];
+    return areas?.map((area: any) => ({ ...area, color: JSON.parse(area.color) })) || [];
   },
   fetchExpenses: async (conjuntoId: string): Promise<Expense[]> => {
       const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
       if (error) return handleApiError(error, 'fetchExpenses') || [];
-      return data || [];
+      return fromSupabase(data) as Expense[] || [];
   },
   fetchVisitorLogs: async (conjuntoId: string): Promise<VisitorLog[]> => {
       const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId);
       if (error) return handleApiError(error, 'fetchVisitorLogs') || [];
-      return data || [];
+      return fromSupabase(data) as VisitorLog[] || [];
   },
   fetchPackageLogs: async (conjuntoId: string): Promise<PackageLog[]> => {
       const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId);
       if (error) return handleApiError(error, 'fetchPackageLogs') || [];
-      return data || [];
+      return fromSupabase(data) as PackageLog[] || [];
   },
 
   fetchDashboardSummary: async (conjuntoId: string): Promise<DashboardSummary> => {
@@ -199,7 +234,7 @@ export const apiService = {
   
   // --- Modifying Data (Tenant-Aware) ---
   updateResident: async (conjuntoId: string, resident: Resident): Promise<void> => {
-    const { error } = await supabase.from('residents').update(resident).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
+    const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
     if (error) handleApiError(error, 'updateResident');
   },
   deleteResident: async (conjuntoId: string, apartment: string): Promise<void> => {
@@ -207,7 +242,7 @@ export const apiService = {
     if (error) handleApiError(error, 'deleteResident');
   },
   addBooking: async (conjuntoId: string, booking: Booking): Promise<void> => {
-    const { error } = await supabase.from('bookings').insert({ ...booking, conjunto_id: conjuntoId });
+    const { error } = await supabase.from('bookings').insert({ ...toSupabase(booking), conjunto_id: conjuntoId });
     if (error) handleApiError(error, 'addBooking');
   },
   addCommonArea: async (conjuntoId: string, name: string): Promise<void> => {
@@ -229,11 +264,11 @@ export const apiService = {
   },
   
   addTask: async (conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> => {
-    const { error } = await supabase.from('tasks').insert({ ...task, conjunto_id: conjuntoId });
+    const { error } = await supabase.from('tasks').insert({ ...toSupabase(task), conjunto_id: conjuntoId });
     if (error) handleApiError(error, 'addTask');
   },
   updateTask: async (conjuntoId: string, task: Task): Promise<void> => {
-    const { error } = await supabase.from('tasks').update(task).eq('conjunto_id', conjuntoId).eq('id', task.id);
+    const { error } = await supabase.from('tasks').update(toSupabase(task)).eq('conjunto_id', conjuntoId).eq('id', task.id);
     if (error) handleApiError(error, 'updateTask');
   },
   deleteTask: async (conjuntoId: string, id: number): Promise<void> => {
@@ -242,11 +277,11 @@ export const apiService = {
   },
   
   addDueDate: async (conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> => {
-    const { error } = await supabase.from('due_dates').insert({ ...dueDate, conjunto_id: conjuntoId });
+    const { error } = await supabase.from('due_dates').insert({ ...toSupabase(dueDate), conjunto_id: conjuntoId });
     if (error) handleApiError(error, 'addDueDate');
   },
   updateDueDate: async (conjuntoId: string, dueDate: DueDate): Promise<void> => {
-    const { error } = await supabase.from('due_dates').update(dueDate).eq('conjunto_id', conjuntoId).eq('id', dueDate.id);
+    const { error } = await supabase.from('due_dates').update(toSupabase(dueDate)).eq('conjunto_id', conjuntoId).eq('id', dueDate.id);
     if (error) handleApiError(error, 'updateDueDate');
   },
   deleteDueDate: async (conjuntoId: string, id: number): Promise<void> => {
@@ -255,11 +290,11 @@ export const apiService = {
   },
   
   addExpense: async (conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> => {
-    const { error } = await supabase.from('expenses').insert({ ...expense, conjunto_id: conjuntoId });
+    const { error } = await supabase.from('expenses').insert({ ...toSupabase(expense), conjunto_id: conjuntoId });
     if (error) handleApiError(error, 'addExpense');
   },
   updateExpense: async (conjuntoId: string, expense: Expense): Promise<void> => {
-    const { error } = await supabase.from('expenses').update(expense).eq('conjunto_id', conjuntoId).eq('id', expense.id);
+    const { error } = await supabase.from('expenses').update(toSupabase(expense)).eq('conjunto_id', conjuntoId).eq('id', expense.id);
     if (error) handleApiError(error, 'updateExpense');
   },
   deleteExpense: async (conjuntoId: string, id: number): Promise<void> => {

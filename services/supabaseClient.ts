@@ -7,6 +7,4 @@ if (!supabaseUrl || !supabaseKey) {
     throw new Error("Supabase URL and Key are required.");
 }
 
-// The Supabase client is configured to automatically map snake_case column names (from DB)
-// to camelCase properties (in JS objects), which matches the existing 'types.ts' interfaces.
 export const supabase = createClient(supabaseUrl, supabaseKey);
