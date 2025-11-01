@@ -149,10 +149,21 @@ const App: React.FC = () => {
     handleAuthSuccess(newUserProfile);
   }, []);
 
-  const handleSaveSetup = (info: ConjuntoInfo) => {
+  const handleSaveSetup = async (info: ConjuntoInfo) => {
+    // 1. Persist the new info to our simulated backend
+    await apiService.updateConjuntoInfo(info);
+
+    // 2. Update the local state to trigger re-render
     setConjuntoInfo(info);
     localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
     setIsInitialSetupModalOpen(false);
+
+    // 3. Also, sync the admin name with the user profile for UI consistency
+    if (userProfile && userProfile.name !== info.adminName) {
+      const updatedProfile = { ...userProfile, name: info.adminName };
+      setUserProfile(updatedProfile);
+      localStorage.setItem('paic_userProfile', JSON.stringify(updatedProfile));
+    }
   };
 
   const handleSaveSettings = (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => {

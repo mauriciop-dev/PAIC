@@ -81,6 +81,13 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     fetchData(); // Refresh data
     setIsEditModalOpen(false);
   };
+
+  const handleDeleteResident = async (apartment: string) => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar al residente del apartamento ${apartment}?`) && userProfile.conjuntoId) {
+        await apiService.deleteResident(userProfile.conjuntoId, apartment);
+        fetchData();
+    }
+  };
   
   const handleSaveUser = async (user: PlatformUser) => {
       if (!userProfile.conjuntoId) return;
@@ -126,7 +133,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
           return <div className="text-center p-10 text-gray-500">Cargando datos...</div>;
       }
       
-      const renderTableActions = () => (
+      const renderGenericTableActions = () => (
           <div className="space-x-2">
               <button className="text-xs font-medium text-blue-600 hover:underline">Editar</button>
               <button className="text-xs font-medium text-red-600 hover:underline">Eliminar</button>
@@ -183,7 +190,10 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{resident.name}</td>
                                   <td className="px-6 py-4">{resident.email}</td>
                                   <td className="px-6 py-4">{resident.phone}</td>
-                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                     <button onClick={() => handleEditResidentClick(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                     <button onClick={() => handleDeleteResident(resident.apartment)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                  </td>
                               </tr>
                           ))}
                       </tbody>
@@ -212,7 +222,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{account.pendingInstallments}</td>
                                   <td className="px-6 py-4">${account.otherCharges.toLocaleString()}</td>
                                   <td className="px-6 py-4 font-semibold">${account.outstandingBalance.toLocaleString()}</td>
-                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
                               </tr>
                           ))}
                       </tbody>
@@ -237,7 +247,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{provider.specialty}</td>
                                   <td className="px-6 py-4">{provider.email}</td>
                                   <td className="px-6 py-4">{provider.phone}</td>
-                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
                               </tr>
                           ))}
                       </tbody>
@@ -262,7 +272,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{staff.position}</td>
                                   <td className="px-6 py-4">{staff.email}</td>
                                   <td className="px-6 py-4">{staff.phone}</td>
-                                  <td className="px-6 py-4 text-right">{renderTableActions()}</td>
+                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
                               </tr>
                           ))}
                       </tbody>

@@ -109,6 +109,15 @@ export const dataStore = {
     },
     getAllConjuntos: (): ConjuntoInfo[] => [...db.conjuntos],
     getConjuntoInfo: (id: string): ConjuntoInfo | null => db.conjuntos.find(c => c.id === id) || null,
+    updateConjuntoInfo: (info: ConjuntoInfo): void => {
+        const index = db.conjuntos.findIndex(c => c.id === info.id);
+        if (index > -1) {
+            db.conjuntos[index] = { ...db.conjuntos[index], ...info };
+        } else {
+            db.conjuntos.push(info);
+        }
+        notifyListeners();
+    },
     
     // --- Auth ---
     authenticateUser: (email: string, pass: string): PlatformUser | null => {
@@ -228,6 +237,11 @@ export const dataStore = {
     updateResident: (conjuntoId: string, updatedResident: Resident): void => {
         const data = getConjuntoData(conjuntoId);
         data.residents = data.residents.map((r: Resident) => r.apartment === updatedResident.apartment ? updatedResident : r);
+        notifyListeners();
+    },
+    deleteResident: (conjuntoId: string, apartment: string): void => {
+        const data = getConjuntoData(conjuntoId);
+        data.residents = data.residents.filter((r: Resident) => r.apartment !== apartment);
         notifyListeners();
     },
 

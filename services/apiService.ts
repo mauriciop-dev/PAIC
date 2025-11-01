@@ -1,3 +1,4 @@
+
 import { dataStore } from '../data/dataStore';
 import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, SuperAdminProfile, UserRole } from '../types';
 
@@ -21,6 +22,10 @@ export const apiService = {
   fetchConjuntoInfo: async (id: string): Promise<ConjuntoInfo | null> => {
       await delay(100);
       return dataStore.getConjuntoInfo(id);
+  },
+  updateConjuntoInfo: async (info: ConjuntoInfo): Promise<void> => {
+      await delay(400); // Simulate saving
+      dataStore.updateConjuntoInfo(info);
   },
 
   // --- Auth & User Management ---
@@ -157,6 +162,10 @@ export const apiService = {
   updateResident: async (conjuntoId: string, resident: Resident): Promise<void> => {
     await delay(300);
     dataStore.updateResident(conjuntoId, resident);
+  },
+  deleteResident: async (conjuntoId: string, apartment: string): Promise<void> => {
+    await delay(300);
+    dataStore.deleteResident(conjuntoId, apartment);
   },
   addBooking: async (conjuntoId: string, booking: Booking): Promise<void> => {
     await delay(300);
