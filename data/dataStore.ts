@@ -48,7 +48,7 @@ let db = {
     ] as ConjuntoInfo[],
     
     superAdmins: [
-        { name: 'Platform Owner', email: 'superadmin@paic.com', role: UserRole.SuperAdmin, password: 'super' }
+        { name: 'Mauricio Pineda', email: 'hmauricio.pineda@gmail.com', role: UserRole.SuperAdmin, password: 'super' }
     ],
 
     users: [
@@ -101,7 +101,6 @@ export const dataStore = {
     // --- Super Admin ---
     authenticateSuperAdmin: (email: string, pass: string): Omit<SuperAdminProfile, 'name'> | null => {
         const admin = db.superAdmins.find(a => a.email === email && a.password === pass);
-        // FIX: Add a type guard to narrow the role type and prevent a type error.
         if (admin && admin.role === UserRole.SuperAdmin) {
             return { email: admin.email, role: admin.role };
         }

@@ -11,7 +11,7 @@ export const apiService = {
       await delay(500);
       const admin = dataStore.authenticateSuperAdmin(email, pass);
       if (admin) {
-          return { ...admin, name: 'Platform Owner' }; // Name is static for now
+          return { ...admin, name: 'Mauricio Pineda' }; // Name is static for now
       }
       return null;
   },
