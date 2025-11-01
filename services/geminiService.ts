@@ -14,15 +14,18 @@ const model = 'gemini-2.5-flash';
  * Initializes and returns a singleton promise for the GoogleGenAI client.
  * This is the correct, robust way to handle async initialization.
  */
-// FIX: Updated to use `process.env.API_KEY` as per coding guidelines. The `window.aistudio.getApiKey` method is deprecated.
+// FIX: Updated to check for the API key in both Vercel's `import.meta.env` and AI Studio's `process.env` to ensure compatibility across both environments.
 const getAiClient = (): Promise<GoogleGenAI> => {
     if (!aiPromise) {
         aiPromise = new Promise((resolve, reject) => {
             try {
-                if (!process.env.API_KEY) {
-                    return reject(new Error("La variable de entorno API_KEY no está configurada."));
+                // Vercel (Vite) uses `import.meta.env.VITE_...`, AI Studio uses `process.env.API_KEY`
+                const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || process.env.API_KEY;
+
+                if (!apiKey) {
+                    return reject(new Error("La variable de entorno de la API de Gemini no está configurada."));
                 }
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey: apiKey });
                 resolve(ai);
             } catch (error) {
                 reject(error);
