@@ -1,280 +1,189 @@
-
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { apiService } from '../../services/apiService';
-import { geminiService } from '../../services/geminiService';
-import { AccountStatus, Resident, InternalStaff, UserProfile } from '../../types';
+import React, { useState } from 'react';
+import { UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
-
-type TargetAudience = 'all' | 'in_debt' | 'up_to_date';
+import { geminiService } from '../../services/geminiService';
+import { apiService } from '../../services/apiService';
 
 interface ComunicacionesViewProps {
     userProfile: UserProfile;
 }
 
 const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) => {
-    const [target, setTarget] = useState<TargetAudience>('all');
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
-    const [additionalEmails, setAdditionalEmails] = useState('');
-    const [copyToAdmin, setCopyToAdmin] = useState(false);
-    const [copyToAccountant, setCopyToAccountant] = useState(false);
-    
-    const [residents, setResidents] = useState<Resident[]>([]);
-    const [accounts, setAccounts] = useState<AccountStatus[]>([]);
-    const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
-    
-    const [isSubjectLoading, setIsSubjectLoading] = useState(false);
-    const [isBodyLoading, setIsBodyLoading] = useState(false);
+    const [recipients, setRecipients] = useState('all');
     const [isSending, setIsSending] = useState(false);
-    
-    const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!userProfile.conjuntoId) return;
-            // FIX: Pass conjuntoId to apiService calls.
-            const [fetchedResidents, fetchedAccounts, fetchedStaff] = await Promise.all([
-                apiService.fetchResidents(userProfile.conjuntoId),
-                apiService.fetchAccountStatus(userProfile.conjuntoId),
-                apiService.fetchInternalStaff(userProfile.conjuntoId),
-            ]);
-            setResidents(fetchedResidents);
-            setAccounts(fetchedAccounts);
-            setInternalStaff(fetchedStaff);
-        };
-        fetchData();
-    }, [userProfile.conjuntoId]);
-
-    const audienceCounts = useMemo(() => {
-        const inDebtApts = new Set(accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment));
-        return {
-            all: residents.length,
-            in_debt: inDebtApts.size,
-            up_to_date: residents.length - inDebtApts.size,
-        };
-    }, [residents, accounts]);
-
-    const { admin, accountant } = useMemo(() => {
-        const admin = internalStaff.find(s => s.position.toLowerCase() === 'administrador');
-        const accountant = internalStaff.find(s => s.position.toLowerCase() === 'contadora');
-        return { admin, accountant };
-    }, [internalStaff]);
-
-    const handleSuggestSubject = async () => {
+    const handleGenerateSubject = async () => {
         if (!body.trim()) {
-            alert('Por favor, escribe primero el cuerpo del mensaje.');
+            setFeedback({type: 'error', text: 'Escribe el cuerpo del mensaje para generar un asunto.'});
             return;
-        }
-        setIsSubjectLoading(true);
+        };
+        setIsGenerating(true);
+        setFeedback(null);
         try {
-            const suggestedSubject = await geminiService.generateSubject(body);
-            setSubject(suggestedSubject);
+            const newSubject = await geminiService.generateSubject(body);
+            setSubject(newSubject);
         } catch (error) {
-            console.error(error);
-            alert('No se pudo sugerir un asunto.');
+            console.error("Error generating subject:", error);
+            setFeedback({type: 'error', text: 'No se pudo generar el asunto.'});
         } finally {
-            setIsSubjectLoading(false);
+            setIsGenerating(false);
         }
     };
-    
+
     const handleImproveWriting = async () => {
         if (!body.trim()) {
-            alert('Por favor, escribe primero el cuerpo del mensaje.');
+            setFeedback({type: 'error', text: 'Escribe el cuerpo del mensaje para mejorarlo.'});
             return;
         }
-        setIsBodyLoading(true);
+        setIsGenerating(true);
+        setFeedback(null);
         try {
             const improvedBody = await geminiService.improveWriting(body);
             setBody(improvedBody);
         } catch (error) {
-            console.error(error);
-            alert('No se pudo mejorar la redacción.');
+            console.error("Error improving writing:", error);
+            setFeedback({type: 'error', text: 'No se pudo mejorar la redacción.'});
         } finally {
-            setIsBodyLoading(false);
+            setIsGenerating(false);
         }
     };
 
-    const handleSend = () => {
-        if (!subject.trim() || !body.trim()) {
-            alert('Por favor, completa el asunto y el cuerpo del mensaje.');
+    const handleSend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!subject.trim() || !body.trim() || !userProfile.conjuntoId) {
+            setFeedback({type: 'error', text: 'Por favor, completa el asunto, el cuerpo del mensaje y asegúrate de que el conjunto esté identificado.'});
             return;
         }
         setIsSending(true);
-        setFeedbackMessage(null);
-
-        const additionalRecipients = [];
-        if (copyToAdmin && admin) additionalRecipients.push('Administrador');
-        if (copyToAccountant && accountant) additionalRecipients.push('Contadora');
-        if (additionalEmails.trim()) {
-            const emailCount = additionalEmails.split(',').filter(e => e.trim()).length;
-            if (emailCount > 0) {
-                additionalRecipients.push(`${emailCount} correo(s) adicional(es)`);
-            }
-        }
+        setFeedback(null);
         
-        let feedbackExtra = '';
-        if (additionalRecipients.length > 0) {
-            feedbackExtra = ` e incluido a: ${additionalRecipients.join(', ')}`;
-        }
+        try {
+            // 1. Fetch emails based on recipient group
+            let emailList: string[] = [];
+            if (recipients === 'all') {
+                const residents = await apiService.fetchResidents(userProfile.conjuntoId);
+                emailList = residents.map(r => r.email).filter(Boolean);
+            } else if (recipients === 'debtors') {
+                const accounts = await apiService.fetchAccountStatus(userProfile.conjuntoId);
+                const debtorApartments = accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment);
+                const residents = await apiService.fetchResidents(userProfile.conjuntoId);
+                emailList = residents.filter(r => debtorApartments.includes(r.apartment)).map(r => r.email).filter(Boolean);
+            }
 
-        setTimeout(() => {
-            const count = audienceCounts[target];
-            setFeedbackMessage(`¡Comunicación enviada exitosamente a ${count} residente(s)${feedbackExtra}!`);
+            if (emailList.length === 0) {
+                setFeedback({type: 'error', text: 'No se encontraron destinatarios para el grupo seleccionado.'});
+                setIsSending(false);
+                return;
+            }
+
+            // 2. Call the Edge Function via apiService
+            const result = await apiService.sendCommunicationEmail(emailList, subject, body);
+            
+            if (result.success) {
+                setFeedback({type: 'success', text: `¡Comunicado enviado a ${emailList.length} destinatario(s)!`});
+                setSubject('');
+                setBody('');
+            } else {
+                throw new Error(result.error || 'Ocurrió un error desconocido.');
+            }
+
+        } catch (error: any) {
+            console.error("Error sending communication:", error);
+            setFeedback({type: 'error', text: `Error al enviar: ${error.message}`});
+        } finally {
             setIsSending(false);
-            setSubject('');
-            setBody('');
-            setAdditionalEmails('');
-            setCopyToAdmin(false);
-            setCopyToAccountant(false);
-            setTimeout(() => setFeedbackMessage(null), 7000);
-        }, 1500);
+            setTimeout(() => setFeedback(null), 7000);
+        }
     };
-
-    const targetOptions: { id: TargetAudience; label: string }[] = [
-        { id: 'all', label: 'Todos los residentes' },
-        { id: 'in_debt', label: 'Residentes en mora' },
-        { id: 'up_to_date', label: 'Residentes al día' },
-    ];
 
     return (
         <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Enviar Comunicaciones</h2>
-            <p className="text-gray-600 mb-6">
-                Redacta y envía mensajes a los residentes. Usa la IA para mejorar tus comunicados.
-            </p>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="space-y-6">
-                    {/* Target Audience */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Paso 1: Elige los destinatarios</label>
-                        <div className="flex flex-wrap gap-3">
-                            {targetOptions.map(option => (
-                                <button
-                                    key={option.id}
-                                    onClick={() => setTarget(option.id)}
-                                    className={`px-4 py-2 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors ${
-                                        target === option.id 
-                                        ? 'bg-blue-600 text-white shadow-md' 
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    {option.label}
-                                    <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                        target === option.id ? 'bg-white text-blue-600' : 'bg-gray-300 text-gray-800'
-                                    }`}>{audienceCounts[option.id]}</span>
-                                </button>
-                            ))}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                    <form onSubmit={handleSend} className="space-y-4">
+                        <div>
+                            <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-1">Destinatarios</label>
+                            <select
+                                id="recipients"
+                                value={recipients}
+                                onChange={(e) => setRecipients(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-md bg-white"
+                            >
+                                <option value="all">Todos los Residentes</option>
+                                <option value="debtors">Residentes en Mora</option>
+                                <option value="group">Grupo específico (próximamente)</option>
+                            </select>
                         </div>
-                    </div>
-                    
-                    {/* Additional Recipients */}
-                    <div>
-                        <label htmlFor="additional-emails" className="block text-sm font-medium text-gray-700 mb-2">Paso 1.5: Destinatarios Adicionales (Opcional)</label>
-                        <input
-                            id="additional-emails"
-                            type="email"
-                            placeholder="ej: correo1@ejemplo.com, correo2@ejemplo.com"
-                            value={additionalEmails}
-                            onChange={(e) => setAdditionalEmails(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Separa múltiples correos con comas.</p>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
-                            {admin && (
-                                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={copyToAdmin}
-                                        onChange={(e) => setCopyToAdmin(e.target.checked)}
-                                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                                    />
-                                    <span className="ml-2">Incluir al Administrador</span>
-                                </label>
-                            )}
-                            {accountant && (
-                                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={copyToAccountant}
-                                        onChange={(e) => setCopyToAccountant(e.target.checked)}
-                                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                                    />
-                                    <span className="ml-2">Incluir a la Contadora</span>
-                                </label>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Subject */}
-                    <div>
-                        <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">Paso 2: Escribe el asunto</label>
-                         <div className="flex items-center gap-2">
+                        <div>
+                            <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Asunto</label>
                             <input
-                                id="subject"
                                 type="text"
-                                placeholder="Asunto del comunicado"
+                                id="subject"
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
-                                className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                placeholder="Asunto del comunicado"
+                                className="w-full p-2 border border-gray-300 rounded-md"
+                                required
                             />
-                            <button 
-                                onClick={handleSuggestSubject}
-                                disabled={isSubjectLoading}
-                                className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-200 transition-colors text-sm flex items-center gap-1.5 disabled:opacity-50"
-                            >
-                                <Icon name="bot" className="w-4 h-4" />
-                                {isSubjectLoading ? 'Sugiriendo...' : 'Sugerir Asunto (IA)'}
-                            </button>
                         </div>
-                    </div>
-
-                    {/* Body */}
-                    <div>
-                        <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-2">Paso 3: Redacta el mensaje</label>
-                        <div className="relative">
+                        <div>
+                            <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-1">Cuerpo del Mensaje</label>
                             <textarea
                                 id="body"
-                                placeholder="Escribe aquí tu mensaje..."
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[150px]"
-                                rows={8}
-                                disabled={isBodyLoading}
+                                placeholder="Escribe tu mensaje aquí..."
+                                className="w-full p-2 border border-gray-300 rounded-md h-64 resize-none"
+                                required
                             />
-                             {isBodyLoading && (
-                                <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-md">
-                                    <p className="text-indigo-700 font-semibold">Mejorando texto...</p>
-                                </div>
-                            )}
                         </div>
-                        <div className="mt-2 flex justify-end">
-                             <button
-                                onClick={handleImproveWriting}
-                                disabled={isBodyLoading}
-                                className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-semibold hover:bg-indigo-200 transition-colors text-sm flex items-center gap-1.5 disabled:opacity-50"
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={isSending || isGenerating}
+                                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
                             >
-                                <Icon name="bot" className="w-4 h-4" />
-                                {isBodyLoading ? 'Procesando...' : 'Mejorar Redacción (IA)'}
+                                <Icon name="send" className="w-5 h-5" />
+                                {isSending ? 'Enviando...' : 'Enviar Comunicado'}
                             </button>
                         </div>
-                    </div>
-                    
-                    {/* Send Button */}
-                    <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                         <button 
-                            onClick={handleSend}
-                            disabled={isSending}
-                            className="px-6 py-3 w-full sm:w-auto bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg text-base disabled:bg-green-300"
-                        >
-                            {isSending ? 'Enviando...' : 'Enviar Comunicado'}
-                        </button>
-                         {feedbackMessage && (
-                            <p className="text-sm text-green-700 font-semibold text-center sm:text-right flex-1">
-                                {feedbackMessage}
+                         {feedback && (
+                            <p className={`text-sm mt-4 text-center ${feedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                {feedback.text}
                             </p>
                         )}
+                    </form>
+                </div>
+                <div className="lg:col-span-1">
+                    <div className="bg-white p-6 rounded-lg shadow-md sticky top-24">
+                        <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                            <Icon name="bot" className="w-6 h-6 text-blue-600" />
+                            Asistente de IA
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Usa la IA para mejorar tus comunicados con un solo clic.
+                        </p>
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleGenerateSubject}
+                                disabled={isGenerating || !body.trim()}
+                                className="w-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                            >
+                                {isGenerating ? 'Generando...' : 'Generar Asunto'}
+                            </button>
+                            <button
+                                onClick={handleImproveWriting}
+                                disabled={isGenerating || !body.trim()}
+                                className="w-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                            >
+                                {isGenerating ? 'Mejorando...' : 'Mejorar Redacción'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
