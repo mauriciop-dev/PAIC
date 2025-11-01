@@ -124,11 +124,6 @@ const App: React.FC = () => {
       setIsAccessPointModalOpen(true);
     }
   };
-  
-  const handleSuperAdminLogin = (profile: SuperAdminProfile) => {
-    setSuperAdminProfile(profile);
-    localStorage.setItem('paic_superAdminProfile', JSON.stringify(profile));
-  };
 
   const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
     const profileObject: any = jwtDecode(credentialResponse.credential);
@@ -137,6 +132,18 @@ const App: React.FC = () => {
       return;
     }
     
+    const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
+    if (isSuperAdmin) {
+        const superAdmin: SuperAdminProfile = {
+            name: profileObject.name,
+            email: profileObject.email,
+            role: UserRole.SuperAdmin,
+        };
+        setSuperAdminProfile(superAdmin);
+        localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
+        return; // End flow here for super admin
+    }
+
     const existingUser = await apiService.findUserByEmail(profileObject.email);
 
     const newUserProfile: UserProfile = {
@@ -179,7 +186,7 @@ const App: React.FC = () => {
   }
 
   if (!userProfile) {
-    return <LoginView onAuthSuccess={handleAuthSuccess} onGoogleLoginSuccess={handleGoogleLoginSuccess} onSuperAdminLogin={handleSuperAdminLogin} />;
+    return <LoginView onAuthSuccess={handleAuthSuccess} onGoogleLoginSuccess={handleGoogleLoginSuccess} />;
   }
   
   const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";

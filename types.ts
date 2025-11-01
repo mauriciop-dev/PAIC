@@ -114,6 +114,8 @@ export interface ConjuntoInfo {
     adminEmail: string;
     adminPhone: string;
     subscriptionPlan: 'Free' | 'Paid';
+    planPrice?: number;
+    registrationDate?: string;
 }
 
 export interface DueDate {
@@ -177,4 +179,12 @@ export interface DashboardSummary {
         packagesToDeliver: number;
     };
     notifications: NotificationItem[];
+}
+
+export interface PlatformStats {
+    totalConjuntos: number;
+    paidSubscriptions: number;
+    totalResidents: number;
+    monthlyRecurringRevenue: number;
+    newThisMonth: number;
 }

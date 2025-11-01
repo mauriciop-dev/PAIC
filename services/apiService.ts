@@ -1,19 +1,18 @@
-
 import { dataStore } from '../data/dataStore';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, SuperAdminProfile, UserRole } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats, SuperAdminProfile } from '../types';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const apiService = {
   // --- Super Admin ---
-  authenticateSuperAdmin: async (email: string, pass: string): Promise<SuperAdminProfile | null> => {
+  checkIfSuperAdmin: async (email: string): Promise<boolean> => {
+      await delay(100);
+      return dataStore.isSuperAdmin(email);
+  },
+  fetchPlatformStats: async (): Promise<PlatformStats> => {
       await delay(500);
-      const admin = dataStore.authenticateSuperAdmin(email, pass);
-      if (admin) {
-          return { ...admin, name: 'Mauricio Pineda' }; // Name is static for now
-      }
-      return null;
+      return dataStore.getPlatformStats();
   },
   fetchAllConjuntos: async (): Promise<ConjuntoInfo[]> => {
       await delay(300);

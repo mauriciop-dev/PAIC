@@ -1,5 +1,4 @@
-
-import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog, PlatformUser, UserRole, AccessPoint, ConjuntoInfo, SuperAdminProfile } from '../types';
+import { Resident, AccountStatus, Booking, CommonArea, DueDate, Task, Provider, InternalStaff, Expense, VisitorLog, PackageLog, PlatformUser, UserRole, AccessPoint, ConjuntoInfo, PlatformStats } from '../types';
 import { 
     residentsData as initialResidents, 
     accountStatusDetailsData as initialAccountStatus,
@@ -43,12 +42,14 @@ let db = {
             adminName: 'Admin Principal',
             adminEmail: 'admin@conjunto.com',
             adminPhone: '3009998877',
-            subscriptionPlan: 'Paid' as 'Paid'
+            subscriptionPlan: 'Paid',
+            planPrice: 50,
+            registrationDate: new Date().toISOString(),
         }
     ] as ConjuntoInfo[],
     
     superAdmins: [
-        { name: 'Mauricio Pineda', email: 'hmauricio.pineda@gmail.com', role: UserRole.SuperAdmin, password: 'super' }
+        { email: 'hmauricio.pineda@gmail.com' }
     ],
 
     users: [
@@ -99,12 +100,28 @@ export const dataStore = {
     },
 
     // --- Super Admin ---
-    authenticateSuperAdmin: (email: string, pass: string): Omit<SuperAdminProfile, 'name'> | null => {
-        const admin = db.superAdmins.find(a => a.email === email && a.password === pass);
-        if (admin && admin.role === UserRole.SuperAdmin) {
-            return { email: admin.email, role: admin.role };
-        }
-        return null;
+    isSuperAdmin: (email: string): boolean => {
+        return db.superAdmins.some(admin => admin.email === email);
+    },
+    getPlatformStats: (): PlatformStats => {
+        const totalConjuntos = db.conjuntos.length;
+        const paidSubscriptions = db.conjuntos.filter(c => c.subscriptionPlan === 'Paid').length;
+        const totalResidents = Object.values(db.dataByConjunto).reduce((sum, data) => sum + (data.residents?.length || 0), 0);
+        const monthlyRecurringRevenue = db.conjuntos
+            .filter(c => c.planPrice && c.subscriptionPlan === 'Paid')
+            .reduce((sum, c) => sum + (c.planPrice || 0), 0);
+            
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const newThisMonth = db.conjuntos.filter(c => c.registrationDate && new Date(c.registrationDate) >= firstDayOfMonth).length;
+
+        return {
+            totalConjuntos,
+            paidSubscriptions,
+            totalResidents,
+            monthlyRecurringRevenue,
+            newThisMonth,
+        };
     },
     getAllConjuntos: (): ConjuntoInfo[] => [...db.conjuntos],
     getConjuntoInfo: (id: string): ConjuntoInfo | null => db.conjuntos.find(c => c.id === id) || null,
@@ -113,7 +130,11 @@ export const dataStore = {
         if (index > -1) {
             db.conjuntos[index] = { ...db.conjuntos[index], ...info };
         } else {
-            db.conjuntos.push(info);
+            db.conjuntos.push({
+                ...info,
+                planPrice: 50, // Default price
+                registrationDate: new Date().toISOString(),
+            });
         }
         notifyListeners();
     },

@@ -7,12 +7,11 @@ import { apiService } from '../../services/apiService';
 interface LoginViewProps {
   onAuthSuccess: (userProfile: UserProfile) => void;
   onGoogleLoginSuccess: (credentialResponse: any) => void;
-  onSuperAdminLogin: (profile: SuperAdminProfile) => void;
 }
 
-type LoginMode = 'admin' | 'staff' | 'superadmin';
+type LoginMode = 'admin' | 'staff';
 
-const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSuccess, onSuperAdminLogin }) => {
+const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSuccess }) => {
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const [origin, setOrigin] = useState('');
   const [copied, setCopied] = useState(false);
@@ -65,21 +64,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
       setError('');
       setIsLoading(true);
       try {
-          if (loginMode === 'superadmin') {
-              const admin = await apiService.authenticateSuperAdmin(email, password);
-              if (admin) {
-                  onSuperAdminLogin(admin);
-              } else {
-                  setError('Credenciales de SuperAdmin incorrectas.');
-              }
-          } else { // staff login
-              const user = await apiService.authenticateUser(email, password);
-              if (user) {
-                  const userProfile: UserProfile = { name: user.name, email: user.email, role: user.role, conjuntoId: user.conjuntoId };
-                  onAuthSuccess(userProfile);
-              } else {
-                  setError('Correo o contraseña incorrectos.');
-              }
+          const user = await apiService.authenticateUser(email, password);
+          if (user) {
+              const userProfile: UserProfile = { name: user.name, email: user.email, role: user.role, conjuntoId: user.conjuntoId };
+              onAuthSuccess(userProfile);
+          } else {
+              setError('Correo o contraseña incorrectos.');
           }
       } catch (err) {
           setError('Ocurrió un error. Inténtalo de nuevo.');
@@ -120,13 +110,6 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
                     <LoginForm title="Iniciar Sesión" />
                 </>
               );
-          case 'superadmin':
-               return (
-                <>
-                    <p className="text-gray-600">Acceso exclusivo para la administración de la plataforma PAIC.</p>
-                    <LoginForm title="Acceder a Plataforma" />
-                </>
-              );
       }
   }
 
@@ -142,10 +125,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
             </div>
             <h1 className="text-3xl font-bold text-gray-900">Bienvenido a PAIC</h1>
             
-            <div className="bg-gray-100 p-1 rounded-full flex flex-col sm:flex-row">
-                <button onClick={() => setLoginMode('admin')} className={`w-full sm:w-1/3 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'admin' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Administrador</button>
-                <button onClick={() => setLoginMode('staff')} className={`w-full sm:w-1/3 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'staff' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Personal</button>
-                <button onClick={() => setLoginMode('superadmin')} className={`w-full sm:w-1/3 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'superadmin' ? 'bg-white shadow text-purple-700' : 'text-gray-600'}`}>Plataforma</button>
+            <div className="bg-gray-100 p-1 rounded-full flex">
+                <button onClick={() => setLoginMode('admin')} className={`w-1/2 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'admin' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Administrador</button>
+                <button onClick={() => setLoginMode('staff')} className={`w-1/2 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'staff' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Personal</button>
             </div>
             
             {renderContent()}

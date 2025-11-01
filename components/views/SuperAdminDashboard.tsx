@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SuperAdminProfile, ConjuntoInfo } from '../../types';
+import { SuperAdminProfile, ConjuntoInfo, PlatformStats } from '../../types';
 import { apiService } from '../../services/apiService';
 import { Icon } from '../ui/Icon';
 
@@ -23,24 +23,27 @@ const StatCard: React.FC<{ title: string; value: string; icon: string; iconColor
 
 const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLogout }) => {
     const [conjuntos, setConjuntos] = useState<ConjuntoInfo[]>([]);
+    const [stats, setStats] = useState<PlatformStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const data = await apiService.fetchAllConjuntos();
-                setConjuntos(data);
+                const [conjuntosData, statsData] = await Promise.all([
+                    apiService.fetchAllConjuntos(),
+                    apiService.fetchPlatformStats(),
+                ]);
+                setConjuntos(conjuntosData);
+                setStats(statsData);
             } catch (error) {
-                console.error("Failed to fetch conjuntos", error);
+                console.error("Failed to fetch platform data", error);
             } finally {
                 setIsLoading(false);
             }
         };
         fetchData();
     }, []);
-
-    const paidSubscriptions = conjuntos.filter(c => c.subscriptionPlan === 'Paid').length;
     
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
@@ -61,11 +64,12 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
             </header>
 
             <main className="p-6 space-y-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <StatCard title="Conjuntos Registrados" value={String(conjuntos.length)} icon="briefcase" iconColor="bg-blue-500" />
-                    <StatCard title="Suscripciones Activas" value={String(paidSubscriptions)} icon="shield-check" iconColor="bg-green-500" />
-                    <StatCard title="Ingresos del Mes (MRR)" value="$0" icon="dollarSign" iconColor="bg-yellow-500" />
-                    <StatCard title="Nuevos Suscriptores (Mes)" value="0" icon="trending-up" iconColor="bg-indigo-500" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <StatCard title="Conjuntos Registrados" value={stats?.totalConjuntos.toString() ?? '...'} icon="briefcase" iconColor="bg-blue-500" />
+                    <StatCard title="Total Residentes" value={stats?.totalResidents.toString() ?? '...'} icon="users" iconColor="bg-teal-500" />
+                    <StatCard title="Suscripciones Activas" value={stats?.paidSubscriptions.toString() ?? '...'} icon="shield-check" iconColor="bg-green-500" />
+                    <StatCard title="Ingresos (MRR)" value={stats ? stats.monthlyRecurringRevenue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }) : '...'} icon="dollarSign" iconColor="bg-yellow-500" />
+                    <StatCard title="Nuevos (Mes)" value={stats?.newThisMonth.toString() ?? '...'} icon="trending-up" iconColor="bg-indigo-500" />
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-md overflow-hidden">
