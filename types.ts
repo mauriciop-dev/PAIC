@@ -42,6 +42,8 @@ export interface ChartData {
     // Added for dual bar charts
     ingresos?: number;
     gastos?: number;
+    // FIX: Added index signature to be compatible with recharts' Pie component data prop, which expects a more generic object type.
+    [key: string]: any;
 }
 
 export interface Resident {

@@ -1,13 +1,7 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { apiService } from '../../services/apiService';
 import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
-import { 
-    monthlyCollectionData, 
-    pendingPaymentsData,
-} from '../../data/mockData';
 import { Icon } from '../ui/Icon';
 
 interface DashboardViewProps {
@@ -75,6 +69,7 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
 
 const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTab, userProfile }) => {
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
+    const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[] } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -82,9 +77,12 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
             if (!userProfile.conjuntoId) return;
             setIsLoading(true);
             try {
-                // FIX: Pass conjuntoId to fetchDashboardSummary.
-                const summaryData = await apiService.fetchDashboardSummary(userProfile.conjuntoId);
+                const [summaryData, chartData] = await Promise.all([
+                    apiService.fetchDashboardSummary(userProfile.conjuntoId),
+                    apiService.fetchFinancialChartData(userProfile.conjuntoId),
+                ]);
                 setSummary(summaryData);
+                setChartData(chartData);
             } catch (error) {
                 console.error("Failed to fetch dashboard summary", error);
             } finally {
@@ -94,12 +92,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
         fetchData();
     }, [userProfile.conjuntoId]);
 
-    if (isLoading) {
+    if (isLoading || !summary || !chartData) {
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
-    }
-    
-    if (!summary) {
-        return <div className="text-center p-10 text-red-500">No se pudieron cargar los datos del dashboard.</div>;
     }
     
     const { stats, notifications } = summary;
@@ -134,14 +128,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
                 </div>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
-                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Recaudo vs Pagos Pendientes</h3>
+                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Recaudo Mensual (Potencial)</h3>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyCollectionData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                         <XAxis dataKey="name" fontSize={12} />
                         <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                         <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                         <Legend wrapperStyle={{fontSize: "12px"}}/>
-                        <Bar dataKey="value" name="Recaudo Mensual" fill="#3b82f6" />
+                        <Bar dataKey="value" name="Recaudo Mensual (Potencial)" fill="#3b82f6" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -160,11 +154,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
             <div className="p-6 border-t border-gray-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-gray-50 p-4 rounded-lg h-80 flex flex-col">
-                        <h3 className="text-md font-semibold text-gray-700 mb-4">Pagos Pendientes de la Administración</h3>
+                        <h3 className="text-md font-semibold text-gray-700 mb-4">Gastos del Mes por Categoría</h3>
                         <ResponsiveContainer width="100%" height="100%">
                            <PieChart>
-                                <Pie data={pendingPaymentsData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {pendingPaymentsData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                                <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                    {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                                 </Pie>
                                 <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                                 <Legend wrapperStyle={{fontSize: "12px"}}/>

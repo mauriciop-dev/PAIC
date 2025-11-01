@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats } from '../types';
+import { Resident, AccountStatus, Provider, InternalStaff, Booking, CommonArea, DueDate, Task, Expense, VisitorLog, PackageLog, DashboardSummary, NotificationItem, Tab, PlatformUser, AccessPoint, ConjuntoInfo, PlatformStats, ChartData } from '../types';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 
 const handleApiError = (error: any, context: string) => {
@@ -196,6 +196,87 @@ export const apiService = {
         return [];
       }
       return (fromSupabase(data) as PackageLog[]) || [];
+  },
+
+  fetchFinancialChartData: async (conjuntoId: string): Promise<{
+    monthlyIncomeVsExpense: ChartData[],
+    expensesByCategory: ChartData[],
+    monthlyBudget: number,
+  } | null> => {
+    try {
+      // 1. Get expenses from the last 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select('date, amount, category')
+        .eq('conjunto_id', conjuntoId)
+        .gte('date', sixMonthsAgo.toISOString().split('T')[0]);
+
+      if (expensesError) throw expensesError;
+      
+      const expenses = (fromSupabase(expensesData) as {date: string, amount: number, category: string}[]) || [];
+
+      // 2. Get total potential income
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('account_status')
+        .select('admin_fee_value')
+        .eq('conjunto_id', conjuntoId);
+      
+      if (accountsError) throw accountsError;
+      
+      const potentialMonthlyIncome = ((fromSupabase(accountsData) as {adminFeeValue: number}[]) || [])
+        .reduce((sum, acc) => sum + acc.adminFeeValue, 0);
+
+      // 3. Process data for charts
+      const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const monthName = d.toLocaleString('es-ES', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase());
+        monthlyData[monthName] = { ingresos: potentialMonthlyIncome, gastos: 0 };
+      }
+
+      expenses.forEach(expense => {
+        const d = new Date(expense.date);
+        const monthName = d.toLocaleString('es-ES', { month: 'short' }).replace('.', '').replace(/^\w/, c => c.toUpperCase());
+        if (monthlyData[monthName]) {
+          monthlyData[monthName].gastos += expense.amount;
+        }
+      });
+      
+      const monthlyIncomeVsExpense: ChartData[] = Object.entries(monthlyData).map(([name, values]) => ({
+        name,
+        ingresos: values.ingresos,
+        gastos: values.gastos,
+        value: values.ingresos, // for dashboard chart
+        fill: '', // not needed for this bar chart
+      }));
+
+      // 4. Process expenses by category for the current month
+      const currentMonthExpenses = expenses.filter(e => new Date(e.date).getMonth() === new Date().getMonth());
+      const expenseByCategoryMap = currentMonthExpenses.reduce((acc, expense) => {
+            acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+            return acc;
+        }, {} as Record<string, number>);
+      
+      const COLORS = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#3b82f6', '#10b981'];
+      const expensesByCategory: ChartData[] = Object.entries(expenseByCategoryMap).map(([name, value], index) => ({
+          name,
+          value,
+          fill: COLORS[index % COLORS.length]
+      }));
+
+      return {
+        monthlyIncomeVsExpense,
+        expensesByCategory,
+        monthlyBudget: 25000000,
+      };
+
+    } catch (error) {
+      return handleApiError(error, 'fetchFinancialChartData');
+    }
   },
 
   fetchDashboardSummary: async (conjuntoId: string): Promise<DashboardSummary | null> => {
