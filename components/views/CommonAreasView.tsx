@@ -131,11 +131,11 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                                       <p className="font-semibold truncate">{booking.event}</p>
                                       <p className="truncate">{booking.user}</p>
                                   </div>
-                                  <div className="absolute z-20 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
+                                  <div className="absolute z-20 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none top-0 left-full ml-2">
                                       <p><span className="font-bold">Evento:</span> {booking.event}</p>
                                       <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
                                       <p><span className="font-bold">Horario:</span> {booking.time}</p>
-                                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+                                      <div className="absolute top-1/2 -translate-y-1/2 right-full w-0 h-0 border-y-4 border-y-transparent border-r-4 border-r-gray-800"></div>
                                   </div>
                               </div>
                             )
