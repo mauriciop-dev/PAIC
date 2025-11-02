@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { Booking, CommonArea, UserProfile } from '../../types';
@@ -76,12 +75,9 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Calendario de Áreas Comunes</h2>
-          <p className="text-gray-600 mt-1">
-            Consulta las reservas. Para agendar, usa el asistente de IA.
-          </p>
-        </div>
+        <p className="text-gray-600">
+          Consulta las reservas. Para agendar, usa el asistente de IA.
+        </p>
          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 flex-wrap">
                 {commonAreas.map(area => (
@@ -135,7 +131,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                                       <p className="font-semibold truncate">{booking.event}</p>
                                       <p className="truncate">{booking.user}</p>
                                   </div>
-                                  <div className="absolute z-10 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
+                                  <div className="absolute z-20 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
                                       <p><span className="font-bold">Evento:</span> {booking.event}</p>
                                       <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
                                       <p><span className="font-bold">Horario:</span> {booking.time}</p>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition } from '../../types';
@@ -208,6 +207,41 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       XLSX.writeFile(wb, templateConfig.filename);
   };
   
+    const renderTableActions = () => {
+        const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
+        
+        return (
+            <div className="flex justify-between items-center p-4 border-b">
+                <div className="flex items-center gap-4">
+                    {canManageData && (
+                        <>
+                            <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
+                            <button onClick={handleUploadClick} disabled={isUploading} className="text-sm font-medium text-blue-600 hover:underline disabled:text-gray-400">
+                                {isUploading ? 'Cargando...' : 'Cargar Información'}
+                            </button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                        </>
+                    )}
+                    {feedbackMessage && (
+                        <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                            {feedbackMessage.text}
+                        </p>
+                    )}
+                </div>
+                <button 
+                    onClick={() => {
+                        if (activeDbTab === DbTab.Users) handleUserModalOpen(null);
+                        else if (activeDbTab === DbTab.Roles) alert('Agregar nuevo rol');
+                        else alert('Agregar nuevo registro');
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
+                  <Icon name="user-plus" className="w-4 h-4" />
+                  {activeDbTab === DbTab.Users ? 'Agregar Usuario' : activeDbTab === DbTab.Roles ? 'Agregar Rol' : 'Agregar Registro'}
+                </button>
+            </div>
+        );
+    };
+
   const renderContent = () => {
       if (isLoading) {
           return <div className="text-center p-10 text-gray-500">Cargando datos...</div>;
@@ -373,8 +407,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Base de Datos</h2>
-      
       <div className="mb-4 border-b border-gray-200">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
           {dbTabs.map(tab => (
@@ -394,34 +426,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b">
-           <div className="flex items-center gap-4">
-                {[DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab) && (
-                    <>
-                        <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
-                        <button onClick={handleUploadClick} disabled={isUploading} className="text-sm font-medium text-blue-600 hover:underline disabled:text-gray-400">
-                            {isUploading ? 'Cargando...' : 'Cargar Información'}
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
-                    </>
-                )}
-                {feedbackMessage && (
-                    <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                        {feedbackMessage.text}
-                    </p>
-                )}
-           </div>
-           <button 
-                onClick={() => {
-                    if (activeDbTab === DbTab.Users) handleUserModalOpen(null);
-                    else if (activeDbTab === DbTab.Roles) alert('Agregar nuevo rol');
-                    else alert('Agregar nuevo registro');
-                }}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
-              <Icon name="user-plus" className="w-4 h-4" />
-              {activeDbTab === DbTab.Users ? 'Agregar Usuario' : activeDbTab === DbTab.Roles ? 'Agregar Rol' : 'Agregar Registro'}
-            </button>
-        </div>
+        {renderTableActions()}
         <div className="overflow-x-auto">
             {renderContent()}
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { DueDate, UserProfile } from '../../types';
@@ -95,12 +94,9 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   return (
     <div>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-800">Vencimientos de Pagos</h2>
-                <p className="text-gray-600 mt-1">
-                    Gestiona las obligaciones de pago de la administración.
-                </p>
-            </div>
+            <p className="text-gray-600">
+                Gestiona las obligaciones de pago de la administración.
+            </p>
             <button 
                 onClick={handleOpenAddModal}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { Task, UserProfile } from '../../types';
@@ -90,12 +89,9 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-6">
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800">Gestión de Tareas</h2>
-            <p className="text-gray-600">
-                Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
-            </p>
-        </div>
+        <p className="text-gray-600">
+            Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
+        </p>
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Agregar Nueva Tarea</h3>
             <div className="flex flex-col sm:flex-row items-center gap-4">

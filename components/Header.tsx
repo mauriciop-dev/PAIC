@@ -7,9 +7,10 @@ interface HeaderProps {
   userProfile: UserProfile | null;
   onLogout: () => void;
   onSettingsClick: () => void;
+  activeTabName: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onSettingsClick }) => {
+const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onSettingsClick, activeTabName }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -28,12 +29,15 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
   if (!userProfile) return null;
 
   return (
-    <header className="p-4 md:p-6 border-b border-gray-200 bg-white sticky top-0 z-10">
-      <div className="flex justify-between items-center">
-        <h1 className="text-lg md:text-xl font-bold text-gray-800">
-          PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
-        </h1>
-        <div className="flex items-center gap-4">
+    <header className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-gray-800">
+            PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
+          </h1>
+          <p className="text-md font-semibold text-blue-600 mt-1">{activeTabName}</p>
+        </div>
+        <div className="flex items-center gap-4 flex-shrink-0 pt-1">
           <button
             onClick={onHelpClick}
             className="hidden sm:block px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors"

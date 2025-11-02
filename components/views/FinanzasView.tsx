@@ -158,7 +158,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
 
         const potentialIncome = chartData.monthlyIncomeVsExpense.slice(-1)[0]?.ingresos || 0;
         
-        const budgetExecution = (thisMonthExpenses / potentialIncome) * 100;
+        const budgetExecution = potentialIncome > 0 ? (thisMonthExpenses / potentialIncome) * 100 : 0;
 
         return {
             summary: {
@@ -207,7 +207,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
                     <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos vs. Gastos (Últimos 6 meses)</h3>
                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={charts.incomeVsExpenseData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <BarChart data={charts.incomeVsExpenseData.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <XAxis dataKey="name" fontSize={12} />
                             <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                             <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
@@ -369,7 +369,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Finanzas</h2>
              <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     {(['Resumen', 'Gastos', 'Ingresos'] as FinanzasTab[]).map(tab => (

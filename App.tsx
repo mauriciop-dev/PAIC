@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -271,7 +270,13 @@ const App: React.FC = () => {
       )}
 
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (userProfile.role === UserRole.Admin ? 'ml-8' : 'ml-0')}`}>
-        <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} onSettingsClick={() => setIsSettingsModalOpen(true)} />
+        <Header 
+            onHelpClick={() => setIsHelpModalOpen(true)} 
+            userProfile={userProfile} 
+            onLogout={handleLogout} 
+            onSettingsClick={() => setIsSettingsModalOpen(true)} 
+            activeTabName={activeTab}
+        />
         {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
           {needsAdminSetup ? (

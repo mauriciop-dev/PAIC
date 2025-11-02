@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UserProfile, StoredFile } from '../../types';
+import { UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
@@ -15,7 +15,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
     const [isSending, setIsSending] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
-    const [files, setFiles] = useState<File[]>([]);
+    const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
 
@@ -78,6 +78,16 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
         setRecipients(prev => [...new Set([...prev, ...emailList.filter(Boolean)])]);
     }
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+            setAttachedFiles(prevFiles => [...prevFiles, ...Array.from(event.target.files!)]);
+        }
+    };
+
+    const removeFile = (fileToRemove: File) => {
+        setAttachedFiles(prevFiles => prevFiles.filter(file => file !== fileToRemove));
+    };
+
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!subject.trim() || !body.trim() || recipients.length === 0) {
@@ -89,15 +99,15 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
         
         try {
             // NOTE: File attachment logic would be added here.
-            // For now, we send the email without attachments.
+            // For now, we send the email without attachments. The backend would need to handle them.
             const result = await apiService.sendCommunicationEmail(recipients, subject, body);
             
             if (result.success) {
-                setFeedback({type: 'success', text: `¡Comunicado enviado a ${recipients.length} destinatario(s)!`});
+                setFeedback({type: 'success', text: `Mensaje enviado al servidor para procesar a ${recipients.length} destinatario(s).`});
                 setSubject('');
                 setBody('');
                 setRecipients([]);
-                setFiles([]);
+                setAttachedFiles([]);
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido.');
             }
@@ -113,7 +123,6 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Enviar Comunicaciones</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
                     <form onSubmit={handleSend} className="space-y-4">
@@ -130,7 +139,8 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                                 value={recipients.join(', ')}
                                 onChange={(e) => setRecipients(e.target.value.split(',').map(em => em.trim()))}
                                 placeholder="Añade correos aquí o selecciona un grupo"
-                                className="w-full p-2 border border-gray-300 rounded-md h-20"
+                                className="w-full p-2 border border-gray-300 rounded-md"
+                                rows={2}
                             />
                         </div>
                         <div>
@@ -200,11 +210,25 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                             >
                               O selecciona un archivo
                             </button>
-                           <input type="file" ref={fileInputRef} className="hidden" multiple />
+                           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" multiple />
                         </div>
-                        <div className="mt-4">
-                            <p className="text-sm font-medium text-gray-700">Archivos adjuntos:</p>
-                            <p className="text-xs text-gray-500 text-center mt-2">La funcionalidad para adjuntar archivos estará disponible próximamente.</p>
+                        <div className="mt-4 space-y-2">
+                            <p className="text-sm font-medium text-gray-700">Archivos adjuntos ({attachedFiles.length}):</p>
+                            {attachedFiles.length > 0 ? (
+                                <ul className="max-h-24 overflow-y-auto space-y-1">
+                                    {attachedFiles.map((file, index) => (
+                                        <li key={index} className="flex justify-between items-center text-xs bg-gray-100 p-1.5 rounded-md">
+                                            <span className="truncate text-gray-700">{file.name}</span>
+                                            <button onClick={() => removeFile(file)} className="text-red-500 hover:text-red-700 ml-2">
+                                                <Icon name="x" className="w-4 h-4" />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-xs text-gray-500 text-center mt-2">Ningún archivo adjunto.</p>
+                            )}
+                            <p className="text-xs text-gray-500 text-center pt-2">El envío de archivos adjuntos se habilitará próximamente.</p>
                         </div>
                     </div>
                 </div>

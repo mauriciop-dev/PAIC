@@ -231,7 +231,6 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
 
     return (
         <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Seguridad y Recepción</h2>
             <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     {(['Visitantes', 'Paquetes'] as SeguridadTab[]).map(tab => (

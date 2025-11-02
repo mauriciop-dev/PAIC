@@ -430,8 +430,11 @@ export const apiService = {
     
     // Communications
     async sendCommunicationEmail(bcc: string[], subject: string, html: string): Promise<{ success: boolean; error?: string }> {
+        const payload = { bcc, subject, html };
+        console.log("Attempting to send email via Supabase function 'send-email' with payload:", JSON.stringify(payload));
+
         const { data, error } = await supabase.functions.invoke('send-email', {
-            body: { bcc, subject, html },
+            body: payload,
         });
 
         if (error) {
@@ -444,6 +447,7 @@ export const apiService = {
              return { success: false, error: data.error };
         }
 
+        console.log("Supabase function 'send-email' invoked successfully.");
         return { success: true };
     },
     async sendMassEmail(conjuntoId: string, group: 'all' | 'debtors', subject: string, body: string): Promise<{success: boolean, message: string}> {

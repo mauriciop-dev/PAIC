@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { apiService } from '../../services/apiService';
 import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
 
 interface DashboardViewProps {
-    conjuntoName: string;
     setActiveTab: (tab: Tab) => void;
     userProfile: UserProfile;
 }
@@ -84,10 +83,11 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
 };
 
 
-const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTab, userProfile }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile }) => {
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
     const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[] } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentChartIndex, setCurrentChartIndex] = useState(0);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -114,13 +114,47 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
     }
     
     const { stats, notifications } = summary;
+    
+    const charts = [
+        {
+            title: 'Gastos del Mes por Categoría',
+            component: (
+                <PieChart>
+                    <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                        {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                    </Pie>
+                    <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                    <Legend wrapperStyle={{fontSize: "12px"}}/>
+                </PieChart>
+            )
+        },
+        {
+            title: 'Comportamiento Histórico (Últimos 12 meses)',
+            component: (
+                <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <XAxis dataKey="name" fontSize={12} />
+                    <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
+                    <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                    <Legend wrapperStyle={{fontSize: "12px"}}/>
+                    <Bar dataKey="ingresos" name="Ingresos" fill="#3b82f6" />
+                    <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
+                </BarChart>
+            )
+        },
+    ];
+
+    const handleNextChart = () => {
+        setCurrentChartIndex((prevIndex) => (prevIndex + 1) % charts.length);
+    };
+
+    const handlePrevChart = () => {
+        setCurrentChartIndex((prevIndex) => (prevIndex - 1 + charts.length) % charts.length);
+    };
+
 
   return (
     <div className="space-y-6">
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800">Centro de Control de {conjuntoName}</h2>
-            <p className="text-gray-600">Un resumen de las actividades y alertas más importantes.</p>
-        </div>
+        <p className="text-gray-600">Un resumen de las actividades y alertas más importantes.</p>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -158,34 +192,23 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
                 </ResponsiveContainer>
             </div>
         </div>
-
-        {/* Secondary Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
-                <h3 className="text-md font-semibold text-gray-700 mb-4">Gastos del Mes por Categoría</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                   <PieChart>
-                        <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                            {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                        </Pie>
-                        <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                        <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    </PieChart>
-                </ResponsiveContainer>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-700">{charts[currentChartIndex].title}</h3>
+                <div className="flex items-center gap-2">
+                    <button onClick={handlePrevChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                        &lt;
+                    </button>
+                    <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
+                    <button onClick={handleNextChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                        &gt;
+                    </button>
+                </div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
-                <h3 className="text-md font-semibold text-gray-700 mb-4">Comportamiento Histórico (Últimos 12 meses)</h3>
-                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                        <XAxis dataKey="name" fontSize={12} />
-                        <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
-                        <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                        <Legend wrapperStyle={{fontSize: "12px"}}/>
-                        <Bar dataKey="ingresos" name="Ingresos" fill="#3b82f6" />
-                        <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height="100%">
+                {charts[currentChartIndex].component}
+            </ResponsiveContainer>
         </div>
     </div>
   );

@@ -27,7 +27,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
       
     switch (activeTab) {
       case Tab.Dashboard:
-        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} userProfile={userProfile} />;
+        return <DashboardView setActiveTab={setActiveTab} userProfile={userProfile} />;
       case Tab.Database:
         return <DatabaseView userProfile={userProfile} />;
       case Tab.CommonAreas:
@@ -43,7 +43,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
       case Tab.Seguridad:
           return <SeguridadView userProfile={userProfile} />;
       default:
-        return <DashboardView conjuntoName={conjuntoName} setActiveTab={setActiveTab} userProfile={userProfile} />;
+        return <DashboardView setActiveTab={setActiveTab} userProfile={userProfile} />;
     }
   };
 
