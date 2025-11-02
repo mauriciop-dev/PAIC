@@ -32,6 +32,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         password: '', // Password field is for changing, not displaying
       });
     } else {
+      // Reset for new user
       setFormData({
         name: '',
         email: '',

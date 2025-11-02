@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition } from '../../types';
-import EditResidentModal from '../EditResidentModal';
+import ResidentModal from '../ResidentModal';
+import ProviderModal from '../ProviderModal';
+import InternalStaffModal from '../InternalStaffModal';
+import AccountStatusModal from '../AccountStatusModal';
+import RoleModal from '../RoleModal';
 import UserModal from '../UserModal';
 import { Icon } from '../ui/Icon';
 
@@ -28,10 +32,24 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   const [roles, setRoles] = useState<UserRoleDefinition[]>([]);
   
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+
+  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<InternalStaff | null>(null);
+
+  const [isAccountStatusModalOpen, setIsAccountStatusModalOpen] = useState(false);
+  const [selectedAccountStatus, setSelectedAccountStatus] = useState<AccountStatus | null>(null);
+
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRoleDefinition | null>(null);
+  
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
+  
   const [activeDbTab, setActiveDbTab] = useState<DbTab>(DbTab.Residents);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -69,30 +87,15 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     fetchData();
   }, [userProfile.conjuntoId]);
 
-  const handleEditResidentClick = (resident: Resident) => {
-    setSelectedResident(resident);
-    setIsEditModalOpen(true);
-  };
-  
-  const handleUserModalOpen = (user: PlatformUser | null) => {
-      setSelectedUser(user);
-      setIsUserModalOpen(true);
-  };
+  // Modal Handlers
+  const handleUserModalOpen = (user: PlatformUser | null) => { setSelectedUser(user); setIsUserModalOpen(true); };
+  const handleResidentModalOpen = (resident: Resident | null) => { setSelectedResident(resident); setIsResidentModalOpen(true); };
+  const handleProviderModalOpen = (provider: Provider | null) => { setSelectedProvider(provider); setIsProviderModalOpen(true); };
+  const handleStaffModalOpen = (staff: InternalStaff | null) => { setSelectedStaff(staff); setIsStaffModalOpen(true); };
+  const handleAccountStatusModalOpen = (account: AccountStatus | null) => { setSelectedAccountStatus(account); setIsAccountStatusModalOpen(true); };
+  const handleRoleModalOpen = (role: UserRoleDefinition | null) => { setSelectedRole(role); setIsRoleModalOpen(true); };
 
-  const handleSaveChanges = async (updatedResident: Resident) => {
-    if (!userProfile.conjuntoId) return;
-    await apiService.updateResident(userProfile.conjuntoId, updatedResident);
-    fetchData(); // Refresh data
-    setIsEditModalOpen(false);
-  };
-
-  const handleDeleteResident = async (apartment: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar al residente del apartamento ${apartment}?`) && userProfile.conjuntoId) {
-        await apiService.deleteResident(userProfile.conjuntoId, apartment);
-        fetchData();
-    }
-  };
-  
+  // Save Handlers
   const handleSaveUser = async (user: PlatformUser) => {
       if (!userProfile.conjuntoId) return;
       if(user.id) {
@@ -104,6 +107,62 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       setIsUserModalOpen(false);
   };
   
+  const handleSaveResident = async (resident: Resident) => {
+    if (!userProfile.conjuntoId) return;
+    if (selectedResident) {
+        await apiService.updateResident(userProfile.conjuntoId, resident);
+    } else {
+        await apiService.addResident(userProfile.conjuntoId, resident);
+    }
+    fetchData();
+    setIsResidentModalOpen(false);
+  };
+  
+  const handleSaveProvider = async (provider: Provider) => {
+    if (!userProfile.conjuntoId) return;
+    if (selectedProvider) {
+        await apiService.updateProvider(userProfile.conjuntoId, provider);
+    } else {
+        await apiService.addProvider(userProfile.conjuntoId, provider);
+    }
+    fetchData();
+    setIsProviderModalOpen(false);
+  };
+
+  const handleSaveStaff = async (staff: InternalStaff) => {
+    if (!userProfile.conjuntoId) return;
+    if (selectedStaff) {
+        await apiService.updateInternalStaff(userProfile.conjuntoId, staff);
+    } else {
+        await apiService.addInternalStaff(userProfile.conjuntoId, staff);
+    }
+    fetchData();
+    setIsStaffModalOpen(false);
+  };
+  
+  const handleSaveAccountStatus = async (account: AccountStatus) => {
+    if (!userProfile.conjuntoId) return;
+    if (selectedAccountStatus) {
+        await apiService.updateAccountStatus(userProfile.conjuntoId, account);
+    } else {
+        await apiService.addAccountStatus(userProfile.conjuntoId, account);
+    }
+    fetchData();
+    setIsAccountStatusModalOpen(false);
+  };
+  
+  const handleSaveRole = async (role: UserRoleDefinition) => {
+    if (!userProfile.conjuntoId) return;
+    if (selectedRole) {
+        await apiService.updateRole(userProfile.conjuntoId, role);
+    } else {
+        await apiService.addRole(userProfile.conjuntoId, role);
+    }
+    fetchData();
+    setIsRoleModalOpen(false);
+  };
+
+  // Delete Handlers
   const handleDeleteUser = async (userId: number) => {
       if(window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
           if (!userProfile.conjuntoId) return;
@@ -111,7 +170,41 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
           fetchData();
       }
   };
+  
+  const handleDeleteResident = async (apartment: string) => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar al residente del apartamento ${apartment}?`) && userProfile.conjuntoId) {
+        await apiService.deleteResident(userProfile.conjuntoId, apartment);
+        fetchData();
+    }
+  };
+  
+  const handleDeleteProvider = async (id: number) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este proveedor?') && userProfile.conjuntoId) {
+        await apiService.deleteProvider(userProfile.conjuntoId, id);
+        fetchData();
+    }
+  };
 
+  const handleDeleteStaff = async (id: number) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar a este miembro del personal?') && userProfile.conjuntoId) {
+        await apiService.deleteInternalStaff(userProfile.conjuntoId, id);
+        fetchData();
+    }
+  };
+  
+  const handleDeleteAccountStatus = async (apartment: string) => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar el estado de cuenta del apartamento ${apartment}?`) && userProfile.conjuntoId) {
+        await apiService.deleteAccountStatus(userProfile.conjuntoId, apartment);
+        fetchData();
+    }
+  };
+  
+  const handleDeleteRole = async (id: string) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este rol?') && userProfile.conjuntoId) {
+        await apiService.deleteRole(userProfile.conjuntoId, id);
+        fetchData();
+    }
+  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -230,9 +323,14 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                 </div>
                 <button 
                     onClick={() => {
-                        if (activeDbTab === DbTab.Users) handleUserModalOpen(null);
-                        else if (activeDbTab === DbTab.Roles) alert('Agregar nuevo rol');
-                        else alert('Agregar nuevo registro');
+                        switch(activeDbTab) {
+                            case DbTab.Residents: handleResidentModalOpen(null); break;
+                            case DbTab.AccountStatus: handleAccountStatusModalOpen(null); break;
+                            case DbTab.Providers: handleProviderModalOpen(null); break;
+                            case DbTab.Internal: handleStaffModalOpen(null); break;
+                            case DbTab.Users: handleUserModalOpen(null); break;
+                            case DbTab.Roles: handleRoleModalOpen(null); break;
+                        }
                     }}
                     className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
                   <Icon name="user-plus" className="w-4 h-4" />
@@ -246,20 +344,31 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       if (isLoading) {
           return <div className="text-center p-10 text-gray-500">Cargando datos...</div>;
       }
-      
-      const renderGenericTableActions = () => (
-          <div className="space-x-2">
-              <button className="text-xs font-medium text-blue-600 hover:underline">Editar</button>
-              <button className="text-xs font-medium text-red-600 hover:underline">Eliminar</button>
-          </div>
-      );
 
       switch (activeDbTab) {
           case DbTab.Roles:
              return (
-                 <p className="p-6 text-center text-gray-600">
-                    Funcionalidad para gestionar roles y permisos estará disponible próximamente.
-                 </p>
+                 <table className="w-full text-sm text-left text-gray-500">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3">Nombre del Rol</th>
+                            <th scope="col" className="px-6 py-3">Permisos</th>
+                            <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {roles.map((role) => (
+                            <tr key={role.id} className="bg-white border-b hover:bg-gray-50">
+                                <td className="px-6 py-4 font-medium text-gray-900">{role.name}</td>
+                                <td className="px-6 py-4">{role.permissions.join(', ')}</td>
+                                <td className="px-6 py-4 text-right space-x-2">
+                                   <button onClick={() => handleRoleModalOpen(role)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                   <button onClick={() => handleDeleteRole(role.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                 </table>
              );
           case DbTab.Users:
              return (
@@ -313,7 +422,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{resident.email}</td>
                                   <td className="px-6 py-4">{resident.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
-                                     <button onClick={() => handleEditResidentClick(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                     <button onClick={() => handleResidentModalOpen(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
                                      <button onClick={() => handleDeleteResident(resident.apartment)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
@@ -329,8 +438,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               <th scope="col" className="px-6 py-3">Apartamento</th>
                               <th scope="col" className="px-6 py-3">Fecha último pago</th>
                               <th scope="col" className="px-6 py-3">Valor Cuota</th>
-                              <th scope="col" className="px-6 py-3">Cuotas pendientes</th>
-                              <th scope="col" className="px-6 py-3">Otros Cobros</th>
                               <th scope="col" className="px-6 py-3">Saldo pendiente</th>
                               <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
@@ -341,10 +448,11 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4 font-medium text-gray-900">{account.apartment}</td>
                                   <td className="px-6 py-4">{account.lastPaymentDate}</td>
                                   <td className="px-6 py-4">${account.adminFeeValue.toLocaleString()}</td>
-                                  <td className="px-6 py-4">{account.pendingInstallments}</td>
-                                  <td className="px-6 py-4">${account.otherCharges.toLocaleString()}</td>
                                   <td className="px-6 py-4 font-semibold">${account.outstandingBalance.toLocaleString()}</td>
-                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                      <button onClick={() => handleAccountStatusModalOpen(account)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                      <button onClick={() => handleDeleteAccountStatus(account.apartment)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                  </td>
                               </tr>
                           ))}
                       </tbody>
@@ -369,7 +477,10 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{provider.specialty}</td>
                                   <td className="px-6 py-4">{provider.email}</td>
                                   <td className="px-6 py-4">{provider.phone}</td>
-                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                      <button onClick={() => handleProviderModalOpen(provider)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                      <button onClick={() => handleDeleteProvider(provider.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                  </td>
                               </tr>
                           ))}
                       </tbody>
@@ -394,7 +505,10 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{staff.position}</td>
                                   <td className="px-6 py-4">{staff.email}</td>
                                   <td className="px-6 py-4">{staff.phone}</td>
-                                  <td className="px-6 py-4 text-right">{renderGenericTableActions()}</td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                     <button onClick={() => handleStaffModalOpen(staff)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                     <button onClick={() => handleDeleteStaff(staff.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                  </td>
                               </tr>
                           ))}
                       </tbody>
@@ -432,11 +546,44 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         </div>
       </div>
       
-      {isEditModalOpen && (
-        <EditResidentModal
-          resident={selectedResident}
-          onClose={() => setIsEditModalOpen(false)}
-          onSave={handleSaveChanges}
+      {isResidentModalOpen && (
+        <ResidentModal
+          isOpen={isResidentModalOpen}
+          residentToEdit={selectedResident}
+          onClose={() => setIsResidentModalOpen(false)}
+          onSave={handleSaveResident}
+        />
+      )}
+      {isProviderModalOpen && (
+        <ProviderModal
+          isOpen={isProviderModalOpen}
+          providerToEdit={selectedProvider}
+          onClose={() => setIsProviderModalOpen(false)}
+          onSave={handleSaveProvider}
+        />
+      )}
+      {isStaffModalOpen && (
+        <InternalStaffModal
+          isOpen={isStaffModalOpen}
+          staffToEdit={selectedStaff}
+          onClose={() => setIsStaffModalOpen(false)}
+          onSave={handleSaveStaff}
+        />
+      )}
+      {isAccountStatusModalOpen && (
+        <AccountStatusModal
+          isOpen={isAccountStatusModalOpen}
+          accountToEdit={selectedAccountStatus}
+          onClose={() => setIsAccountStatusModalOpen(false)}
+          onSave={handleSaveAccountStatus}
+        />
+      )}
+      {isRoleModalOpen && (
+        <RoleModal
+          isOpen={isRoleModalOpen}
+          roleToEdit={selectedRole}
+          onClose={() => setIsRoleModalOpen(false)}
+          onSave={handleSaveRole}
         />
       )}
       {isUserModalOpen && (

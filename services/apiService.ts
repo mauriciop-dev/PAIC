@@ -80,6 +80,10 @@ export const apiService = {
         if (error) return handleApiError(error, 'fetchResidents') || [];
         return fromSupabase(data) as Resident[];
     },
+     async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
+        const { error } = await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
+        if (error) handleApiError(error, 'addResident');
+    },
     async updateResident(conjuntoId: string, resident: Resident): Promise<void> {
         const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
         if (error) handleApiError(error, 'updateResident');
@@ -104,6 +108,18 @@ export const apiService = {
         if (error) return handleApiError(error, 'fetchAccountStatusByApartment');
         return fromSupabase(data) as AccountStatus | null;
     },
+    async addAccountStatus(conjuntoId: string, account: Omit<AccountStatus, 'id'>): Promise<void> {
+        const { error } = await supabase.from('account_status').insert(toSupabase({ ...account, conjuntoId }));
+        if (error) handleApiError(error, 'addAccountStatus');
+    },
+    async updateAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
+        const { error } = await supabase.from('account_status').update(toSupabase(account)).eq('conjunto_id', conjuntoId).eq('apartment', account.apartment);
+        if (error) handleApiError(error, 'updateAccountStatus');
+    },
+    async deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
+        const { error } = await supabase.from('account_status').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+        if (error) handleApiError(error, 'deleteAccountStatus');
+    },
     async bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
         const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
         const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id,apartment' });
@@ -115,6 +131,18 @@ export const apiService = {
         if (error) return handleApiError(error, 'fetchProviders') || [];
         return fromSupabase(data) as Provider[];
     },
+     async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
+        const { error } = await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
+        if (error) handleApiError(error, 'addProvider');
+    },
+    async updateProvider(conjuntoId: string, provider: Provider): Promise<void> {
+        const { error } = await supabase.from('providers').update(toSupabase(provider)).eq('id', provider.id).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'updateProvider');
+    },
+    async deleteProvider(conjuntoId: string, providerId: number): Promise<void> {
+        const { error } = await supabase.from('providers').delete().eq('id', providerId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'deleteProvider');
+    },
     async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
         const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
         const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id' });
@@ -125,6 +153,18 @@ export const apiService = {
         const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
         if (error) return handleApiError(error, 'fetchInternalStaff') || [];
         return fromSupabase(data) as InternalStaff[];
+    },
+    async addInternalStaff(conjuntoId: string, staff: Omit<InternalStaff, 'id'>): Promise<void> {
+        const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
+        if (error) handleApiError(error, 'addInternalStaff');
+    },
+    async updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
+        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('id', staff.id).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'updateInternalStaff');
+    },
+    async deleteInternalStaff(conjuntoId: string, staffId: number): Promise<void> {
+        const { error } = await supabase.from('internal_staff').delete().eq('id', staffId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'deleteInternalStaff');
     },
     async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
         const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
@@ -142,6 +182,21 @@ export const apiService = {
         return Promise.resolve([
             { id: 'contador', name: 'Contador', permissions: [Tab.Finanzas] },
         ]);
+    },
+    async addRole(conjuntoId: string, role: Omit<UserRoleDefinition, 'id'>): Promise<void> {
+        // Mocked
+        console.log('Mocked addRole:', { ...role, conjuntoId });
+        return Promise.resolve();
+    },
+    async updateRole(conjuntoId: string, role: UserRoleDefinition): Promise<void> {
+        // Mocked
+        console.log('Mocked updateRole:', { ...role, conjuntoId });
+        return Promise.resolve();
+    },
+    async deleteRole(conjuntoId: string, roleId: string): Promise<void> {
+        // Mocked
+        console.log('Mocked deleteRole:', { roleId, conjuntoId });
+        return Promise.resolve();
     },
     async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
         const { error } = await supabase.from('platform_users').insert(toSupabase({ ...user, conjuntoId }));
