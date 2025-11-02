@@ -291,6 +291,7 @@ export const apiService = {
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
+        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
         const payload = {
             description: expense.description,
             amount: expense.amount,
@@ -313,6 +314,7 @@ export const apiService = {
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
+        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
         const payload = {
             description: income.description,
             amount: income.amount,
@@ -337,6 +339,7 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
+        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
         const payload = {
             apartment: log.apartment,
             visitor_name: log.visitorName,
