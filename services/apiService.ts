@@ -291,17 +291,8 @@ export const apiService = {
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
-        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
-        const payload = {
-            description: expense.description,
-            amount: expense.amount,
-            category: expense.category,
-            date: expense.date,
-            provider_id: expense.providerId,
-            is_recurring: expense.isRecurring,
-            conjunto_id: conjuntoId,
-        };
-        const { error } = await supabase.from('expenses').insert(payload);
+        // FIX: Reverted to using the reliable `toSupabase` mapper, mirroring the pattern of other working functions.
+        const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
         if (error) handleApiError(error, 'addExpense');
     },
     async deleteExpense(conjuntoId: string, id: number): Promise<void> {
@@ -314,16 +305,8 @@ export const apiService = {
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
-        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
-        const payload = {
-            description: income.description,
-            amount: income.amount,
-            category: income.category,
-            date: income.date,
-            is_recurring: income.isRecurring,
-            conjunto_id: conjuntoId,
-        };
-        const { error } = await supabase.from('incomes').insert(payload);
+        // FIX: Reverted to using the reliable `toSupabase` mapper, mirroring the pattern of other working functions.
+        const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
         if (error) handleApiError(error, 'addIncome');
     },
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {
@@ -339,17 +322,8 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
-        // FIX: Reverted to manual, explicit object creation to resolve silent insertion failures.
-        const payload = {
-            apartment: log.apartment,
-            visitor_name: log.visitorName,
-            date: log.date,
-            status: log.status,
-            entry_time: log.entryTime,
-            exit_time: log.exitTime,
-            conjunto_id: conjuntoId,
-        };
-        const { error } = await supabase.from('visitor_logs').insert(payload);
+        // FIX: Reverted to using the reliable `toSupabase` mapper, mirroring the pattern of other working functions.
+        const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
