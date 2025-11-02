@@ -38,12 +38,12 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                 apiService.fetchPackageLogs(userProfile.conjuntoId),
                 apiService.fetchResidents(userProfile.conjuntoId),
             ]);
-            setVisitorLogs(visitors);
+            setVisitorLogs(visitors.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id - a.id));
             setPackageLogs(packages);
             setResidents(res);
             if (res.length > 0) {
-                setPkgApartment(res[0].apartment);
-                setVisitorApartment(res[0].apartment);
+                if (!pkgApartment) setPkgApartment(res[0].apartment);
+                if (!visitorApartment) setVisitorApartment(res[0].apartment);
             }
         } catch (error) {
             console.error("Failed to fetch security data:", error);
@@ -101,41 +101,33 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         fetchData();
     };
 
-    const handleAuthorizeVisitor = async (e: React.FormEvent) => {
+    const handleRegisterVisitorEntry = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!visitorName || !visitorApartment || !userProfile.conjuntoId) return;
 
         setIsSubmittingVisitor(true);
         setVisitorFeedback(null);
         try {
+            const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
             await apiService.addVisitorLog(userProfile.conjuntoId, {
                 visitorName,
                 apartment: visitorApartment,
                 date: visitorDate,
-                status: 'Autorizado',
+                status: 'Ingresó',
+                entryTime: now
             });
             
             setVisitorName('');
-            setVisitorFeedback('¡Visitante pre-autorizado exitosamente!');
+            setVisitorFeedback('¡Ingreso de visitante registrado exitosamente!');
             setTimeout(() => setVisitorFeedback(null), 3000);
             
             fetchData();
         } catch (error) {
-            console.error("Error authorizing visitor:", error);
-            setVisitorFeedback("Error al autorizar visitante.");
+            console.error("Error registering visitor entry:", error);
+            setVisitorFeedback("Error al registrar el ingreso del visitante.");
         } finally {
             setIsSubmittingVisitor(false);
         }
-    };
-
-    const handleRegisterEntry = async (logId: number) => {
-        if (!userProfile.conjuntoId) return;
-        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
-            status: 'Ingresó',
-            entryTime: now,
-        });
-        fetchData();
     };
 
     const handleRegisterExit = async (logId: number) => {
@@ -150,8 +142,8 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
 
     const renderVisitorForm = () => (
         <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Autorizar Visitante</h3>
-            <form onSubmit={handleAuthorizeVisitor} className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Ingreso de Visitante</h3>
+            <form onSubmit={handleRegisterVisitorEntry} className="space-y-4">
                  <div>
                     <label htmlFor="visitorName" className="block text-sm font-medium text-gray-700">Nombre del Visitante</label>
                     <input type="text" id="visitorName" value={visitorName} onChange={e => setVisitorName(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
@@ -167,7 +159,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                     <input type="date" id="visitDate" value={visitorDate} onChange={e => setVisitorDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                 </div>
                 <button type="submit" disabled={isSubmittingVisitor} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
-                    {isSubmittingVisitor ? 'Autorizando...' : 'Pre-Autorizar'}
+                    {isSubmittingVisitor ? 'Registrando...' : 'Registrar Ingreso'}
                 </button>
                 {visitorFeedback && <p className="text-sm text-green-600 text-center">{visitorFeedback}</p>}
             </form>
@@ -228,17 +220,11 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                                 </td>
                                 <td className="px-6 py-4">{log.entryTime || 'N/A'}</td>
                                 <td className="px-6 py-4">{log.exitTime || 'N/A'}</td>
-                                <td className="px-6 py-4 text-right space-x-2">
-                                    <button 
-                                        onClick={() => handleRegisterEntry(log.id)}
-                                        disabled={log.status !== 'Autorizado'}
-                                        className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
-                                        Registrar Ingreso
-                                    </button>
+                                <td className="px-6 py-4 text-right">
                                      <button 
                                         onClick={() => handleRegisterExit(log.id)}
                                         disabled={log.status !== 'Ingresó'}
-                                        className="font-medium text-gray-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
+                                        className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
                                         Registrar Salida
                                      </button>
                                 </td>
