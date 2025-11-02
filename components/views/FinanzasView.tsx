@@ -212,7 +212,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                             <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                             <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                             <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            <Bar dataKey="ingresos" name="Ingresos (Potencial)" fill="#3b82f6" />
+                            <Bar dataKey="ingresos" name="Ingresos (Potencial)" fill="#2563eb" />
                             <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
                         </BarChart>
                     </ResponsiveContainer>
