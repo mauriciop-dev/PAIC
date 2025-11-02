@@ -9,22 +9,11 @@ interface DashboardViewProps {
     userProfile: UserProfile;
 }
 
-const TooltipWrapper: React.FC<{ content: string[]; children: React.ReactNode }> = ({ content, children }) => {
-    if (!content || content.length === 0) return <>{children}</>;
-    return (
-        <div className="relative group">
-            {children}
-            <div className="absolute z-10 w-60 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
-                <ul className="list-disc list-inside">
-                    {content.slice(0, 5).map((item, i) => <li key={i}>{item}</li>)}
-                    {content.length > 5 && <li>...y {content.length - 5} más.</li>}
-                </ul>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
-            </div>
-        </div>
-    );
-};
-
+interface TooltipData {
+    content: string[];
+    x: number;
+    y: number;
+}
 
 const StatCard: React.FC<{ title: string; value: number; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
     <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
@@ -88,6 +77,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[] } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
+    const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -108,6 +98,20 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         };
         fetchData();
     }, [userProfile.conjuntoId]);
+
+    const handleMouseEnter = (content: string[], event: React.MouseEvent) => {
+        if (!content || content.length === 0) return;
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        setTooltip({
+            content,
+            x: rect.left + rect.width / 2, // Center of the card
+            y: rect.top, // Top edge of the card
+        });
+    };
+
+    const handleMouseLeave = () => {
+        setTooltip(null);
+    };
 
     if (isLoading || !summary || !chartData) {
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
@@ -171,10 +175,18 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     <div className="space-y-6">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <TooltipWrapper content={stats.residentsInDebt.details}><StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" /></TooltipWrapper>
-            <TooltipWrapper content={stats.pendingTasks.details}><StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" /></TooltipWrapper>
-            <TooltipWrapper content={stats.overduePayments.details}><StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" /></TooltipWrapper>
-            <TooltipWrapper content={stats.packagesToDeliver.details}><StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" /></TooltipWrapper>
+            <div onMouseEnter={(e) => handleMouseEnter(stats.residentsInDebt.details, e)} onMouseLeave={handleMouseLeave}>
+                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
+            </div>
+            <div onMouseEnter={(e) => handleMouseEnter(stats.pendingTasks.details, e)} onMouseLeave={handleMouseLeave}>
+                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
+            </div>
+            <div onMouseEnter={(e) => handleMouseEnter(stats.overduePayments.details, e)} onMouseLeave={handleMouseLeave}>
+                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
+            </div>
+            <div onMouseEnter={(e) => handleMouseEnter(stats.packagesToDeliver.details, e)} onMouseLeave={handleMouseLeave}>
+                <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
+            </div>
         </div>
         
         {/* Main Grid: Notifications + Chart Carousel */}
@@ -209,6 +221,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 </ResponsiveContainer>
             </div>
         </div>
+
+        {tooltip && (
+            <div
+                style={{
+                    position: 'fixed',
+                    left: `${tooltip.x}px`,
+                    top: `${tooltip.y}px`,
+                    transform: 'translate(-50%, -100%)',
+                    marginTop: '-10px',
+                }}
+                className="z-50 w-60 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg"
+            >
+                <ul className="list-disc list-inside">
+                    {tooltip.content.slice(0, 5).map((item, i) => <li key={i}>{item}</li>)}
+                    {tooltip.content.length > 5 && <li>...y {tooltip.content.length - 5} más.</li>}
+                </ul>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+            </div>
+        )}
     </div>
   );
 };
