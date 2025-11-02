@@ -291,8 +291,16 @@ export const apiService = {
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
-        const payload = { ...expense, conjuntoId };
-        const { error } = await supabase.from('expenses').insert(toSupabase(payload));
+        const payload = {
+            description: expense.description,
+            amount: expense.amount,
+            category: expense.category,
+            date: expense.date,
+            provider_id: expense.providerId,
+            is_recurring: expense.isRecurring,
+            conjunto_id: conjuntoId,
+        };
+        const { error } = await supabase.from('expenses').insert(payload);
         if (error) handleApiError(error, 'addExpense');
     },
     async deleteExpense(conjuntoId: string, id: number): Promise<void> {
@@ -305,8 +313,15 @@ export const apiService = {
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
-        const payload = { ...income, conjuntoId };
-        const { error } = await supabase.from('incomes').insert(toSupabase(payload));
+        const payload = {
+            description: income.description,
+            amount: income.amount,
+            category: income.category,
+            date: income.date,
+            is_recurring: income.isRecurring,
+            conjunto_id: conjuntoId,
+        };
+        const { error } = await supabase.from('incomes').insert(payload);
         if (error) handleApiError(error, 'addIncome');
     },
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {
@@ -322,8 +337,16 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
-        const payload = { ...log, conjuntoId };
-        const { error } = await supabase.from('visitor_logs').insert(toSupabase(payload));
+        const payload = {
+            apartment: log.apartment,
+            visitor_name: log.visitorName,
+            date: log.date,
+            status: log.status,
+            entry_time: log.entryTime,
+            exit_time: log.exitTime,
+            conjunto_id: conjuntoId,
+        };
+        const { error } = await supabase.from('visitor_logs').insert(payload);
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
