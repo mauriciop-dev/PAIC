@@ -12,6 +12,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
+    const [currentRecipient, setCurrentRecipient] = useState('');
     const [files, setFiles] = useState<File[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -79,6 +80,19 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
         setRecipients(prev => [...new Set([...prev, ...emailList.filter(Boolean)])]);
     }
     
+    const handleAddRecipient = () => {
+        const newRecipient = currentRecipient.trim();
+        // Basic email validation
+        if (newRecipient && !recipients.includes(newRecipient) && /\S+@\S+\.\S+/.test(newRecipient)) {
+            setRecipients([...recipients, newRecipient]);
+            setCurrentRecipient('');
+        }
+    };
+
+    const handleRemoveRecipient = (recipientToRemove: string) => {
+        setRecipients(recipients.filter(r => r !== recipientToRemove));
+    };
+
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
             setFiles(prev => [...prev, ...Array.from(event.target.files!)]);
@@ -142,20 +156,35 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                     <form onSubmit={handleSend} className="space-y-4">
                         <div>
                             <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
-                            <div className="flex flex-wrap gap-2 mb-2">
+                             <div className="flex flex-wrap gap-2 mb-2">
                                 <button type="button" onClick={() => addRecipientGroup('all')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Todos los residentes</button>
                                 <button type="button" onClick={() => addRecipientGroup('debtors')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Residentes en mora</button>
                                 <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
                                 <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
                             </div>
-                            <textarea
-                                id="recipients"
-                                value={recipients.join(', ')}
-                                onChange={(e) => setRecipients(e.target.value.split(',').map(em => em.trim()))}
-                                placeholder="Añade correos aquí o selecciona un grupo"
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                                rows={2}
-                            />
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="email"
+                                    value={currentRecipient}
+                                    onChange={(e) => setCurrentRecipient(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddRecipient(); } }}
+                                    placeholder="Añadir correo y presionar Enter"
+                                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                                />
+                                <button type="button" onClick={handleAddRecipient} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Añadir</button>
+                            </div>
+                            {recipients.length > 0 && (
+                                <div className="flex flex-wrap gap-2 p-2 mt-2 border border-gray-200 rounded-md bg-gray-50 max-h-28 overflow-y-auto">
+                                    {recipients.map(recipient => (
+                                        <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
+                                            {recipient}
+                                            <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
+                                                <Icon name="x" className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -197,7 +226,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                                 className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
                             >
                                 <Icon name="send" className="w-5 h-5" />
-                                {isUploading ? 'Subiendo archivos...' : isSending ? 'Enviando...' : 'Enviar Comunicado'}
+                                {isUploading ? 'Subiendo archivos...' : isSending ? 'Enviando...' : `Enviar a ${recipients.length} destinatarios`}
                             </button>
                         </div>
                          {feedback && (
