@@ -507,28 +507,35 @@ export const apiService = {
         return { name: file.name, url: data.publicUrl };
     },
     async sendCommunicationEmail(bcc: string[], subject: string, html: string, attachments: {name: string, url: string}[]): Promise<{ success: boolean; error?: string }> {
-        // --- SIMULATION START ---
-        // This function simulates sending an email because the backend Supabase function
-        // 'send-email' is not deployed in this demonstration environment.
         let finalHtml = html;
         if (attachments.length > 0) {
             const attachmentLinks = attachments.map(att => `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`).join('');
             finalHtml += `<br><hr><p><strong>Archivos Adjuntos:</strong></p><ul>${attachmentLinks}</ul>`;
         }
+        
+        try {
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: { bcc, subject, html: finalHtml },
+            });
 
-        console.log("--- SIMULACIÓN DE ENVÍO DE CORREO ---");
-        console.log("Destinatarios (BCC):", bcc.join(', '));
-        console.log("Asunto:", subject);
-        console.log("Cuerpo (HTML):", finalHtml);
-        console.log("En una aplicación real, aquí se llamaría al backend para el envío real.");
-        console.log("-----------------------------------------");
-        
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Return a success response to mimic a successful API call.
-        return { success: true };
-        // --- SIMULATION END ---
+            if (error) {
+                throw new Error(`Function invocation failed: ${error.message}`);
+            }
+
+            // The 'data' object from the function response needs to be checked.
+            if (data && data.success) {
+                console.log("Supabase function 'send-email' reported success:", data);
+                return { success: true };
+            } else {
+                 // If the function ran but reported an internal error (e.g., from Resend)
+                 const errorMessage = (data && data.error) ? data.error : 'Unknown error from function.';
+                 throw new Error(errorMessage);
+            }
+
+        } catch (error: any) {
+            console.error("Error invoking Supabase function 'send-email':", error);
+            return { success: false, error: error.message };
+        }
     },
     async sendMassEmail(conjuntoId: string, group: 'all' | 'debtors', subject: string, body: string): Promise<{success: boolean, message: string}> {
         let emailList: string[] = [];

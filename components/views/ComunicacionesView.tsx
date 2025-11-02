@@ -116,13 +116,13 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
             const result = await apiService.sendCommunicationEmail(recipients, subject, body, uploadedAttachments);
             
             if (result.success) {
-                setFeedback({type: 'success', text: `Simulación Exitosa: Mensaje enviado a ${recipients.length} destinatario(s).`});
+                setFeedback({type: 'success', text: `¡Correo enviado exitosamente a ${recipients.length} destinatario(s)!`});
                 setSubject('');
                 setBody('');
                 setRecipients([]);
                 setFiles([]);
             } else {
-                throw new Error(result.error || 'Ocurrió un error desconocido.');
+                throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
             }
 
         } catch (error: any) {
