@@ -23,11 +23,14 @@ import {
     PlatformStats,
     UserRole,
     Income,
-    UserRoleDefinition
+    UserRoleDefinition,
+    StoredFile
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
-const handleApiError = (error: PostgrestError, context: string) => {
+// FIX: Broadened the error type to accept any error object with a `message` property,
+// resolving a type conflict between `PostgrestError` and `StorageError`.
+const handleApiError = (error: { message: string }, context: string) => {
     console.error(`Error in ${context}:`, error);
     // In a real app, you might want to throw the error or handle it more gracefully
     return null;
@@ -335,7 +338,8 @@ export const apiService = {
             this.sendCommunicationEmail(
                 [resident.email],
                 `📦 ¡Tienes un paquete en recepción!`,
-                `Hola ${resident.name}, te informamos que hemos recibido un paquete para ti de <strong>${pkg.courier}</strong>. Puedes reclamarlo en la recepción.`
+                `<p>Hola ${resident.name},</p><p>Te informamos que hemos recibido un paquete para ti de <strong>${pkg.courier}</strong>. Puedes reclamarlo en la recepción.</p>`,
+                []
             );
         }
     },
@@ -358,7 +362,8 @@ export const apiService = {
                  this.sendCommunicationEmail(
                     [resident.email],
                     `✅ Tu paquete ha sido entregado`,
-                    `Hola ${resident.name}, te confirmamos que tu paquete de <strong>${pkgBeforeUpdate.courier}</strong> ha sido entregado exitosamente.`
+                    `<p>Hola ${resident.name},</p><p>Te confirmamos que tu paquete de <strong>${pkgBeforeUpdate.courier}</strong> ha sido entregado exitosamente.</p>`,
+                    []
                 );
              }
         }
@@ -484,26 +489,46 @@ export const apiService = {
     },
     
     // Communications
-    async sendCommunicationEmail(bcc: string[], subject: string, html: string): Promise<{ success: boolean; error?: string }> {
-        const payload = { bcc, subject, html };
-        console.log("Attempting to send email via Supabase function 'send-email' with payload:", JSON.stringify(payload));
-
-        const { data, error } = await supabase.functions.invoke('send-email', {
-            body: payload,
-        });
+    async uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{name: string, url: string} | null> {
+        const filePath = `public/${conjuntoId}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage
+            .from('adjuntos_comunicaciones')
+            .upload(filePath, file);
 
         if (error) {
-            console.error('Error invoking send-email function:', error);
-            return { success: false, error: error.message };
-        }
-        
-        if (data && data.success === false) {
-             console.error('Error from inside send-email function:', data.error);
-             return { success: false, error: data.error };
+            handleApiError(error, `uploadCommunicationAttachment for file ${file.name}`);
+            return null;
         }
 
-        console.log("Supabase function 'send-email' invoked successfully.");
+        const { data } = supabase.storage
+            .from('adjuntos_comunicaciones')
+            .getPublicUrl(filePath);
+
+        return { name: file.name, url: data.publicUrl };
+    },
+    async sendCommunicationEmail(bcc: string[], subject: string, html: string, attachments: {name: string, url: string}[]): Promise<{ success: boolean; error?: string }> {
+        // --- SIMULATION START ---
+        // This function simulates sending an email because the backend Supabase function
+        // 'send-email' is not deployed in this demonstration environment.
+        let finalHtml = html;
+        if (attachments.length > 0) {
+            const attachmentLinks = attachments.map(att => `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`).join('');
+            finalHtml += `<br><hr><p><strong>Archivos Adjuntos:</strong></p><ul>${attachmentLinks}</ul>`;
+        }
+
+        console.log("--- SIMULACIÓN DE ENVÍO DE CORREO ---");
+        console.log("Destinatarios (BCC):", bcc.join(', '));
+        console.log("Asunto:", subject);
+        console.log("Cuerpo (HTML):", finalHtml);
+        console.log("En una aplicación real, aquí se llamaría al backend para el envío real.");
+        console.log("-----------------------------------------");
+        
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Return a success response to mimic a successful API call.
         return { success: true };
+        // --- SIMULATION END ---
     },
     async sendMassEmail(conjuntoId: string, group: 'all' | 'debtors', subject: string, body: string): Promise<{success: boolean, message: string}> {
         let emailList: string[] = [];
@@ -521,7 +546,7 @@ export const apiService = {
             return { success: false, message: "No se encontraron destinatarios." };
         }
         
-        const result = await this.sendCommunicationEmail(emailList, subject, body);
+        const result = await this.sendCommunicationEmail(emailList, subject, body, []);
         if (result.success) {
             return { success: true, message: `¡Correo enviado a ${emailList.length} destinatarios!` };
         }

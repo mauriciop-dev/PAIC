@@ -12,10 +12,11 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
+    const [files, setFiles] = useState<File[]>([]);
     const [isSending, setIsSending] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
-    const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
 
@@ -77,16 +78,17 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
         }
         setRecipients(prev => [...new Set([...prev, ...emailList.filter(Boolean)])]);
     }
-
+    
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
-            setAttachedFiles(prevFiles => [...prevFiles, ...Array.from(event.target.files!)]);
+            setFiles(prev => [...prev, ...Array.from(event.target.files!)]);
         }
     };
 
     const removeFile = (fileToRemove: File) => {
-        setAttachedFiles(prevFiles => prevFiles.filter(file => file !== fileToRemove));
+        setFiles(prev => prev.filter(file => file !== fileToRemove));
     };
+
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,19 +97,30 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
             return;
         }
         setIsSending(true);
+        setIsUploading(files.length > 0);
         setFeedback(null);
         
         try {
-            // NOTE: File attachment logic would be added here.
-            // For now, we send the email without attachments. The backend would need to handle them.
-            const result = await apiService.sendCommunicationEmail(recipients, subject, body);
+            let uploadedAttachments: { name: string; url: string }[] = [];
+            if (files.length > 0 && userProfile.conjuntoId) {
+                const uploadPromises = files.map(file => apiService.uploadCommunicationAttachment(userProfile.conjuntoId!, file));
+                const results = await Promise.all(uploadPromises);
+                const successfulUploads = results.filter(res => res !== null) as { name: string; url: string }[];
+                if (successfulUploads.length !== files.length) {
+                    throw new Error("Algunos archivos no se pudieron subir.");
+                }
+                uploadedAttachments = successfulUploads;
+            }
+            setIsUploading(false);
+
+            const result = await apiService.sendCommunicationEmail(recipients, subject, body, uploadedAttachments);
             
             if (result.success) {
-                setFeedback({type: 'success', text: `Mensaje enviado al servidor para procesar a ${recipients.length} destinatario(s).`});
+                setFeedback({type: 'success', text: `Simulación Exitosa: Mensaje enviado a ${recipients.length} destinatario(s).`});
                 setSubject('');
                 setBody('');
                 setRecipients([]);
-                setAttachedFiles([]);
+                setFiles([]);
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido.');
             }
@@ -117,6 +130,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
             setFeedback({type: 'error', text: `Error al enviar: ${error.message}`});
         } finally {
             setIsSending(false);
+            setIsUploading(false);
             setTimeout(() => setFeedback(null), 7000);
         }
     };
@@ -183,7 +197,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                                 className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
                             >
                                 <Icon name="send" className="w-5 h-5" />
-                                {isSending ? 'Enviando...' : 'Enviar Comunicado'}
+                                {isUploading ? 'Subiendo archivos...' : isSending ? 'Enviando...' : 'Enviar Comunicado'}
                             </button>
                         </div>
                          {feedback && (
@@ -197,39 +211,34 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                     <div className="bg-white p-6 rounded-lg shadow-md sticky top-24">
                         <h3 className="text-lg font-semibold text-gray-700 mb-4">Gestor de Archivos</h3>
                         <div 
-                          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
                         >
                           <Icon name="package" className="mx-auto h-10 w-10 text-gray-400" />
                           <p className="mt-2 text-sm text-gray-600">
-                            Arrastra y suelta archivos aquí
+                            Arrastra archivos aquí o haz clic para seleccionar.
                           </p>
-                           <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="mt-4 px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 text-sm"
-                            >
-                              O selecciona un archivo
-                            </button>
-                           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" multiple />
+                          <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                multiple
+                            />
                         </div>
-                        <div className="mt-4 space-y-2">
-                            <p className="text-sm font-medium text-gray-700">Archivos adjuntos ({attachedFiles.length}):</p>
-                            {attachedFiles.length > 0 ? (
-                                <ul className="max-h-24 overflow-y-auto space-y-1">
-                                    {attachedFiles.map((file, index) => (
-                                        <li key={index} className="flex justify-between items-center text-xs bg-gray-100 p-1.5 rounded-md">
-                                            <span className="truncate text-gray-700">{file.name}</span>
-                                            <button onClick={() => removeFile(file)} className="text-red-500 hover:text-red-700 ml-2">
-                                                <Icon name="x" className="w-4 h-4" />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-xs text-gray-500 text-center mt-2">Ningún archivo adjunto.</p>
-                            )}
-                            <p className="text-xs text-gray-500 text-center pt-2">El envío de archivos adjuntos se habilitará próximamente.</p>
-                        </div>
+                        {files.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                                <h4 className="text-sm font-medium text-gray-600">Archivos adjuntos:</h4>
+                                {files.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between text-sm bg-gray-100 p-2 rounded-md">
+                                        <span className="truncate">{file.name}</span>
+                                        <button onClick={() => removeFile(file)} className="text-red-500 hover:text-red-700">
+                                            <Icon name="x" className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
