@@ -291,7 +291,19 @@ export const apiService = {
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
-        const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
+        const payload = {
+            conjunto_id: conjuntoId,
+            description: expense.description,
+            amount: expense.amount,
+            category: expense.category,
+            date: expense.date,
+            provider_id: expense.providerId,
+            is_recurring: expense.isRecurring,
+        };
+        // Ensure undefined properties are not sent to Supabase
+        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
+
+        const { error } = await supabase.from('expenses').insert(payload);
         if (error) handleApiError(error, 'addExpense');
     },
     async deleteExpense(conjuntoId: string, id: number): Promise<void> {
@@ -304,7 +316,18 @@ export const apiService = {
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
-        const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
+        const payload = {
+            conjunto_id: conjuntoId,
+            description: income.description,
+            amount: income.amount,
+            category: income.category,
+            date: income.date,
+            is_recurring: income.isRecurring,
+        };
+        // Ensure undefined properties are not sent to Supabase
+        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
+        
+        const { error } = await supabase.from('incomes').insert(payload);
         if (error) handleApiError(error, 'addIncome');
     },
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {

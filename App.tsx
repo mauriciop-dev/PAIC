@@ -64,8 +64,10 @@ const App: React.FC = () => {
 
         if (storedUser) {
             const parsedUser: UserProfile = JSON.parse(storedUser);
-            if (!parsedUser.role) { // Compatibility fix
-                parsedUser.role = UserRole.Admin;
+            // FIX: This check prevents a crash if a user from an older version of the app
+            // is stored in localStorage without a 'role' property.
+            if (!parsedUser.role) { 
+                parsedUser.role = UserRole.Admin; // Default to Admin for backward compatibility
             }
             setUserProfile(parsedUser); // Set user profile immediately
 
@@ -139,7 +141,9 @@ const App: React.FC = () => {
       }
     };
 
-    handlePaymentSuccess();
+    if(userProfile && conjuntoInfo) {
+      handlePaymentSuccess();
+    }
   }, [userProfile, conjuntoInfo]);
 
   useEffect(() => {
