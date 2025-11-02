@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { apiService } from '../../services/apiService';
 import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
@@ -119,14 +119,15 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         {
             title: 'Ingresos vs Gastos (Últimos 6 meses)',
             component: (
-                 <BarChart data={chartData.monthlyIncomeVsExpense.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                 <LineChart data={chartData.monthlyIncomeVsExpense.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                     <XAxis dataKey="name" fontSize={12} />
                     <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                     <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Bar dataKey="ingresos" name="Ingresos (Potencial)" fill="#2563eb" />
-                    <Bar dataKey="gastos" name="Gastos (Registrados)" fill="#ef4444" />
-                </BarChart>
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos (Potencial)" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
             )
         },
         {
@@ -144,14 +145,15 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         {
             title: 'Comportamiento Histórico (Últimos 12 meses)',
             component: (
-                <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <LineChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                     <XAxis dataKey="name" fontSize={12} />
                     <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                     <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Bar dataKey="ingresos" name="Ingresos" fill="#2563eb" />
-                    <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
-                </BarChart>
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#2563eb" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} dot={false} />
+                </LineChart>
             )
         },
     ];
