@@ -81,9 +81,8 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
     }
     
     const handleAddRecipient = () => {
-        const newRecipient = currentRecipient.trim();
-        // Basic email validation
-        if (newRecipient && !recipients.includes(newRecipient) && /\S+@\S+\.\S+/.test(newRecipient)) {
+        const newRecipient = currentRecipient.trim().replace(/,$/, ''); // Remove trailing comma
+        if (newRecipient && /\S+@\S+\.\S+/.test(newRecipient) && !recipients.includes(newRecipient)) {
             setRecipients([...recipients, newRecipient]);
             setCurrentRecipient('');
         }
@@ -162,29 +161,30 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                                 <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
                                 <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
                             </div>
-                            <div className="flex items-center gap-2">
+                            
+                            <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                                {recipients.map(recipient => (
+                                    <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
+                                        {recipient}
+                                        <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
+                                            <Icon name="x" className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
                                 <input
                                     type="email"
                                     value={currentRecipient}
                                     onChange={(e) => setCurrentRecipient(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddRecipient(); } }}
-                                    placeholder="Añadir correo y presionar Enter"
-                                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ',') {
+                                            e.preventDefault();
+                                            handleAddRecipient();
+                                        }
+                                    }}
+                                    placeholder={recipients.length === 0 ? "Añadir correos y presionar Enter..." : ""}
+                                    className="flex-1 bg-transparent focus:outline-none p-1 text-sm"
                                 />
-                                <button type="button" onClick={handleAddRecipient} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Añadir</button>
                             </div>
-                            {recipients.length > 0 && (
-                                <div className="flex flex-wrap gap-2 p-2 mt-2 border border-gray-200 rounded-md bg-gray-50 max-h-28 overflow-y-auto">
-                                    {recipients.map(recipient => (
-                                        <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
-                                            {recipient}
-                                            <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
-                                                <Icon name="x" className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
