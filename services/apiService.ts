@@ -291,19 +291,8 @@ export const apiService = {
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
-        const payload = {
-            conjunto_id: conjuntoId,
-            description: expense.description,
-            amount: expense.amount,
-            category: expense.category,
-            date: expense.date,
-            provider_id: expense.providerId,
-            is_recurring: expense.isRecurring,
-        };
-        // Ensure undefined properties are not sent to Supabase
-        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
-
-        const { error } = await supabase.from('expenses').insert(payload);
+        const payload = { ...expense, conjuntoId };
+        const { error } = await supabase.from('expenses').insert(toSupabase(payload));
         if (error) handleApiError(error, 'addExpense');
     },
     async deleteExpense(conjuntoId: string, id: number): Promise<void> {
@@ -316,18 +305,8 @@ export const apiService = {
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
-        const payload = {
-            conjunto_id: conjuntoId,
-            description: income.description,
-            amount: income.amount,
-            category: income.category,
-            date: income.date,
-            is_recurring: income.isRecurring,
-        };
-        // Ensure undefined properties are not sent to Supabase
-        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
-        
-        const { error } = await supabase.from('incomes').insert(payload);
+        const payload = { ...income, conjuntoId };
+        const { error } = await supabase.from('incomes').insert(toSupabase(payload));
         if (error) handleApiError(error, 'addIncome');
     },
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {
@@ -343,20 +322,8 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
-        // Being explicit to avoid potential issues with the generic mapper and optional fields.
-        const payload = {
-            conjunto_id: conjuntoId,
-            apartment: log.apartment,
-            visitor_name: log.visitorName,
-            date: log.date,
-            status: log.status,
-            entry_time: log.entryTime,
-            exit_time: log.exitTime,
-        };
-        // Ensure undefined properties are not sent to Supabase
-        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
-
-        const { error } = await supabase.from('visitor_logs').insert(payload);
+        const payload = { ...log, conjuntoId };
+        const { error } = await supabase.from('visitor_logs').insert(toSupabase(payload));
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
