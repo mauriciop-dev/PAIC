@@ -21,7 +21,9 @@ import {
     PackageLog,
     AccessPoint,
     PlatformStats,
-    UserRole
+    UserRole,
+    Income,
+    UserRoleDefinition
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
@@ -97,6 +99,11 @@ export const apiService = {
         if (error) return handleApiError(error, 'fetchAccountStatus') || [];
         return fromSupabase(data) as AccountStatus[];
     },
+     async fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
+        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+        if (error) return handleApiError(error, 'fetchAccountStatusByApartment');
+        return fromSupabase(data) as AccountStatus | null;
+    },
     async bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
         const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
         const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id,apartment' });
@@ -129,6 +136,12 @@ export const apiService = {
         const { data, error } = await supabase.from('platform_users').select('*').eq('conjunto_id', conjuntoId);
         if (error) return handleApiError(error, 'fetchUsers') || [];
         return fromSupabase(data) as PlatformUser[];
+    },
+    async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
+        // This is mocked for now. In a real app, this would fetch from a `user_roles` table.
+        return Promise.resolve([
+            { id: 'contador', name: 'Contador', permissions: [Tab.Finanzas] },
+        ]);
     },
     async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
         const { error } = await supabase.from('platform_users').insert(toSupabase({ ...user, conjuntoId }));
@@ -227,6 +240,20 @@ export const apiService = {
         const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteExpense');
     },
+    async fetchIncomes(conjuntoId: string): Promise<Income[]> {
+        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
+        if (error) return handleApiError(error, 'fetchIncomes') || [];
+        return fromSupabase(data) as Income[];
+    },
+    async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
+        const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
+        if (error) handleApiError(error, 'addIncome');
+    },
+    async deleteIncome(conjuntoId: string, id: number): Promise<void> {
+        const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'deleteIncome');
+    },
+
     
     // Security
     async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
@@ -242,11 +269,44 @@ export const apiService = {
     async addPackageLog(conjuntoId: string, pkg: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
         const payload = { ...pkg, receivedDate: new Date().toISOString(), status: 'En recepción' as const, conjuntoId };
         const { error } = await supabase.from('package_logs').insert(toSupabase(payload));
-        if (error) handleApiError(error, 'addPackageLog');
+        if (error) {
+            handleApiError(error, 'addPackageLog');
+            return;
+        }
+        
+        // After successful insertion, trigger email notification
+        const resident = (await this.fetchResidents(conjuntoId)).find(r => r.apartment === pkg.apartment);
+        if (resident && resident.email) {
+            this.sendCommunicationEmail(
+                [resident.email],
+                `📦 ¡Tienes un paquete en recepción!`,
+                `Hola ${resident.name}, te informamos que hemos recibido un paquete para ti de <strong>${pkg.courier}</strong>. Puedes reclamarlo en la recepción.`
+            );
+        }
     },
     async updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
+        const { data: pkgBeforeUpdate, error: fetchError } = await supabase.from('package_logs').select('apartment, courier').eq('id', packageId).single();
+        if (fetchError || !pkgBeforeUpdate) {
+            handleApiError(fetchError!, 'fetching package before status update');
+            return;
+        }
+
         const { error } = await supabase.from('package_logs').update({ status }).eq('id', packageId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updatePackageLogStatus');
+        if (error) {
+            handleApiError(error, 'updatePackageLogStatus');
+            return;
+        }
+        
+        if (status === 'Entregado') {
+             const resident = (await this.fetchResidents(conjuntoId)).find(r => r.apartment === pkgBeforeUpdate.apartment);
+             if (resident && resident.email) {
+                 this.sendCommunicationEmail(
+                    [resident.email],
+                    `✅ Tu paquete ha sido entregado`,
+                    `Hola ${resident.name}, te confirmamos que tu paquete de <strong>${pkgBeforeUpdate.courier}</strong> ha sido entregado exitosamente.`
+                );
+             }
+        }
     },
 
     // Settings
@@ -278,15 +338,19 @@ export const apiService = {
     
     // Dashboard Specific
     async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary | null> {
-        // This would be a single RPC call in a real app for efficiency
-        const [debtors, tasks, overdue, packages, dueDates, recentPackages] = await Promise.all([
+        const [debtors, tasks, overdue, packages, dueDates, recentPackages, residents, accounts] = await Promise.all([
              supabase.from('account_status').select('apartment', { count: 'exact' }).eq('conjunto_id', conjuntoId).gt('outstanding_balance', 0),
-             supabase.from('tasks').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('completed', false),
-             supabase.from('due_dates').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'Vencido'),
-             supabase.from('package_logs').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'En recepción'),
+             supabase.from('tasks').select('id, text', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('completed', false),
+             supabase.from('due_dates').select('id, item', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'Vencido'),
+             supabase.from('package_logs').select('id, apartment', { count: 'exact' }).eq('conjunto_id', conjuntoId).eq('status', 'En recepción'),
              this.fetchDueDates(conjuntoId),
-             this.fetchPackageLogs(conjuntoId)
+             this.fetchPackageLogs(conjuntoId),
+             this.fetchResidents(conjuntoId),
+             this.fetchAccountStatus(conjuntoId),
         ]);
+
+        const debtorApartments = accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment);
+        const debtorDetails = residents.filter(r => debtorApartments.includes(r.apartment)).map(r => `${r.name} (Apto ${r.apartment})`);
 
         const dueDateNotifications: NotificationItem[] = dueDates
             .filter(d => d.status !== 'Pagado')
@@ -314,19 +378,17 @@ export const apiService = {
         
         return {
             stats: {
-                residentsInDebt: debtors.count ?? 0,
-                pendingTasks: tasks.count ?? 0,
-                overduePayments: overdue.count ?? 0,
-                packagesToDeliver: packages.count ?? 0,
+                residentsInDebt: { count: debtors.count ?? 0, details: debtorDetails },
+                pendingTasks: { count: tasks.count ?? 0, details: (fromSupabase(tasks.data) as Task[]).map(t => t.text) },
+                overduePayments: { count: overdue.count ?? 0, details: (fromSupabase(overdue.data) as DueDate[]).map(d => d.item) },
+                packagesToDeliver: { count: packages.count ?? 0, details: (fromSupabase(packages.data) as PackageLog[]).map(p => `Apto ${p.apartment}`) },
             },
             notifications: [...dueDateNotifications, ...packageNotifications].slice(0,4),
         };
     },
     async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null> {
-        // This is a simplified mock. A real implementation would involve complex SQL queries or RPC calls.
         const expenses = await this.fetchExpenses(conjuntoId);
         const accounts = await this.fetchAccountStatus(conjuntoId);
-
         const totalPotentialIncome = accounts.reduce((sum, acc) => sum + acc.adminFeeValue, 0);
 
         const expensesByCategory: ChartData[] = expenses.reduce((acc, expense) => {
@@ -343,17 +405,26 @@ export const apiService = {
             return cat;
         });
         
-        // FIX: Add 'fill' property to conform to ChartData type. This property is not used by the BarChart but is required by the type definition.
-        const monthlyIncomeVsExpense: ChartData[] = [
-             { name: 'Hace 2 Meses', ingresos: totalPotentialIncome, gastos: 18500000, value: totalPotentialIncome, fill: '' },
-             { name: 'Mes Pasado', ingresos: totalPotentialIncome, gastos: 21000000, value: totalPotentialIncome, fill: '' },
-             { name: 'Este Mes', ingresos: totalPotentialIncome, gastos: expenses.reduce((sum, e) => sum + e.amount, 0), value: totalPotentialIncome, fill: '' }
-        ];
+        const monthlyIncomeVsExpense: ChartData[] = Array.from({ length: 12 }, (_, i) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            const monthName = date.toLocaleString('es-ES', { month: 'short' });
+            return { 
+                name: monthName,
+                ingresos: totalPotentialIncome, // Simplified: uses same potential income for all past months
+                gastos: Math.random() * (20000000 - 15000000) + 15000000, // Mocked historical expenses
+                value: 0, 
+                fill: ''
+            };
+        }).reverse();
+        
+        monthlyIncomeVsExpense[11].gastos = expenses.reduce((sum, e) => sum + e.amount, 0); // Use real data for current month
+
 
         return {
             monthlyIncomeVsExpense,
             expensesByCategory,
-            monthlyBudget: totalPotentialIncome * 0.9 // Assume 90% budget
+            monthlyBudget: totalPotentialIncome
         };
     },
     
@@ -368,7 +439,6 @@ export const apiService = {
             return { success: false, error: error.message };
         }
         
-        // The invoked function itself might return a failure state in its body
         if (data && data.success === false) {
              console.error('Error from inside send-email function:', data.error);
              return { success: false, error: data.error };
@@ -376,4 +446,26 @@ export const apiService = {
 
         return { success: true };
     },
+    async sendMassEmail(conjuntoId: string, group: 'all' | 'debtors', subject: string, body: string): Promise<{success: boolean, message: string}> {
+        let emailList: string[] = [];
+        if (group === 'all') {
+            const residents = await this.fetchResidents(conjuntoId);
+            emailList = residents.map(r => r.email).filter(Boolean);
+        } else if (group === 'debtors') {
+            const accounts = await this.fetchAccountStatus(conjuntoId);
+            const debtorApartments = accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment);
+            const residents = await this.fetchResidents(conjuntoId);
+            emailList = residents.filter(r => debtorApartments.includes(r.apartment)).map(r => r.email).filter(Boolean);
+        }
+
+        if(emailList.length === 0) {
+            return { success: false, message: "No se encontraron destinatarios." };
+        }
+        
+        const result = await this.sendCommunicationEmail(emailList, subject, body);
+        if (result.success) {
+            return { success: true, message: `¡Correo enviado a ${emailList.length} destinatarios!` };
+        }
+        return { success: false, message: `Error al enviar: ${result.error}` };
+    }
 };

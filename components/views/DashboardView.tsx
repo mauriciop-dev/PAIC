@@ -10,6 +10,23 @@ interface DashboardViewProps {
     userProfile: UserProfile;
 }
 
+const TooltipWrapper: React.FC<{ content: string[]; children: React.ReactNode }> = ({ content, children }) => {
+    if (!content || content.length === 0) return <>{children}</>;
+    return (
+        <div className="relative group">
+            {children}
+            <div className="absolute z-10 w-60 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bottom-full left-1/2 -translate-x-1/2 mb-2">
+                <ul className="list-disc list-inside">
+                    {content.slice(0, 5).map((item, i) => <li key={i}>{item}</li>)}
+                    {content.length > 5 && <li>...y {content.length - 5} más.</li>}
+                </ul>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
+            </div>
+        </div>
+    );
+};
+
+
 const StatCard: React.FC<{ title: string; value: number; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
     <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
         <div className={`p-3 rounded-full ${iconColor}`}>
@@ -99,7 +116,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
     const { stats, notifications } = summary;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
         <div>
             <h2 className="text-2xl font-bold text-gray-800">Centro de Control de {conjuntoName}</h2>
             <p className="text-gray-600">Un resumen de las actividades y alertas más importantes.</p>
@@ -107,14 +124,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard title="Residentes en Mora" value={stats.residentsInDebt} icon="users" iconColor="bg-red-500" />
-            <StatCard title="Tareas Pendientes" value={stats.pendingTasks} icon="checkSquare" iconColor="bg-yellow-500" />
-            <StatCard title="Pagos Vencidos" value={stats.overduePayments} icon="alert-triangle" iconColor="bg-orange-500" />
-            <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver} icon="package" iconColor="bg-blue-500" />
+            <TooltipWrapper content={stats.residentsInDebt.details}><StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" /></TooltipWrapper>
+            <TooltipWrapper content={stats.pendingTasks.details}><StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" /></TooltipWrapper>
+            <TooltipWrapper content={stats.overduePayments.details}><StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" /></TooltipWrapper>
+            <TooltipWrapper content={stats.packagesToDeliver.details}><StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" /></TooltipWrapper>
         </div>
         
-        {/* Main Grid: Notifications + Key Chart */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Grid: Notifications + Key Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Centro de Notificaciones</h3>
                 <div className="space-y-3">
@@ -128,47 +145,48 @@ const DashboardView: React.FC<DashboardViewProps> = ({ conjuntoName, setActiveTa
                 </div>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
-                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Recaudo Mensual (Potencial)</h3>
+                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos vs Gastos (Últimos meses)</h3>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                     <BarChart data={chartData.monthlyIncomeVsExpense.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                         <XAxis dataKey="name" fontSize={12} />
                         <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                         <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                         <Legend wrapperStyle={{fontSize: "12px"}}/>
-                        <Bar dataKey="value" name="Recaudo Mensual (Potencial)" fill="#3b82f6" />
+                        <Bar dataKey="ingresos" name="Ingresos (Potencial)" fill="#3b82f6" />
+                        <Bar dataKey="gastos" name="Gastos (Registrados)" fill="#ef4444" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
         </div>
 
-         {/* Collapsible section for more charts */}
-        <details className="bg-white rounded-lg shadow-md">
-            <summary className="p-6 font-semibold text-gray-700 cursor-pointer flex justify-between items-center">
-                Ver Más Gráficos de Análisis
-                <span className="text-gray-500 transform transition-transform duration-300 chevron-rotate">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                </span>
-            </summary>
-            <div className="p-6 border-t border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-gray-50 p-4 rounded-lg h-80 flex flex-col">
-                        <h3 className="text-md font-semibold text-gray-700 mb-4">Gastos del Mes por Categoría</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                           <PieChart>
-                                <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                                </Pie>
-                                <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                                <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    {/* Add another chart here if needed */}
-                </div>
+        {/* Secondary Charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                <h3 className="text-md font-semibold text-gray-700 mb-4">Gastos del Mes por Categoría</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                   <PieChart>
+                        <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                            {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Pie>
+                        <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                        <Legend wrapperStyle={{fontSize: "12px"}}/>
+                    </PieChart>
+                </ResponsiveContainer>
             </div>
-        </details>
+            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                <h3 className="text-md font-semibold text-gray-700 mb-4">Comportamiento Histórico (Últimos 12 meses)</h3>
+                 <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <XAxis dataKey="name" fontSize={12} />
+                        <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
+                        <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                        <Legend wrapperStyle={{fontSize: "12px"}}/>
+                        <Bar dataKey="ingresos" name="Ingresos" fill="#3b82f6" />
+                        <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
     </div>
   );
 };

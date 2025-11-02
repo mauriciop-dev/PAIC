@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlatformUser, UserRole } from '../types';
+import { PlatformUser, UserRole, UserRoleDefinition } from '../types';
 import { Icon } from './ui/Icon';
 
 interface UserModalProps {
@@ -7,12 +7,14 @@ interface UserModalProps {
   onClose: () => void;
   onSave: (user: PlatformUser) => void;
   userToEdit: PlatformUser | null;
+  availableRoles: UserRoleDefinition[];
 }
 
-const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit }) => {
+const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles }) => {
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
     name: '',
     email: '',
+    phone: '',
     role: UserRole.Guard,
     password: '',
   });
@@ -25,6 +27,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         id: userToEdit.id,
         name: userToEdit.name,
         email: userToEdit.email,
+        phone: userToEdit.phone || '',
         role: userToEdit.role,
         password: '', // Password field is for changing, not displaying
       });
@@ -32,6 +35,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
       setFormData({
         name: '',
         email: '',
+        phone: '',
         role: UserRole.Guard,
         password: '',
       });
@@ -53,6 +57,12 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
     }
     onSave(formData as PlatformUser);
   };
+
+  const allRoles = [
+      { id: UserRole.Admin, name: UserRole.Admin },
+      { id: UserRole.Guard, name: UserRole.Guard },
+      ...availableRoles,
+  ];
 
   return (
     <div
@@ -80,11 +90,16 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
               <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
             </div>
+             <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Teléfono</label>
+              <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+            </div>
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</label>
               <select id="role" name="role" value={formData.role} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
-                <option value={UserRole.Guard}>Portero</option>
-                <option value={UserRole.Admin}>Administrador</option>
+                {allRoles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                ))}
               </select>
                <p className="text-xs text-gray-500 mt-1">El rol 'Administrador' solo puede iniciar sesión con Google.</p>
             </div>

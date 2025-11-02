@@ -72,6 +72,12 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     const startEditing = (task: Task) => {
         setEditingTask({ ...task });
     };
+    
+    const handleEditingChange = (field: 'text' | 'dueDate', value: string) => {
+        if(editingTask) {
+            setEditingTask({...editingTask, [field]: value});
+        }
+    }
 
     const sortedTasks = [...tasks].sort((a, b) => {
         if (a.completed === b.completed) {
@@ -83,12 +89,14 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     });
 
   return (
-    <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Gestión de Tareas</h2>
-        <p className="text-gray-600 mb-6">
-            Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
-        </p>
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+    <div className="space-y-6">
+        <div>
+            <h2 className="text-2xl font-bold text-gray-800">Gestión de Tareas</h2>
+            <p className="text-gray-600">
+                Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
+            </p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Agregar Nueva Tarea</h3>
             <div className="flex flex-col sm:flex-row items-center gap-4">
                 <input 
@@ -128,24 +136,32 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
                     />
                     <div className="flex-1">
                         {editingTask?.id === task.id ? (
-                            <input
-                                type="text"
-                                value={editingTask.text}
-                                onChange={(e) => setEditingTask({...editingTask, text: e.target.value})}
-                                onBlur={handleUpdateTask}
-                                onKeyPress={(e) => e.key === 'Enter' && handleUpdateTask()}
-                                className="font-medium text-gray-800 bg-yellow-100 p-1 rounded-md w-full focus:outline-none"
-                                autoFocus
-                            />
+                            <div className="space-y-2">
+                                <input
+                                    type="text"
+                                    value={editingTask.text}
+                                    onChange={(e) => handleEditingChange('text', e.target.value)}
+                                    onBlur={handleUpdateTask}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleUpdateTask()}
+                                    className="font-medium text-gray-800 bg-yellow-100 p-1 rounded-md w-full focus:outline-none"
+                                    autoFocus
+                                />
+                                 <input
+                                    type="date"
+                                    value={editingTask.dueDate}
+                                    onChange={(e) => handleEditingChange('dueDate', e.target.value)}
+                                    onBlur={handleUpdateTask}
+                                    className="text-sm text-gray-500 bg-yellow-100 p-1 rounded-md w-full sm:w-auto focus:outline-none"
+                                />
+                            </div>
                         ) : (
-                            <p 
-                                className={`font-medium cursor-pointer ${task.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}
-                                onClick={() => !task.completed && startEditing(task)}
-                            >
-                                {task.text}
-                            </p>
+                            <div onClick={() => !task.completed && startEditing(task)} className="cursor-pointer">
+                                <p className={`font-medium ${task.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                                    {task.text}
+                                </p>
+                                <p className={`text-sm ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>{task.dueDate ? `Vence: ${task.dueDate}` : 'Sin fecha'}</p>
+                            </div>
                         )}
-                        <p className={`text-sm ${task.completed ? 'text-gray-400' : 'text-gray-500'}`}>{task.dueDate ? `Vence: ${task.dueDate}` : 'Sin fecha'}</p>
                     </div>
                     <div className="flex gap-2">
                         <button 

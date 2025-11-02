@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
-import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser } from '../../types';
+import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition } from '../../types';
 import EditResidentModal from '../EditResidentModal';
 import UserModal from '../UserModal';
 import { Icon } from '../ui/Icon';
@@ -14,6 +14,7 @@ enum DbTab {
   Providers = 'Proveedores',
   Internal = 'Internos',
   Users = 'Usuarios',
+  Roles = 'Roles'
 }
 
 interface DatabaseViewProps {
@@ -26,6 +27,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [internalStaff, setInternalStaff] = useState<InternalStaff[]>([]);
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
+  const [roles, setRoles] = useState<UserRoleDefinition[]>([]);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -43,18 +45,20 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
-      const [res, acc, prov, staff, users] = await Promise.all([
+      const [res, acc, prov, staff, users, customRoles] = await Promise.all([
         apiService.fetchResidents(userProfile.conjuntoId),
         apiService.fetchAccountStatus(userProfile.conjuntoId),
         apiService.fetchProviders(userProfile.conjuntoId),
         apiService.fetchInternalStaff(userProfile.conjuntoId),
         userProfile.role === UserRole.Admin ? apiService.fetchUsers(userProfile.conjuntoId) : Promise.resolve([]),
+        userProfile.role === UserRole.Admin ? apiService.fetchRoles(userProfile.conjuntoId) : Promise.resolve([]),
       ]);
       setResidents(res);
       setAccountStatus(acc);
       setProviders(prov);
       setInternalStaff(staff);
       setPlatformUsers(users);
+      setRoles(customRoles);
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -188,7 +192,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               headers: ['name', 'position', 'email', 'phone'],
               filename: 'plantilla_personal_interno.xlsx'
           },
-          [DbTab.Users]: null 
+          [DbTab.Users]: null,
+          [DbTab.Roles]: null
       };
 
       const templateConfig = templates[activeDbTab];
@@ -216,6 +221,12 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       );
 
       switch (activeDbTab) {
+          case DbTab.Roles:
+             return (
+                 <p className="p-6 text-center text-gray-600">
+                    Funcionalidad para gestionar roles y permisos estará disponible próximamente.
+                 </p>
+             );
           case DbTab.Users:
              return (
                   <table className="w-full text-sm text-left text-gray-500">
@@ -223,6 +234,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           <tr>
                               <th scope="col" className="px-6 py-3">Nombre</th>
                               <th scope="col" className="px-6 py-3">Correo</th>
+                              <th scope="col" className="px-6 py-3">Teléfono</th>
                               <th scope="col" className="px-6 py-3">Rol</th>
                               <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
@@ -232,6 +244,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{user.name}</td>
                                   <td className="px-6 py-4">{user.email}</td>
+                                  <td className="px-6 py-4">{user.phone || 'N/A'}</td>
                                   <td className="px-6 py-4">
                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.role === UserRole.Admin ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
                                       {user.role}
@@ -356,47 +369,12 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       }
   };
 
-  const dbTabs = Object.values(DbTab).filter(tab => userProfile.role === UserRole.Admin || tab !== DbTab.Users);
+  const dbTabs = Object.values(DbTab).filter(tab => userProfile.role === UserRole.Admin || ![DbTab.Users, DbTab.Roles].includes(tab));
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Base de Datos</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800">Base de Datos</h2>
       
-      {activeDbTab !== DbTab.Users && (
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Gestión de Información</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Utiliza estas herramientas para cargar o actualizar la información de <span className="font-semibold">{activeDbTab}</span> de forma masiva.
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-              <button 
-                  onClick={handleDownloadTemplate}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                  Descargar Plantilla
-              </button>
-              <button 
-                  onClick={handleUploadClick} 
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  disabled={isUploading}
-              >
-                  {isUploading ? 'Cargando...' : `Cargar Información (${activeDbTab})`}
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-                accept=".xlsx, .xls, .csv"
-              />
-          </div>
-          {feedbackMessage && (
-            <p className={`text-sm mt-4 ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-              {feedbackMessage.text}
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="mb-4 border-b border-gray-200">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
           {dbTabs.map(tab => (
@@ -416,12 +394,32 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="flex justify-end p-2 border-b">
+        <div className="flex justify-between items-center p-4 border-b">
+           <div className="flex items-center gap-4">
+                {[DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab) && (
+                    <>
+                        <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
+                        <button onClick={handleUploadClick} disabled={isUploading} className="text-sm font-medium text-blue-600 hover:underline disabled:text-gray-400">
+                            {isUploading ? 'Cargando...' : 'Cargar Información'}
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                    </>
+                )}
+                {feedbackMessage && (
+                    <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        {feedbackMessage.text}
+                    </p>
+                )}
+           </div>
            <button 
-                onClick={() => activeDbTab === DbTab.Users ? handleUserModalOpen(null) : alert('Add new record')}
-                className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md font-semibold hover:bg-blue-200 transition-colors text-xs flex items-center gap-1">
+                onClick={() => {
+                    if (activeDbTab === DbTab.Users) handleUserModalOpen(null);
+                    else if (activeDbTab === DbTab.Roles) alert('Agregar nuevo rol');
+                    else alert('Agregar nuevo registro');
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
               <Icon name="user-plus" className="w-4 h-4" />
-              {activeDbTab === DbTab.Users ? 'Agregar Usuario' : 'Agregar Registro'}
+              {activeDbTab === DbTab.Users ? 'Agregar Usuario' : activeDbTab === DbTab.Roles ? 'Agregar Rol' : 'Agregar Registro'}
             </button>
         </div>
         <div className="overflow-x-auto">
@@ -442,6 +440,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             onClose={() => setIsUserModalOpen(false)}
             onSave={handleSaveUser}
             userToEdit={selectedUser}
+            availableRoles={roles}
           />
       )}
     </div>

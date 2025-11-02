@@ -1,5 +1,5 @@
 export enum Tab {
-  Dashboard = 'Dashboard',
+  Dashboard = 'Centro de Control',
   Database = 'Base de datos',
   CommonAreas = 'Áreas comunes',
   Comunicaciones = 'Comunicaciones',
@@ -13,13 +13,22 @@ export enum UserRole {
   Admin = 'Administrador',
   Guard = 'Portero',
   SuperAdmin = 'SuperAdmin',
+  Contador = 'Contador',
 }
+
+export interface UserRoleDefinition {
+  id: string;
+  name: string;
+  permissions: Tab[];
+}
+
 
 export interface PlatformUser {
   id: number;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string; // Can be a standard role or a custom role name
+  phone?: string;
   password?: string;
   conjuntoId: string;
 }
@@ -96,7 +105,7 @@ export interface UserProfile {
     email: string;
     picture?: string;
     phone?: string;
-    role: UserRole;
+    role: UserRole | string;
     conjuntoId?: string;
 }
 
@@ -143,7 +152,19 @@ export interface Expense {
     category: ExpenseCategory;
     date: string;
     providerId?: number;
+    isRecurring?: boolean;
 }
+
+export type IncomeCategory = 'Cuotas de Administración' | 'Intereses de Mora' | 'Alquiler de Áreas' | 'Otros';
+export interface Income {
+    id: number;
+    description: string;
+    amount: number;
+    category: IncomeCategory;
+    date: string;
+    isRecurring?: boolean;
+}
+
 
 export interface VisitorLog {
     id: number;
@@ -176,10 +197,10 @@ export interface NotificationItem {
 
 export interface DashboardSummary {
     stats: {
-        residentsInDebt: number;
-        pendingTasks: number;
-        overduePayments: number;
-        packagesToDeliver: number;
+        residentsInDebt: { count: number; details: string[] };
+        pendingTasks: { count: number; details: string[] };
+        overduePayments: { count: number; details: string[] };
+        packagesToDeliver: { count: number; details: string[] };
     };
     notifications: NotificationItem[];
 }
@@ -190,4 +211,13 @@ export interface PlatformStats {
     totalResidents: number;
     monthlyRecurringRevenue: number;
     newThisMonth: number;
+}
+
+export interface StoredFile {
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    mimeType: string;
+    createdAt: string;
 }

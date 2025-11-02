@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { UserProfile } from '../../types';
+import React, { useState, useRef } from 'react';
+import { UserProfile, StoredFile } from '../../types';
 import { Icon } from '../ui/Icon';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
@@ -11,10 +11,13 @@ interface ComunicacionesViewProps {
 const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) => {
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
-    const [recipients, setRecipients] = useState('all');
+    const [recipients, setRecipients] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
 
     const handleGenerateSubject = async () => {
         if (!body.trim()) {
@@ -51,42 +54,50 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
             setIsGenerating(false);
         }
     };
+    
+    const addRecipientGroup = async (group: 'all' | 'debtors' | 'providers' | 'internal') => {
+        if (!userProfile.conjuntoId) return;
+        let emailList: string[] = [];
+        switch(group) {
+            case 'all':
+                emailList = (await apiService.fetchResidents(userProfile.conjuntoId)).map(r => r.email);
+                break;
+            case 'debtors':
+                 const accounts = await apiService.fetchAccountStatus(userProfile.conjuntoId);
+                const debtorApartments = accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment);
+                const residents = await apiService.fetchResidents(userProfile.conjuntoId);
+                emailList = residents.filter(r => debtorApartments.includes(r.apartment)).map(r => r.email);
+                break;
+            case 'providers':
+                emailList = (await apiService.fetchProviders(userProfile.conjuntoId)).map(p => p.email);
+                break;
+            case 'internal':
+                emailList = (await apiService.fetchInternalStaff(userProfile.conjuntoId)).map(s => s.email);
+                break;
+        }
+        setRecipients(prev => [...new Set([...prev, ...emailList.filter(Boolean)])]);
+    }
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!subject.trim() || !body.trim() || !userProfile.conjuntoId) {
-            setFeedback({type: 'error', text: 'Por favor, completa el asunto, el cuerpo del mensaje y asegúrate de que el conjunto esté identificado.'});
+        if (!subject.trim() || !body.trim() || recipients.length === 0) {
+            setFeedback({type: 'error', text: 'Por favor, completa asunto, cuerpo y destinatarios.'});
             return;
         }
         setIsSending(true);
         setFeedback(null);
         
         try {
-            // 1. Fetch emails based on recipient group
-            let emailList: string[] = [];
-            if (recipients === 'all') {
-                const residents = await apiService.fetchResidents(userProfile.conjuntoId);
-                emailList = residents.map(r => r.email).filter(Boolean);
-            } else if (recipients === 'debtors') {
-                const accounts = await apiService.fetchAccountStatus(userProfile.conjuntoId);
-                const debtorApartments = accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment);
-                const residents = await apiService.fetchResidents(userProfile.conjuntoId);
-                emailList = residents.filter(r => debtorApartments.includes(r.apartment)).map(r => r.email).filter(Boolean);
-            }
-
-            if (emailList.length === 0) {
-                setFeedback({type: 'error', text: 'No se encontraron destinatarios para el grupo seleccionado.'});
-                setIsSending(false);
-                return;
-            }
-
-            // 2. Call the Edge Function via apiService
-            const result = await apiService.sendCommunicationEmail(emailList, subject, body);
+            // NOTE: File attachment logic would be added here.
+            // For now, we send the email without attachments.
+            const result = await apiService.sendCommunicationEmail(recipients, subject, body);
             
             if (result.success) {
-                setFeedback({type: 'success', text: `¡Comunicado enviado a ${emailList.length} destinatario(s)!`});
+                setFeedback({type: 'success', text: `¡Comunicado enviado a ${recipients.length} destinatario(s)!`});
                 setSubject('');
                 setBody('');
+                setRecipients([]);
+                setFiles([]);
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido.');
             }
@@ -101,26 +112,34 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
     };
 
     return (
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Enviar Comunicaciones</h2>
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800">Enviar Comunicaciones</h2>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
                     <form onSubmit={handleSend} className="space-y-4">
                         <div>
-                            <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-1">Destinatarios</label>
-                            <select
+                            <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                <button type="button" onClick={() => addRecipientGroup('all')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Todos los residentes</button>
+                                <button type="button" onClick={() => addRecipientGroup('debtors')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Residentes en mora</button>
+                                <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
+                                <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
+                            </div>
+                            <textarea
                                 id="recipients"
-                                value={recipients}
-                                onChange={(e) => setRecipients(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-md bg-white"
-                            >
-                                <option value="all">Todos los Residentes</option>
-                                <option value="debtors">Residentes en Mora</option>
-                                <option value="group">Grupo específico (próximamente)</option>
-                            </select>
+                                value={recipients.join(', ')}
+                                onChange={(e) => setRecipients(e.target.value.split(',').map(em => em.trim()))}
+                                placeholder="Añade correos aquí o selecciona un grupo"
+                                className="w-full p-2 border border-gray-300 rounded-md h-20"
+                            />
                         </div>
                         <div>
-                            <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Asunto</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label htmlFor="subject" className="block text-sm font-medium text-gray-700">Asunto</label>
+                                <button type="button" onClick={handleGenerateSubject} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
+                                    <Icon name="bot" className="w-4 h-4" /> Re-escribir con IA
+                                </button>
+                            </div>
                             <input
                                 type="text"
                                 id="subject"
@@ -132,7 +151,12 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                             />
                         </div>
                         <div>
-                            <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-1">Cuerpo del Mensaje</label>
+                             <div className="flex justify-between items-center mb-1">
+                                <label htmlFor="body" className="block text-sm font-medium text-gray-700">Cuerpo del Mensaje</label>
+                                 <button type="button" onClick={handleImproveWriting} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
+                                    <Icon name="bot" className="w-4 h-4" /> Mejorar redacción
+                                </button>
+                            </div>
                             <textarea
                                 id="body"
                                 value={body}
@@ -161,28 +185,26 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
                 </div>
                 <div className="lg:col-span-1">
                     <div className="bg-white p-6 rounded-lg shadow-md sticky top-24">
-                        <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                            <Icon name="bot" className="w-6 h-6 text-blue-600" />
-                            Asistente de IA
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Usa la IA para mejorar tus comunicados con un solo clic.
-                        </p>
-                        <div className="space-y-3">
-                            <button
-                                onClick={handleGenerateSubject}
-                                disabled={isGenerating || !body.trim()}
-                                className="w-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                        <h3 className="text-lg font-semibold text-gray-700 mb-4">Gestor de Archivos</h3>
+                        <div 
+                          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                        >
+                          <Icon name="package" className="mx-auto h-10 w-10 text-gray-400" />
+                          <p className="mt-2 text-sm text-gray-600">
+                            Arrastra y suelta archivos aquí
+                          </p>
+                           <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="mt-4 px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 text-sm"
                             >
-                                {isGenerating ? 'Generando...' : 'Generar Asunto'}
+                              O selecciona un archivo
                             </button>
-                            <button
-                                onClick={handleImproveWriting}
-                                disabled={isGenerating || !body.trim()}
-                                className="w-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 disabled:opacity-50"
-                            >
-                                {isGenerating ? 'Mejorando...' : 'Mejorar Redacción'}
-                            </button>
+                           <input type="file" ref={fileInputRef} className="hidden" multiple />
+                        </div>
+                        <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-700">Archivos adjuntos:</p>
+                            <p className="text-xs text-gray-500 text-center mt-2">La funcionalidad para adjuntar archivos estará disponible próximamente.</p>
                         </div>
                     </div>
                 </div>

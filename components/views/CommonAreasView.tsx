@@ -74,8 +74,8 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const today = new Date();
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Calendario de Áreas Comunes</h2>
           <p className="text-gray-600 mt-1">
@@ -93,7 +93,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
             </div>
             <button
               onClick={() => setIsManageModalOpen(true)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-md hover:bg-gray-100 bg-white"
+              className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-md hover:bg-gray-100 bg-white shadow-sm"
             >
                 Gestionar Áreas
             </button>

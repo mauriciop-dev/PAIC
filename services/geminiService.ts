@@ -37,49 +37,48 @@ const getAiClient = (): Promise<GoogleGenAI> => {
 
 
 const getSystemPrompt = async (conjuntoId: string): Promise<string> => {
-    // Fetching fresh data each time can be slow. For a real app, consider caching.
-    const [residents, accounts, providers, internalStaff, commonAreas, dueDates, tasks] = await Promise.all([
-        apiService.fetchResidents(conjuntoId),
-        apiService.fetchAccountStatus(conjuntoId),
-        apiService.fetchProviders(conjuntoId),
-        apiService.fetchInternalStaff(conjuntoId),
-        apiService.fetchCommonAreas(conjuntoId),
-        apiService.fetchDueDates(conjuntoId),
-        apiService.fetchTasks(conjuntoId)
-    ]);
-
     // This prompt engineering is crucial for the chatbot's performance.
     const context = `
 You are PAIC, an intelligent assistant for managing residential complexes. Your goal is to help the administrator manage their tasks efficiently.
-You are friendly, helpful, and concise.
+You are friendly, helpful, and professional. Your communication must be clear and well-formatted. DO NOT use asterisks for formatting. Use newlines for lists.
 
-Here is a summary of the current data of the residential complex. Use this information to answer user questions and perform actions.
+**Core Functionality:**
+When a user asks to perform an action, you MUST ask for all necessary information sequentially if it's not provided. Once you have all the information, you MUST respond ONLY with a single JSON object describing the function call. Do not add any other text, markdown, or explanation.
 
-- **Total Residents:** ${residents.length}
-- **Residents in Debt:** ${accounts.filter(a => a.outstandingBalance > 0).length}
-- **Available Common Areas:** ${commonAreas.map(a => a.name).join(', ')}
-- **Pending Due Dates:** ${dueDates.filter(d => d.status === 'Pendiente').length}
-- **Overdue Dates:** ${dueDates.filter(d => d.status === 'Vencido').length}
-- **Pending Tasks:** ${tasks.filter(t => !t.completed).length}
-
-You can perform actions. When the user asks to do something like add a task, book an area, or update a payment, you MUST respond ONLY with a JSON object describing the function call. Do not add any other text or explanation.
-
-Here are the available functions and their JSON formats:
+**Available Functions (JSON format only):**
 
 1.  **Add a new task:**
-    - User says: "recuérdame llamar al plomero mañana"
-    - You respond: \`{"function": "addTask", "payload": {"text": "Llamar al plomero", "dueDate": "YYYY-MM-DD"}}\` (replace with tomorrow's date)
+    // FIX: Escaped backticks within the template literal to resolve syntax errors.
+    - Required info: \\\`text\\\`, \\\`dueDate\\\`.
+    - Example user interaction:
+      - User: "1" or "crear tarea"
+      - You: "Claro, ¿cuál es la descripción de la tarea?"
+      - User: "llamar al plomero"
+      - You: "Entendido. ¿Para qué fecha necesitas este recordatorio?"
+      - User: "para mañana"
+      - You: \\\`{"function": "addTask", "payload": {"text": "Llamar al plomero", "dueDate": "YYYY-MM-DD"}}\\\` (replace with tomorrow's date)
 
 2.  **Book a common area:**
-    - User says: "reserva el BBQ para el apto 101 el 15 de este mes de 2 a 4 pm"
-    - You respond: \`{"function": "addBooking", "payload": {"day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apt 101"}}\`
+    // FIX: Escaped backticks within the template literal to resolve syntax errors.
+    - Required info: \\\`event\\\` (area name), \\\`user\\\` (apartment), \\\`day\\\`, \\\`time\\\`.
+    - You respond: \\\`{"function": "addBooking", "payload": {"day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apto 101"}}\\\`
 
-3.  **Mark a due date as paid:**
-    - User says: "ya pagué el servicio de vigilancia"
-    - (Assuming 'Servicio de Vigilancia' has id: 1)
-    - You respond: \`{"function": "updateDueDateStatus", "payload": {"id": 1, "status": "Pagado"}}\`
+3.  **Send a communication:**
+    // FIX: Escaped backticks within the template literal to resolve syntax errors.
+    - Required info: \\\`recipients\\\` ('all', 'debtors'), \\\`subject\\\`, \\\`body\\\`.
+    - You respond: \\\`{"function": "sendCommunication", "payload": {"recipients": "debtors", "subject": "Recordatorio de Pago", "body": "Este es un recordatorio de su pago pendiente."}}\\\`
 
-For any other query, provide a helpful text response based on the provided data summary.
+4.  **Query the database:**
+    - Use this for specific questions about data (e.g., account status, bookings for a specific date).
+    // FIX: Escaped backticks within the template literal to resolve syntax errors.
+    - Required info: \\\`query_description\\\`.
+    - Example user interaction:
+      - User: "cuanto debe el 305"
+      - You: \\\`{"function": "queryDatabase", "payload": {"query_description": "Get account status for apartment 305"}}\\\`
+      - User: "que dias esta alquilado el salon comunal el proximo mes"
+      - You: \\\`{"function": "queryDatabase", "payload": {"query_description": "Get all bookings for 'Salón Comunal' in the next month"}}\\\`
+
+For general questions or conversation, provide a helpful text response.
     `.trim();
 
     return context;
@@ -125,6 +124,28 @@ const processApiResponse = async (response: string): Promise<string> => {
                         return `El estado del pago ha sido actualizado a '${action.payload.status}'. ¿Te ayudo con otra cosa?`;
                     }
                     return "No pude encontrar el vencimiento que mencionaste.";
+                }
+                case 'sendCommunication': {
+                    const { recipients, subject, body } = action.payload;
+                    const result = await apiService.sendMassEmail(currentConjuntoId, recipients, subject, body);
+                    await initializeChat(currentConjuntoId);
+                    return result.message;
+                }
+                 case 'queryDatabase': {
+                    // This is a simplified query handler. A real-world app would need a more robust NLP-to-SQL layer.
+                    const desc = action.payload.query_description.toLowerCase();
+                    if (desc.includes('account status') || desc.includes('debe')) {
+                        const aptMatch = desc.match(/\d+/);
+                        if (aptMatch) {
+                            const apt = aptMatch[0];
+                            const account = await apiService.fetchAccountStatusByApartment(currentConjuntoId, apt);
+                            if (account) {
+                                return `El saldo pendiente del Apto ${apt} es de $${account.outstandingBalance.toLocaleString()}. Último pago: ${account.lastPaymentDate}.`;
+                            }
+                            return `No encontré información para el Apto ${apt}.`;
+                        }
+                    }
+                    return "No pude procesar la consulta específica. Intenta preguntar de una forma más sencilla.";
                 }
                 default:
                     return "No pude reconocer la acción solicitada. ¿Puedes intentarlo de otra manera?";

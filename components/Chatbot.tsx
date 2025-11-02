@@ -12,7 +12,16 @@ interface ChatbotProps {
 
 const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => {
   const [messages, setMessages] = useState<Message[]>([
-    { sender: 'ai', text: '¡Hola! Soy PAIC, tu asistente virtual. ¿Cómo puedo ayudarte a administrar el conjunto hoy?' }
+    { sender: 'ai', text: `¡Hola! Soy PAIC, tu asistente virtual.
+
+Puedes pedirme ayuda con tus tareas diarias. Aquí tienes algunas ideas, solo elige un número:
+
+1. Crear una nueva tarea.
+2. Agendar un área común.
+3. Consultar el estado de cuenta de un apartamento.
+4. Enviar una comunicación.
+
+O simplemente, escribe tu pregunta.` }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -111,7 +120,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => 
                     handleSend();
                 }
             }}
-            placeholder="Escribe tu mensaje..."
+            placeholder="Escribe tu mensaje o elige una opción..."
             className="flex-1 bg-transparent p-2 text-sm text-gray-800 focus:outline-none resize-none"
             rows={1}
             disabled={isLoading}

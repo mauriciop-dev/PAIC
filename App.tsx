@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import Footer from './components/Footer';
+import NavBar from './components/NavBar';
 import Chatbot from './components/Chatbot';
 import HelpModal from './components/HelpModal';
 import InitialSetupModal from './components/InitialSetupModal';
@@ -272,7 +272,8 @@ const App: React.FC = () => {
 
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (userProfile.role === UserRole.Admin ? 'ml-8' : 'ml-0')}`}>
         <Header onHelpClick={() => setIsHelpModalOpen(true)} userProfile={userProfile} onLogout={handleLogout} onSettingsClick={() => setIsSettingsModalOpen(true)} />
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
           {needsAdminSetup ? (
              <div className="text-center p-10 text-gray-600">
                 <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
@@ -285,7 +286,6 @@ const App: React.FC = () => {
             <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
           )}
         </div>
-        {!needsAdminSetup && <Footer activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
       </main>
 
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} />}
