@@ -320,11 +320,34 @@ export const apiService = {
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
-        const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
+        // Being explicit to avoid potential issues with the generic mapper and optional fields.
+        const payload = {
+            conjunto_id: conjuntoId,
+            apartment: log.apartment,
+            visitor_name: log.visitorName,
+            date: log.date,
+            status: log.status,
+            entry_time: log.entryTime,
+            exit_time: log.exitTime,
+        };
+        // Ensure undefined properties are not sent to Supabase
+        Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
+
+        const { error } = await supabase.from('visitor_logs').insert(payload);
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
-        const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
+        // Being explicit to avoid potential issues with the generic mapper.
+        const payload: { [key: string]: any } = {};
+        if (updates.status) payload.status = updates.status;
+        if (updates.entryTime) payload.entry_time = updates.entryTime;
+        if (updates.exitTime) payload.exit_time = updates.exitTime;
+        if (updates.visitorName) payload.visitor_name = updates.visitorName;
+        // Add other updatable fields if necessary
+
+        if (Object.keys(payload).length === 0) return; // Nothing to update
+
+        const { error } = await supabase.from('visitor_logs').update(payload).eq('id', logId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'updateVisitorLog');
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
