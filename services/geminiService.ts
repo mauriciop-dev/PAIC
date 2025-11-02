@@ -48,35 +48,31 @@ When a user asks to perform an action, you MUST ask for all necessary informatio
 **Available Functions (JSON format only):**
 
 1.  **Add a new task:**
-    // FIX: Escaped backticks within the template literal to resolve syntax errors.
-    - Required info: \\\`text\\\`, \\\`dueDate\\\`.
+    - Required info: \`text\`, \`dueDate\`.
     - Example user interaction:
       - User: "1" or "crear tarea"
       - You: "Claro, ¿cuál es la descripción de la tarea?"
       - User: "llamar al plomero"
       - You: "Entendido. ¿Para qué fecha necesitas este recordatorio?"
       - User: "para mañana"
-      - You: \\\`{"function": "addTask", "payload": {"text": "Llamar al plomero", "dueDate": "YYYY-MM-DD"}}\\\` (replace with tomorrow's date)
+      - You: \`{"function": "addTask", "payload": {"text": "Llamar al plomero", "dueDate": "YYYY-MM-DD"}}\` (replace with tomorrow's date)
 
 2.  **Book a common area:**
-    // FIX: Escaped backticks within the template literal to resolve syntax errors.
-    - Required info: \\\`event\\\` (area name), \\\`user\\\` (apartment), \\\`day\\\`, \\\`time\\\`.
-    - You respond: \\\`{"function": "addBooking", "payload": {"day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apto 101"}}\\\`
+    - Required info: \`event\` (area name), \`user\` (apartment), \`day\`, \`time\`.
+    - You respond: \`{"function": "addBooking", "payload": {"day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apto 101"}}\`
 
 3.  **Send a communication:**
-    // FIX: Escaped backticks within the template literal to resolve syntax errors.
-    - Required info: \\\`recipients\\\` ('all', 'debtors'), \\\`subject\\\`, \\\`body\\\`.
-    - You respond: \\\`{"function": "sendCommunication", "payload": {"recipients": "debtors", "subject": "Recordatorio de Pago", "body": "Este es un recordatorio de su pago pendiente."}}\\\`
+    - Required info: \`recipients\` ('all', 'debtors'), \`subject\`, \`body\`.
+    - You respond: \`{"function": "sendCommunication", "payload": {"recipients": "debtors", "subject": "Recordatorio de Pago", "body": "Este es un recordatorio de su pago pendiente."}}\`
 
 4.  **Query the database:**
     - Use this for specific questions about data (e.g., account status, bookings for a specific date).
-    // FIX: Escaped backticks within the template literal to resolve syntax errors.
-    - Required info: \\\`query_description\\\`.
+    - Required info: \`query_description\`.
     - Example user interaction:
       - User: "cuanto debe el 305"
-      - You: \\\`{"function": "queryDatabase", "payload": {"query_description": "Get account status for apartment 305"}}\\\`
+      - You: \`{"function": "queryDatabase", "payload": {"query_description": "Get account status for apartment 305"}}\`
       - User: "que dias esta alquilado el salon comunal el proximo mes"
-      - You: \\\`{"function": "queryDatabase", "payload": {"query_description": "Get all bookings for 'Salón Comunal' in the next month"}}\\\`
+      - You: \`{"function": "queryDatabase", "payload": {"query_description": "Get all bookings for 'Salón Comunal' in the next month"}}\`
 
 For general questions or conversation, provide a helpful text response.
     `.trim();

@@ -5,6 +5,12 @@ import ManageAreasModal from '../ManageAreasModal';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+interface TooltipData {
+    content: Booking;
+    x: number;
+    y: number;
+}
+
 interface CommonAreasViewProps {
   userProfile: UserProfile;
 }
@@ -15,12 +21,13 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+
 
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
-        // FIX: Pass conjuntoId to apiService calls.
         const [fetchedBookings, fetchedAreas] = await Promise.all([
             apiService.fetchBookings(userProfile.conjuntoId),
             apiService.fetchCommonAreas(userProfile.conjuntoId),
@@ -67,6 +74,18 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         calendarDays.push(null);
     }
     return calendarDays;
+  };
+
+  const handleMouseEnter = (booking: Booking, event: React.MouseEvent) => {
+    setTooltip({
+      content: booking,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip(null);
   };
   
   const calendarDays = generateCalendarDays();
@@ -126,17 +145,14 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                             const area = commonAreas.find(a => a.name === booking.event);
                             const colors = area ? area.color : { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
                             return (
-                              <div key={booking.event+booking.day+booking.user} className="relative group">
-                                  <div className={`${colors.bg} ${colors.text} p-1 rounded-md text-xs text-left cursor-pointer`}>
-                                      <p className="font-semibold truncate">{booking.event}</p>
-                                      <p className="truncate">{booking.user}</p>
-                                  </div>
-                                  <div className="absolute z-20 w-48 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none top-0 left-full ml-2">
-                                      <p><span className="font-bold">Evento:</span> {booking.event}</p>
-                                      <p><span className="font-bold">Reservado por:</span> {booking.user}</p>
-                                      <p><span className="font-bold">Horario:</span> {booking.time}</p>
-                                      <div className="absolute top-1/2 -translate-y-1/2 right-full w-0 h-0 border-y-4 border-y-transparent border-r-4 border-r-gray-800"></div>
-                                  </div>
+                              <div
+                                key={booking.event+booking.day+booking.user}
+                                onMouseEnter={(e) => handleMouseEnter(booking, e)}
+                                onMouseLeave={handleMouseLeave}
+                                className={`${colors.bg} ${colors.text} p-1 rounded-md text-xs text-left cursor-pointer`}
+                              >
+                                <p className="font-semibold truncate">{booking.event}</p>
+                                <p className="truncate">{booking.user}</p>
                               </div>
                             )
                         })}
@@ -147,6 +163,23 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
             </div>
         )}
       </div>
+
+      {tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            top: `${tooltip.y + 15}px`,
+            left: `${tooltip.x + 15}px`,
+            pointerEvents: 'none',
+          }}
+          className="z-50 w-48 p-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg"
+        >
+          <p><span className="font-bold">Evento:</span> {tooltip.content.event}</p>
+          <p><span className="font-bold">Reservado por:</span> {tooltip.content.user}</p>
+          <p><span className="font-bold">Horario:</span> {tooltip.content.time}</p>
+        </div>
+      )}
+
       {isManageModalOpen && (
         <ManageAreasModal 
             isOpen={isManageModalOpen} 
