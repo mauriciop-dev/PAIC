@@ -19,9 +19,15 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [pkgApartment, setPkgApartment] = useState('');
     const [pkgCourier, setPkgCourier] = useState('');
     const [pkgTracking, setPkgTracking] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [feedback, setFeedback] = useState<string | null>(null);
+    const [isSubmittingPackage, setIsSubmittingPackage] = useState(false);
+    const [packageFeedback, setPackageFeedback] = useState<string | null>(null);
 
+    // Visitor Form State
+    const [visitorName, setVisitorName] = useState('');
+    const [visitorApartment, setVisitorApartment] = useState('');
+    const [visitorDate, setVisitorDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSubmittingVisitor, setIsSubmittingVisitor] = useState(false);
+    const [visitorFeedback, setVisitorFeedback] = useState<string | null>(null);
 
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
@@ -37,6 +43,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
             setResidents(res);
             if (res.length > 0) {
                 setPkgApartment(res[0].apartment);
+                setVisitorApartment(res[0].apartment);
             }
         } catch (error) {
             console.error("Failed to fetch security data:", error);
@@ -64,8 +71,8 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         e.preventDefault();
         if (!pkgApartment || !pkgCourier || !userProfile.conjuntoId) return;
 
-        setIsSubmitting(true);
-        setFeedback(null);
+        setIsSubmittingPackage(true);
+        setPackageFeedback(null);
         try {
             await apiService.addPackageLog(userProfile.conjuntoId, {
                 apartment: pkgApartment,
@@ -73,19 +80,18 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                 trackingNumber: pkgTracking || undefined,
             });
             
-            // Reset form
             setPkgCourier('');
             setPkgTracking('');
             
-            setFeedback('¡Paquete registrado exitosamente!');
-            setTimeout(() => setFeedback(null), 3000);
+            setPackageFeedback('¡Paquete registrado exitosamente!');
+            setTimeout(() => setPackageFeedback(null), 3000);
             
-            fetchData(); // Refresh data
+            fetchData();
         } catch (error) {
             console.error("Error registering package:", error);
-            setFeedback("Error al registrar el paquete.");
+            setPackageFeedback("Error al registrar el paquete.");
         } finally {
-            setIsSubmitting(false);
+            setIsSubmittingPackage(false);
         }
     };
 
@@ -95,28 +101,75 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         fetchData();
     };
 
+    const handleAuthorizeVisitor = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!visitorName || !visitorApartment || !userProfile.conjuntoId) return;
+
+        setIsSubmittingVisitor(true);
+        setVisitorFeedback(null);
+        try {
+            await apiService.addVisitorLog(userProfile.conjuntoId, {
+                visitorName,
+                apartment: visitorApartment,
+                date: visitorDate,
+                status: 'Autorizado',
+            });
+            
+            setVisitorName('');
+            setVisitorFeedback('¡Visitante pre-autorizado exitosamente!');
+            setTimeout(() => setVisitorFeedback(null), 3000);
+            
+            fetchData();
+        } catch (error) {
+            console.error("Error authorizing visitor:", error);
+            setVisitorFeedback("Error al autorizar visitante.");
+        } finally {
+            setIsSubmittingVisitor(false);
+        }
+    };
+
+    const handleRegisterEntry = async (logId: number) => {
+        if (!userProfile.conjuntoId) return;
+        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+            status: 'Ingresó',
+            entryTime: now,
+        });
+        fetchData();
+    };
+
+    const handleRegisterExit = async (logId: number) => {
+        if (!userProfile.conjuntoId) return;
+        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+            status: 'Salió',
+            exitTime: now,
+        });
+        fetchData();
+    };
 
     const renderVisitorForm = () => (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Autorizar Visitante</h3>
-            <form className="space-y-4">
+            <form onSubmit={handleAuthorizeVisitor} className="space-y-4">
                  <div>
                     <label htmlFor="visitorName" className="block text-sm font-medium text-gray-700">Nombre del Visitante</label>
-                    <input type="text" id="visitorName" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                    <input type="text" id="visitorName" value={visitorName} onChange={e => setVisitorName(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                 </div>
                 <div>
                     <label htmlFor="apartmentVisitor" className="block text-sm font-medium text-gray-700">Apartamento</label>
-                    <select id="apartmentVisitor" className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
+                    <select id="apartmentVisitor" value={visitorApartment} onChange={e => setVisitorApartment(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
                         {residents.map(r => <option key={r.apartment} value={r.apartment}>Apto {r.apartment} - {r.name}</option>)}
                     </select>
                 </div>
                 <div>
                     <label htmlFor="visitDate" className="block text-sm font-medium text-gray-700">Fecha de Visita</label>
-                    <input type="date" id="visitDate" defaultValue={new Date().toISOString().split('T')[0]} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                    <input type="date" id="visitDate" value={visitorDate} onChange={e => setVisitorDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                 </div>
-                <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                    Pre-Autorizar
+                <button type="submit" disabled={isSubmittingVisitor} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
+                    {isSubmittingVisitor ? 'Autorizando...' : 'Pre-Autorizar'}
                 </button>
+                {visitorFeedback && <p className="text-sm text-green-600 text-center">{visitorFeedback}</p>}
             </form>
         </div>
     );
@@ -139,10 +192,10 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                     <label htmlFor="trackingNumber" className="block text-sm font-medium text-gray-700">Número de Guía (Opcional)</label>
                     <input type="text" id="trackingNumber" value={pkgTracking} onChange={e => setPkgTracking(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
                 </div>
-                <button type="submit" disabled={isSubmitting} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
-                    {isSubmitting ? 'Registrando...' : 'Registrar Recepción'}
+                <button type="submit" disabled={isSubmittingPackage} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
+                    {isSubmittingPackage ? 'Registrando...' : 'Registrar Recepción'}
                 </button>
-                {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
+                {packageFeedback && <p className="text-sm text-green-600 text-center">{packageFeedback}</p>}
             </form>
         </div>
     );
@@ -176,8 +229,18 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                                 <td className="px-6 py-4">{log.entryTime || 'N/A'}</td>
                                 <td className="px-6 py-4">{log.exitTime || 'N/A'}</td>
                                 <td className="px-6 py-4 text-right space-x-2">
-                                    <button className="font-medium text-blue-600 hover:underline text-xs">Registrar Ingreso</button>
-                                     <button className="font-medium text-gray-600 hover:underline text-xs">Registrar Salida</button>
+                                    <button 
+                                        onClick={() => handleRegisterEntry(log.id)}
+                                        disabled={log.status !== 'Autorizado'}
+                                        className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
+                                        Registrar Ingreso
+                                    </button>
+                                     <button 
+                                        onClick={() => handleRegisterExit(log.id)}
+                                        disabled={log.status !== 'Ingresó'}
+                                        className="font-medium text-gray-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
+                                        Registrar Salida
+                                     </button>
                                 </td>
                             </tr>
                         ))}

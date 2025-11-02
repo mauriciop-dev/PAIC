@@ -319,6 +319,14 @@ export const apiService = {
         if (error) return handleApiError(error, 'fetchVisitorLogs') || [];
         return fromSupabase(data) as VisitorLog[];
     },
+    async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
+        const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
+        if (error) handleApiError(error, 'addVisitorLog');
+    },
+    async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
+        const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'updateVisitorLog');
+    },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
         const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
         if (error) return handleApiError(error, 'fetchPackageLogs') || [];
