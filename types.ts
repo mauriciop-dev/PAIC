@@ -161,7 +161,6 @@ export interface Income {
     amount: number;
     category: IncomeCategory;
     date: string;
-    isRecurring?: boolean;
 }
 
 

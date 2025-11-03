@@ -39,7 +39,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [incomeAmount, setIncomeAmount] = useState('');
     const [incomeCategory, setIncomeCategory] = useState<IncomeCategory>('Cuotas de Administración');
     const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0]);
-    const [incomeIsRecurring, setIncomeIsRecurring] = useState(false);
     
     const [feedback, setFeedback] = useState<string | null>(null);
     const [uploadFeedback, setUploadFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -115,14 +114,12 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             amount: parseFloat(amountCleaned),
             category: incomeCategory,
             date: incomeDate,
-            isRecurring: incomeIsRecurring,
         };
         await apiService.addIncome(userProfile.conjuntoId, newIncome);
         setIncomeDescription('');
         setIncomeAmount('');
         setIncomeCategory('Cuotas de Administración');
         setIncomeDate(new Date().toISOString().split('T')[0]);
-        setIncomeIsRecurring(false);
         setFeedback("¡Ingreso agregado exitosamente!");
         setTimeout(() => setFeedback(null), 3000);
         fetchData();
@@ -196,7 +193,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const handleDownloadTemplate = () => {
         const headers = activeTab === 'Gastos' 
             ? ['description', 'amount', 'category', 'date', 'providerId']
-            : ['description', 'amount', 'category', 'date', 'isRecurring'];
+            : ['description', 'amount', 'category', 'date'];
         const filename = activeTab === 'Gastos' ? 'plantilla_gastos.xlsx' : 'plantilla_ingresos.xlsx';
         
         const ws = XLSX.utils.aoa_to_sheet([headers]);
@@ -393,10 +390,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                         <label htmlFor="incomeDate" className="block text-sm font-medium text-gray-700">Fecha</label>
                         <input type="date" id="incomeDate" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                     </div>
-                    <div className="flex items-center">
-                        <input id="isRecurringIncome" type="checkbox" checked={incomeIsRecurring} onChange={e => setIncomeIsRecurring(e.target.checked)} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-                        <label htmlFor="isRecurringIncome" className="ml-2 block text-sm text-gray-900">Ingreso recurrente (mensual)</label>
-                    </div>
                     <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Agregar Ingreso</button>
                     {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
                 </form>
@@ -422,7 +415,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                 <th scope="col" className="px-4 py-3">Descripción</th>
                                 <th scope="col" className="px-4 py-3">Categoría</th>
                                 <th scope="col" className="px-4 py-3 text-right">Monto</th>
-                                <th scope="col" className="px-4 py-3 text-center">Recurrente</th>
                                 <th scope="col" className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -433,7 +425,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{inc.description}</td>
                                     <td className="px-4 py-3">{inc.category}</td>
                                     <td className="px-4 py-3 text-right">${inc.amount.toLocaleString()}</td>
-                                    <td className="px-4 py-3 text-center">{inc.isRecurring ? 'Sí' : 'No'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <button onClick={() => handleDeleteIncome(inc.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
