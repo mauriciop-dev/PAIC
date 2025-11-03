@@ -286,7 +286,7 @@ export const apiService = {
     
     // Financial
     async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
-        const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
+        const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
         if (error) return handleApiError(error, 'fetchExpenses') || [];
         return fromSupabase(data) as Expense[];
     },
@@ -299,7 +299,7 @@ export const apiService = {
         if (error) handleApiError(error, 'deleteExpense');
     },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
-        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
+        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
         if (error) return handleApiError(error, 'fetchIncomes') || [];
         return fromSupabase(data) as Income[];
     },
