@@ -151,7 +151,7 @@ export interface Expense {
     amount: number;
     category: ExpenseCategory;
     date: string;
-    providerId?: number;
+    providerId?: number | null;
     isRecurring?: boolean;
 }
 

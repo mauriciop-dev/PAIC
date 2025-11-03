@@ -85,7 +85,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             amount: parseFloat(expenseAmount),
             category: expenseCategory,
             date: expenseDate,
-            providerId: expenseProviderId ? parseInt(expenseProviderId) : undefined,
+            providerId: expenseProviderId ? parseInt(expenseProviderId, 10) : null,
             isRecurring: expenseIsRecurring,
         };
 
