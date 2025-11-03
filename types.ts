@@ -152,7 +152,6 @@ export interface Expense {
     category: ExpenseCategory;
     date: string;
     providerId?: number | null;
-    isRecurring?: boolean;
 }
 
 export type IncomeCategory = 'Cuotas de Administración' | 'Intereses de Mora' | 'Alquiler de Áreas' | 'Otros';
