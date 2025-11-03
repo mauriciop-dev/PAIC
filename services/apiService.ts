@@ -95,7 +95,7 @@ export const apiService = {
         const { error } = await supabase.from('residents').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
         if (error) handleApiError(error, 'deleteResident');
     },
-    async bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<void> {
+    async bulkUpsertResidents(conjuntoId: string, residents: any[]): Promise<void> {
         const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
         const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'conjunto_id,apartment' });
         if(error) handleApiError(error, 'bulkUpsertResidents');
@@ -123,7 +123,7 @@ export const apiService = {
         const { error } = await supabase.from('account_status').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
         if (error) handleApiError(error, 'deleteAccountStatus');
     },
-    async bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
+    async bulkUpsertAccountStatus(conjuntoId: string, accounts: any[]): Promise<void> {
         const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
         const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id,apartment' });
         if(error) handleApiError(error, 'bulkUpsertAccountStatus');
@@ -146,9 +146,9 @@ export const apiService = {
         const { error } = await supabase.from('providers').delete().eq('id', providerId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteProvider');
     },
-    async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
-        const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
-        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id' });
+    async bulkUpsertProviders(conjuntoId: string, providers: any[]): Promise<void> {
+        const payload = providers.map(p => toSupabase({ ...p, id: p.id || undefined, conjuntoId }));
+        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id,conjunto_id' });
         if (error) handleApiError(error, 'bulkUpsertProviders');
     },
 
@@ -169,9 +169,9 @@ export const apiService = {
         const { error } = await supabase.from('internal_staff').delete().eq('id', staffId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteInternalStaff');
     },
-    async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
-        const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
-        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'id' });
+    async bulkUpsertInternalStaff(conjuntoId: string, staff: any[]): Promise<void> {
+        const payload = staff.map(s => toSupabase({ ...s, id: s.id || undefined, conjuntoId }));
+        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'id,conjunto_id' });
         if (error) handleApiError(error, 'bulkUpsertInternalStaff');
     },
 
