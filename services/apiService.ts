@@ -17,12 +17,12 @@ import {
     NotificationItem,
     Tab,
     Expense,
+    Income,
     VisitorLog,
     PackageLog,
     AccessPoint,
     PlatformStats,
     UserRole,
-    Income,
     UserRoleDefinition,
     StoredFile
 } from '../types';
@@ -311,7 +311,6 @@ export const apiService = {
         const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteIncome');
     },
-
     
     // Security
     async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {

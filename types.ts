@@ -154,7 +154,7 @@ export interface Expense {
     providerId?: number | null;
 }
 
-export type IncomeCategory = 'Cuotas de Administración' | 'Intereses de Mora' | 'Alquiler de Áreas' | 'Otros';
+export type IncomeCategory = 'Cuota de Administración' | 'Multas' | 'Alquiler de Áreas' | 'Otros';
 export interface Income {
     id: number;
     description: string;

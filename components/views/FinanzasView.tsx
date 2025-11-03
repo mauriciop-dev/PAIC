@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { apiService } from '../../services/apiService';
-import { Expense, Provider, ExpenseCategory, ChartData, UserProfile, Income, IncomeCategory } from '../../types';
+import { Expense, Provider, ExpenseCategory, Income, IncomeCategory, ChartData, UserProfile } from '../../types';
 
 type FinanzasTab = 'Resumen' | 'Gastos' | 'Ingresos';
 declare var XLSX: any;
@@ -27,17 +27,16 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null>(null);
 
-    // Expense Form state
+    // Form states
     const [expenseDescription, setExpenseDescription] = useState('');
     const [expenseAmount, setExpenseAmount] = useState('');
     const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('Otros');
     const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
     const [expenseProviderId, setExpenseProviderId] = useState<string>('');
     
-    // Income Form state
     const [incomeDescription, setIncomeDescription] = useState('');
     const [incomeAmount, setIncomeAmount] = useState('');
-    const [incomeCategory, setIncomeCategory] = useState<IncomeCategory>('Cuotas de Administración');
+    const [incomeCategory, setIncomeCategory] = useState<IncomeCategory>('Cuota de Administración');
     const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0]);
     
     const [feedback, setFeedback] = useState<string | null>(null);
@@ -78,7 +77,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             return;
         }
 
-        const amountCleaned = expenseAmount.replace(/\./g, ''); // Remove thousand separators
+        const amountCleaned = expenseAmount.replace(/\./g, '');
         const newExpense: Omit<Expense, 'id'> = {
             description: expenseDescription,
             amount: parseFloat(amountCleaned),
@@ -89,7 +88,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
 
         await apiService.addExpense(userProfile.conjuntoId, newExpense);
         
-        // Reset form
         setExpenseDescription('');
         setExpenseAmount('');
         setExpenseCategory('Otros');
@@ -98,33 +96,35 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         
         setFeedback("¡Gasto agregado exitosamente!");
         setTimeout(() => setFeedback(null), 3000);
-
-        fetchData(); // Refresh data
+        fetchData();
     };
-    
+
     const handleAddIncome = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!incomeDescription || !incomeAmount || !userProfile.conjuntoId) {
             setFeedback("Por favor completa la descripción y el monto.");
             return;
         }
-        const amountCleaned = incomeAmount.replace(/\./g, ''); // Remove thousand separators
+
+        const amountCleaned = incomeAmount.replace(/\./g, '');
         const newIncome: Omit<Income, 'id'> = {
             description: incomeDescription,
             amount: parseFloat(amountCleaned),
             category: incomeCategory,
             date: incomeDate,
         };
+
         await apiService.addIncome(userProfile.conjuntoId, newIncome);
+
         setIncomeDescription('');
         setIncomeAmount('');
-        setIncomeCategory('Cuotas de Administración');
+        setIncomeCategory('Cuota de Administración');
         setIncomeDate(new Date().toISOString().split('T')[0]);
+
         setFeedback("¡Ingreso agregado exitosamente!");
         setTimeout(() => setFeedback(null), 3000);
         fetchData();
     };
-
     
     const handleDeleteExpense = async (id: number) => {
         if(window.confirm('¿Estás seguro de que quieres eliminar este gasto?') && userProfile.conjuntoId) {
@@ -145,49 +145,8 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setIsUploading(true);
-        setUploadFeedback(null);
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
-
-                if (json.length === 0) throw new Error("El archivo está vacío o tiene un formato incorrecto.");
-                if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
-
-                // Note: bulk upsert for expenses/incomes is not implemented in apiService,
-                // this would need to be added for full functionality.
-                // For now, we'll just log it.
-                console.log(`Uploading ${json.length} records for ${activeTab}`, json);
-                
-                // Example of how it WOULD work:
-                // if (activeTab === 'Gastos') {
-                //     await apiService.bulkUpsertExpenses(userProfile.conjuntoId, json);
-                // } else if (activeTab === 'Ingresos') {
-                //     await apiService.bulkUpsertIncomes(userProfile.conjuntoId, json);
-                // }
-                
-                await fetchData();
-                setUploadFeedback({type: 'success', text: `¡${json.length} registros cargados con éxito!`});
-
-            } catch (error: any) {
-                console.error("Error processing file:", error);
-                setUploadFeedback({type: 'error', text: `Error al cargar: ${error.message}`});
-            } finally {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-                setTimeout(() => setUploadFeedback(null), 7000);
-            }
-        };
-        reader.readAsArrayBuffer(file);
+        // ... (Implementation for bulk upload would go here)
+        console.log("File upload not fully implemented in bulk yet.");
     };
 
     const handleDownloadTemplate = () => {
@@ -203,30 +162,23 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     };
 
     const { summary, charts } = useMemo(() => {
-        if (!chartData) { // Guard clause for initial render
-            return {
-                summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 },
-                charts: { expenseChartData: [], incomeVsExpenseData: [] }
-            };
+        if (!chartData) {
+            return { summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 }, charts: { expenseChartData: [], incomeVsExpenseData: [] } };
         }
 
-        const thisMonthExpenses = expenses
-            .filter(e => new Date(e.date).getMonth() === new Date().getMonth())
-            .reduce((sum, e) => sum + e.amount, 0);
-            
-        const thisMonthIncome = incomes
-            .filter(i => new Date(i.date).getMonth() === new Date().getMonth())
-            .reduce((sum, i) => sum + i.amount, 0);
+        const thisMonthFilter = (item: { date: string }) => new Date(item.date).getUTCMonth() === new Date().getUTCMonth() && new Date(item.date).getUTCFullYear() === new Date().getUTCFullYear();
 
-        const potentialIncome = chartData.monthlyIncomeVsExpense.slice(-1)[0]?.ingresos || 0;
-        
+        const thisMonthExpenses = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
+        const thisMonthIncomes = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
+            
+        const potentialIncome = chartData.monthlyBudget;
         const budgetExecution = potentialIncome > 0 ? (thisMonthExpenses / potentialIncome) * 100 : 0;
 
         return {
             summary: {
-                thisMonthIncome: potentialIncome,
+                thisMonthIncome: thisMonthIncomes,
                 thisMonthExpenses,
-                currentBalance: thisMonthIncome - thisMonthExpenses,
+                currentBalance: thisMonthIncomes - thisMonthExpenses,
                 budgetExecution: Math.min(100, budgetExecution),
             },
             charts: {
@@ -237,14 +189,14 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     }, [expenses, incomes, chartData]);
     
     const expenseCategories: ExpenseCategory[] = ['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'];
-    const incomeCategories: IncomeCategory[] = ['Cuotas de Administración', 'Intereses de Mora', 'Alquiler de Áreas', 'Otros'];
+    const incomeCategories: IncomeCategory[] = ['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'];
 
     const renderSummary = () => (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Ingresos del Mes (Potencial)" value={`$${summary.thisMonthIncome.toLocaleString()}`} description="Recaudo de cuotas de administración" />
+                <StatCard title="Ingresos del Mes (Registrados)" value={`$${summary.thisMonthIncome.toLocaleString()}`} description="Suma de todos los ingresos guardados" />
                 <StatCard title="Gastos del Mes" value={`$${summary.thisMonthExpenses.toLocaleString()}`} description="Pagos y compras registradas" />
-                <StatCard title="Balance del Mes" value={`$${summary.currentBalance.toLocaleString()}`} description="Ingresos (reales) vs. Gastos" />
+                <StatCard title="Balance del Mes" value={`$${summary.currentBalance.toLocaleString()}`} description="Ingresos (registrados) vs. Gastos" />
                 <div className="bg-white p-4 rounded-lg shadow-sm">
                     <h3 className="text-sm font-semibold text-gray-500">Ejecución Presupuestaria</h3>
                     <p className="text-2xl font-bold text-gray-800 mt-1">{summary.budgetExecution.toFixed(1)}%</p>
@@ -267,7 +219,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </ResponsiveContainer>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos vs. Gastos (Últimos 6 meses)</h3>
+                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Potencial) vs. Gastos</h3>
                      <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={charts.incomeVsExpenseData.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
@@ -276,7 +228,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                             <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                             <Legend wrapperStyle={{fontSize: "12px"}}/>
                             <Line type="monotone" dataKey="ingresos" name="Ingresos (Potencial)" stroke="#2563eb" strokeWidth={2} />
-                            <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} />
+                            <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -289,31 +241,16 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Gasto</h3>
                 <form onSubmit={handleAddExpense} className="space-y-4">
-                    <div>
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Descripción</label>
-                        <input type="text" id="description" value={expenseDescription} onChange={e => setExpenseDescription(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
-                    <div>
-                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Monto</label>
-                        <input type="text" inputMode="numeric" pattern="[0-9.]*" id="amount" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="Ej: 150.000" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
-                    <div>
-                        <label htmlFor="category" className="block text-sm font-medium text-gray-700">Categoría</label>
-                        <select id="category" value={expenseCategory} onChange={e => setExpenseCategory(e.target.value as ExpenseCategory)} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
-                            {expenseCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="date" className="block text-sm font-medium text-gray-700">Fecha</label>
-                        <input type="date" id="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
-                    <div>
-                        <label htmlFor="providerId" className="block text-sm font-medium text-gray-700">Proveedor (Opcional)</label>
-                        <select id="providerId" value={expenseProviderId} onChange={e => setExpenseProviderId(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
-                            <option value="">Ninguno</option>
-                            {providers.map(p => <option key={p.id} value={p.id}>{p.company}</option>)}
-                        </select>
-                    </div>
+                    <input type="text" placeholder="Descripción" value={expenseDescription} onChange={e => setExpenseDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <input type="text" inputMode="numeric" pattern="[0-9.]*" placeholder="Monto Ej: 150.000" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value as ExpenseCategory)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
+                        {expenseCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <select value={expenseProviderId} onChange={e => setExpenseProviderId(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
+                        <option value="">Proveedor (Opcional)</option>
+                        {providers.map(p => <option key={p.id} value={p.id}>{p.company}</option>)}
+                    </select>
                     <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Agregar Gasto</button>
                     {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
                 </form>
@@ -323,15 +260,8 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                   <h3 className="text-lg font-semibold text-gray-700">Últimos Gastos Registrados</h3>
                   <div className="flex items-center gap-2">
                     <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
-                    <a href="#" onClick={handleUploadClick} className="text-xs font-medium text-blue-600 hover:underline">{isUploading ? 'Cargando...' : 'Cargar Datos'}</a>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
                   </div>
                 </div>
-                 {uploadFeedback && (
-                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                        {uploadFeedback.text}
-                    </p>
-                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
@@ -368,45 +298,27 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     );
     
     const renderIncomes = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Ingreso</h3>
                 <form onSubmit={handleAddIncome} className="space-y-4">
-                    <div>
-                        <label htmlFor="incomeDesc" className="block text-sm font-medium text-gray-700">Descripción</label>
-                        <input type="text" id="incomeDesc" value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
-                    <div>
-                        <label htmlFor="incomeAmount" className="block text-sm font-medium text-gray-700">Monto</label>
-                        <input type="text" inputMode="numeric" pattern="[0-9.]*" id="incomeAmount" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} placeholder="Ej: 350.000" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
-                    <div>
-                        <label htmlFor="incomeCategory" className="block text-sm font-medium text-gray-700">Categoría</label>
-                        <select id="incomeCategory" value={incomeCategory} onChange={e => setIncomeCategory(e.target.value as IncomeCategory)} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white">
-                            {incomeCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="incomeDate" className="block text-sm font-medium text-gray-700">Fecha</label>
-                        <input type="date" id="incomeDate" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                    </div>
+                    <input type="text" placeholder="Descripción" value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <input type="text" inputMode="numeric" pattern="[0-9.]*" placeholder="Monto Ej: 250.000" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <select value={incomeCategory} onChange={e => setIncomeCategory(e.target.value as IncomeCategory)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
+                        {incomeCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
                     <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Agregar Ingreso</button>
                     {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
                 </form>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                 <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-700">Últimos Ingresos Registrados</h3>
                   <div className="flex items-center gap-2">
                     <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
-                    <a href="#" onClick={handleUploadClick} className="text-xs font-medium text-blue-600 hover:underline">{isUploading ? 'Cargando...' : 'Cargar Datos'}</a>
                   </div>
                 </div>
-                 {uploadFeedback && (
-                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                        {uploadFeedback.text}
-                    </p>
-                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
@@ -418,7 +330,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                 <th scope="col" className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
-                         <tbody>
+                        <tbody>
                             {incomes.map(inc => (
                                 <tr key={inc.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-4 py-3">{inc.date}</td>
@@ -437,6 +349,14 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         </div>
     );
 
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'Resumen': return renderSummary();
+            case 'Gastos': return renderExpenses();
+            case 'Ingresos': return renderIncomes();
+            default: return null;
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -457,9 +377,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     ))}
                 </nav>
             </div>
-            {isLoading ? <div className="text-center p-10">Cargando datos financieros...</div> : (
-                activeTab === 'Resumen' ? renderSummary() : activeTab === 'Gastos' ? renderExpenses() : renderIncomes()
-            )}
+            {isLoading ? <div className="text-center p-10">Cargando datos financieros...</div> : renderContent()}
         </div>
     );
 };
