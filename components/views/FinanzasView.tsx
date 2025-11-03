@@ -80,9 +80,10 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             return;
         }
 
+        const amountCleaned = expenseAmount.replace(/\./g, ''); // Remove thousand separators
         const newExpense: Omit<Expense, 'id'> = {
             description: expenseDescription,
-            amount: parseFloat(expenseAmount),
+            amount: parseFloat(amountCleaned),
             category: expenseCategory,
             date: expenseDate,
             providerId: expenseProviderId ? parseInt(expenseProviderId, 10) : null,
@@ -111,9 +112,10 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             setFeedback("Por favor completa la descripción y el monto.");
             return;
         }
+        const amountCleaned = incomeAmount.replace(/\./g, ''); // Remove thousand separators
         const newIncome: Omit<Income, 'id'> = {
             description: incomeDescription,
-            amount: parseFloat(incomeAmount),
+            amount: parseFloat(amountCleaned),
             category: incomeCategory,
             date: incomeDate,
             isRecurring: incomeIsRecurring,
@@ -299,7 +301,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </div>
                     <div>
                         <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Monto</label>
-                        <input type="number" id="amount" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                        <input type="text" inputMode="numeric" pattern="[0-9.]*" id="amount" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="Ej: 150.000" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                     </div>
                     <div>
                         <label htmlFor="category" className="block text-sm font-medium text-gray-700">Categoría</label>
@@ -330,10 +332,8 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-700">Últimos Gastos Registrados</h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
-                    <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
-                        {isUploading ? 'Cargando...' : 'Cargar Datos'}
-                    </button>
+                    <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
+                    <a href="#" onClick={handleUploadClick} className="text-xs font-medium text-blue-600 hover:underline">{isUploading ? 'Cargando...' : 'Cargar Datos'}</a>
                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
                   </div>
                 </div>
@@ -349,22 +349,29 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                 <th scope="col" className="px-4 py-3">Fecha</th>
                                 <th scope="col" className="px-4 py-3">Descripción</th>
                                 <th scope="col" className="px-4 py-3">Categoría</th>
+                                <th scope="col" className="px-4 py-3">Proveedor</th>
                                 <th scope="col" className="px-4 py-3 text-right">Monto</th>
+                                <th scope="col" className="px-4 py-3 text-center">Recurrente</th>
                                 <th scope="col" className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {expenses.map(exp => (
+                            {expenses.map(exp => {
+                                const providerName = providers.find(p => p.id === exp.providerId)?.company || 'N/A';
+                                return (
                                 <tr key={exp.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-4 py-3">{exp.date}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900">{exp.description}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{exp.description}</td>
                                     <td className="px-4 py-3">{exp.category}</td>
+                                    <td className="px-4 py-3">{providerName}</td>
                                     <td className="px-4 py-3 text-right">${exp.amount.toLocaleString()}</td>
+                                    <td className="px-4 py-3 text-center">{exp.isRecurring ? 'Sí' : 'No'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <button onClick={() => handleDeleteExpense(exp.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -383,7 +390,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </div>
                     <div>
                         <label htmlFor="incomeAmount" className="block text-sm font-medium text-gray-700">Monto</label>
-                        <input type="number" id="incomeAmount" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                        <input type="text" inputMode="numeric" pattern="[0-9.]*" id="incomeAmount" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} placeholder="Ej: 350.000" className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                     </div>
                     <div>
                         <label htmlFor="incomeCategory" className="block text-sm font-medium text-gray-700">Categoría</label>
@@ -407,10 +414,8 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                  <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-700">Últimos Ingresos Registrados</h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
-                    <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
-                        {isUploading ? 'Cargando...' : 'Cargar Datos'}
-                    </button>
+                    <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
+                    <a href="#" onClick={handleUploadClick} className="text-xs font-medium text-blue-600 hover:underline">{isUploading ? 'Cargando...' : 'Cargar Datos'}</a>
                   </div>
                 </div>
                  {uploadFeedback && (
@@ -426,6 +431,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                 <th scope="col" className="px-4 py-3">Descripción</th>
                                 <th scope="col" className="px-4 py-3">Categoría</th>
                                 <th scope="col" className="px-4 py-3 text-right">Monto</th>
+                                <th scope="col" className="px-4 py-3 text-center">Recurrente</th>
                                 <th scope="col" className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -433,9 +439,10 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                             {incomes.map(inc => (
                                 <tr key={inc.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-4 py-3">{inc.date}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900">{inc.description}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{inc.description}</td>
                                     <td className="px-4 py-3">{inc.category}</td>
                                     <td className="px-4 py-3 text-right">${inc.amount.toLocaleString()}</td>
+                                    <td className="px-4 py-3 text-center">{inc.isRecurring ? 'Sí' : 'No'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <button onClick={() => handleDeleteIncome(inc.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
