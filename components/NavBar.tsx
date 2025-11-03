@@ -14,7 +14,7 @@ const allTabs = [
   { id: Tab.Database, label: 'Base de datos', icon: 'database', roles: [UserRole.Admin] },
   { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar', roles: [UserRole.Admin] },
   { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail', roles: [UserRole.Admin] },
-  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Admin] },
+  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Admin, UserRole.Contador] },
   { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield', roles: [UserRole.Admin, UserRole.Guard] },
   { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock', roles: [UserRole.Admin] },
   { id: Tab.PendingTasks, label: 'Tareas', icon: 'checkSquare', roles: [UserRole.Admin] },

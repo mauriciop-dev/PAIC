@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, UserProfile } from '../types';
 import { Icon } from './ui/Icon';
@@ -12,16 +11,17 @@ interface ChatbotProps {
 
 const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => {
   const [messages, setMessages] = useState<Message[]>([
-    { sender: 'ai', text: `¡Hola! Soy PAIC, tu asistente virtual.
+    { sender: 'ai', text: `¡Hola! Soy PAIC, tu asistente inteligente. Estoy aquí para ayudarte a administrar tu conjunto.
 
-Puedes pedirme ayuda con tus tareas diarias. Aquí tienes algunas ideas, solo elige un número:
+¿Qué necesitas hacer hoy? Puedes escribirlo o elegir una de estas opciones comunes:
 
-1. Crear una nueva tarea.
-2. Agendar un área común.
-3. Consultar el estado de cuenta de un apartamento.
-4. Enviar una comunicación.
+1. Registrar un gasto o ingreso.
+2. Crear un recordatorio de tarea.
+3. Consultar el saldo de un apartamento (ej: "cuánto debe el apto 101?")
+4. Enviar un comunicado a los residentes.
+5. Agendar un área común (ej: "reservar el BBQ para el sábado")
 
-O simplemente, escribe tu pregunta.` }
+También puedo ayudarte a cargar datos desde un archivo Excel.` }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
