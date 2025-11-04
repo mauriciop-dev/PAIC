@@ -58,7 +58,7 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
           <Icon name="x" className="w-6 h-6"/>
         </button>
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">{isNew ? 'Crear Nuevo Rol' : 'Editar Rol'}</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">{isNew ? 'Agregar Permisos' : 'Editar Permisos'}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre del Rol</label>

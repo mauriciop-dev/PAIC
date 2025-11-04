@@ -342,7 +342,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                             onClick={() => handleRoleModalOpen(null)}
                             className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
                           <Icon name="key" className="w-4 h-4" />
-                          Agregar Rol
+                          Agregar Permisos
                         </button>
                     )}
                     {canManageData && (
