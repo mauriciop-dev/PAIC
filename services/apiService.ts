@@ -24,9 +24,28 @@ import {
     PlatformStats,
     UserRole,
     UserRoleDefinition,
-    StoredFile
+    StoredFile,
+    ExpenseCategory,
+    IncomeCategory
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
+
+// --- MOCK DATA GENERATION ---
+const firstNames = ['Juan', 'Maria', 'Carlos', 'Ana', 'Luis', 'Laura', 'Pedro', 'Sofia', 'Diego', 'Camila', 'Andres', 'Valentina', 'Jose', 'Daniela', 'Miguel', 'Paula', 'Javier', 'Isabella', 'Ricardo', 'Gabriela'];
+const lastNames = ['Garcia', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Perez', 'Sanchez', 'Ramirez', 'Torres', 'Gomez', 'Diaz', 'Vasquez', 'Rojas', 'Mora', 'Castro'];
+const companies = ['Plomería Express', 'Electricistas Certificados', 'Aseo Brillante', 'Seguridad Aguila', 'Jardinería El Oasis', 'Ascensores Andinos', 'Constructora G&G', 'Fumigaciones Stop', 'Impermeabilizaciones Total'];
+const specialties = ['Plomería', 'Electricidad', 'Aseo y Limpieza', 'Vigilancia', 'Jardinería', 'Mantenimiento Ascensores', 'Construcción', 'Fumigación', 'Impermeabilización'];
+const positions = ['Todero', 'Aseadora', 'Jardinero', 'Vigilante', 'Recepcionista', 'Jefe de Mantenimiento'];
+const couriers = ['Servientrega', 'Interrapidísimo', 'Coordinadora', 'Mercado Libre', 'Deprisa', 'DHL', 'TCC', 'Envia'];
+const expenseItems = ['Pago nómina vigilancia', 'Reparación bomba de agua', 'Compra de bombillos LED', 'Servicio de jardinería', 'Mantenimiento mensual ascensores', 'Seguro de áreas comunes', 'Factura de energía', 'Factura de acueducto'];
+const incomeItems = ['Cuota administración', 'Multa por ruido', 'Alquiler salón social', 'Intereses de mora', 'Alquiler de parqueadero'];
+
+const getRandomElement = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const getRandomNumber = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const getRandomDate = (start: Date, end: Date) => new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+
+// This flag prevents multiple seeding attempts during a single app session.
+let hasSeededForSession = false;
 
 // FIX: Broadened the error type to accept any error object with a `message` property,
 // resolving a type conflict between `PostgrestError` and `StorageError`.
@@ -45,6 +64,154 @@ const handleApiError = (error: any, context: string) => {
 
 
 export const apiService = {
+    // Seeding function
+    async seedDatabase(conjuntoId: string): Promise<void> {
+        if (hasSeededForSession) return;
+        
+        const { count } = await supabase.from('residents').select('*', { count: 'exact', head: true }).eq('conjunto_id', conjuntoId);
+        
+        if (count !== null && count > 0) {
+            hasSeededForSession = true;
+            return;
+        }
+
+        console.log(`No data found for conjunto ${conjuntoId}. Seeding database...`);
+
+        try {
+            // -- ORDER OF SEEDING MATTERS --
+            
+            // 1. Common Areas & Access Points
+            const commonAreasSeed = [
+                { name: 'Salón Social', color: { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' } },
+                { name: 'Gimnasio', color: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' } },
+                { name: 'Piscina', color: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' } },
+                { name: 'Zona BBQ', color: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' } },
+            ].map(a => ({ ...a, conjunto_id: conjuntoId }));
+            await supabase.from('common_areas').insert(commonAreasSeed);
+            const { data: areasData } = await supabase.from('common_areas').select('name').eq('conjunto_id', conjuntoId);
+            const areaNames = (areasData || []).map(a => a.name);
+
+            const accessPointsSeed = [{ name: 'Portería Principal' }, { name: 'Portería Parqueadero' }].map(p => ({ ...p, conjunto_id: conjuntoId }));
+            await supabase.from('access_points').insert(accessPointsSeed);
+
+            // 2. Residents & Accounts
+            let residentsSeed: any[] = [];
+            let accountsSeed: any[] = [];
+            let apartments: string[] = [];
+            for (let i = 0; i < 50; i++) {
+                const torre = getRandomNumber(1, 5);
+                const aptNum = getRandomNumber(101, 804);
+                const apartment = `${torre}-${aptNum}`;
+                if (apartments.includes(apartment)) { i--; continue; }
+                apartments.push(apartment);
+
+                const fName = getRandomElement(firstNames);
+                const lName = getRandomElement(lastNames);
+                residentsSeed.push({ apartment, name: `${fName} ${lName}`, email: `${fName.toLowerCase()}.${lName.toLowerCase()}${i}@example.com`, phone: `3${getRandomNumber(10, 22)}${getRandomNumber(1000000, 9999999)}` });
+                accountsSeed.push({ apartment, last_payment_date: getRandomDate(new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), new Date()).toISOString().split('T')[0], admin_fee_value: 280000, outstanding_balance: Math.random() < 0.2 ? 280000 * getRandomNumber(1, 3) : 0 });
+            }
+            await supabase.from('residents').insert(residentsSeed.map(r => ({ ...r, conjunto_id: conjuntoId })));
+            await supabase.from('account_status').insert(accountsSeed.map(a => ({ ...a, conjunto_id: conjuntoId })));
+
+            // 3. Providers, Staff, Users, Roles
+            const providersSeed = Array.from({ length: 15 }, (_, i) => {
+                const company = getRandomElement(companies);
+                return { company: `${company} #${i}`, specialty: getRandomElement(specialties), email: `contacto@${company.toLowerCase().replace(/\s/g, '')}${i}.com`, phone: `300${getRandomNumber(1000000, 9999999)}` };
+            });
+            await supabase.from('providers').insert(providersSeed.map(p => ({ ...p, conjunto_id: conjuntoId })));
+            const { data: providersData } = await supabase.from('providers').select('id').eq('conjunto_id', conjuntoId);
+            const providerIds = (providersData || []).map(p => p.id);
+            
+            const staffSeed = Array.from({ length: 5 }, () => {
+                const fName = getRandomElement(firstNames);
+                const lName = getRandomElement(lastNames);
+                return { name: `${fName} ${lName}`, position: getRandomElement(positions), email: `${fName.toLowerCase()}${lName.toLowerCase()}@work.com`, phone: `315${getRandomNumber(1000000, 9999999)}`};
+            });
+            await supabase.from('internal_staff').insert(staffSeed.map(s => ({...s, conjunto_id: conjuntoId})));
+            
+            const usersSeed = [
+                { name: 'Carlos Vigilante', email: 'carlos.v@work.com', phone_number: '3111111111', role: 'Portero', password: 'password123' },
+                { name: 'Lucia Vigilante', email: 'lucia.v@work.com', phone_number: '3222222222', role: 'Portero', password: 'password123' },
+                { name: 'Roberto Contador', email: 'roberto.c@work.com', phone_number: '3333333333', role: 'Contador', password: 'password123' },
+            ];
+            await supabase.from('users').insert(usersSeed.map(u => ({...u, conjunto_id: conjuntoId})));
+
+            const rolesSeed = [{ name: 'Miembro del Consejo', permissions: [Tab.Dashboard, Tab.Finanzas], conjunto_id: conjuntoId }];
+            await supabase.from('user_roles').insert(rolesSeed);
+
+            // 4. Due Dates & Tasks
+            const dueDatesSeed = Array.from({ length: 20 }, () => ({
+                item: getRandomElement(expenseItems),
+                category: getRandomElement(['Servicios', 'Mantenimiento', 'Seguros', 'Nómina', 'Otros']),
+                due_date: getRandomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+                status: getRandomElement(['Pendiente', 'Vencido', 'Pagado'])
+            }));
+            await supabase.from('due_dates').insert(dueDatesSeed.map(d => ({...d, conjunto_id: conjuntoId})));
+
+            const tasksSeed = Array.from({ length: 25 }, () => ({
+                text: `Revisar ${getRandomElement(['bombillos', 'cámaras', 'extintores', 'ascensor'])} en Torre ${getRandomNumber(1,5)}`,
+                due_date: getRandomDate(new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+                completed: Math.random() < 0.4
+            }));
+            await supabase.from('tasks').insert(tasksSeed.map(t => ({...t, conjunto_id: conjuntoId})));
+
+            // 5. Bookings, Finances, Security Logs
+            const bookingsSeed = Array.from({ length: 40 }, () => ({
+                day: getRandomNumber(1, 28),
+                time: `${getRandomNumber(8, 18)}:00`,
+                event: getRandomElement(areaNames),
+                user: `Apto ${getRandomElement(apartments)}`
+            }));
+            await supabase.from('bookings').insert(bookingsSeed.map(b => ({...b, conjunto_id: conjuntoId})));
+
+            const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+            const expensesSeed = Array.from({ length: 50 }, () => ({
+                description: getRandomElement(expenseItems),
+                amount: getRandomNumber(50000, 2000000),
+                category: getRandomElement(['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'] as ExpenseCategory[]),
+                date: getRandomDate(sixMonthsAgo, new Date()).toISOString().split('T')[0],
+                provider_id: Math.random() < 0.5 ? getRandomElement(providerIds) : null
+            }));
+            await supabase.from('expenses').insert(expensesSeed.map(e => ({...e, conjunto_id: conjuntoId})));
+            
+            const incomesSeed = Array.from({ length: 50 }, () => ({
+                description: getRandomElement(incomeItems),
+                amount: getRandomNumber(100000, 500000),
+                category: getRandomElement(['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'] as IncomeCategory[]),
+                date: getRandomDate(sixMonthsAgo, new Date()).toISOString().split('T')[0],
+            }));
+            await supabase.from('incomes').insert(incomesSeed.map(i => ({...i, conjunto_id: conjuntoId})));
+
+            const visitorLogsSeed = Array.from({ length: 50 }, () => {
+                const status = getRandomElement(['Autorizado', 'Ingresó', 'Salió']);
+                return {
+                    apartment: getRandomElement(apartments),
+                    visitor_name: `${getRandomElement(firstNames)} ${getRandomElement(lastNames)}`,
+                    date: getRandomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date()).toISOString().split('T')[0],
+                    status,
+                    entry_time: status !== 'Autorizado' ? `${getRandomNumber(7, 19)}:${getRandomNumber(10, 59)}` : null,
+                    exit_time: status === 'Salió' ? `${getRandomNumber(10, 21)}:${getRandomNumber(10, 59)}` : null
+                };
+            });
+            await supabase.from('visitor_logs').insert(visitorLogsSeed.map(v => ({...v, conjunto_id: conjuntoId})));
+            
+            const packageLogsSeed = Array.from({ length: 50 }, () => ({
+                apartment: getRandomElement(apartments),
+                courier: getRandomElement(couriers),
+                tracking_number: `GU${getRandomNumber(100000000, 999999999)}`,
+                received_date: getRandomDate(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), new Date()).toISOString(),
+                status: getRandomElement(['En recepción', 'Entregado'])
+            }));
+            await supabase.from('package_logs').insert(packageLogsSeed.map(p => ({...p, conjunto_id: conjuntoId})));
+
+            hasSeededForSession = true;
+            console.log("Database seeding completed successfully.");
+        } catch (error) {
+            console.error("A critical error occurred during database seeding:", error);
+            // Don't retry seeding in this session if it fails, to avoid loops.
+            hasSeededForSession = true;
+        }
+    },
     // Conjunto & User
     async fetchConjuntoInfo(conjuntoId: string): Promise<ConjuntoInfo | null> {
         const { data, error } = await supabase.from('conjuntos').select('*').eq('id', conjuntoId).single();
@@ -413,6 +580,49 @@ export const apiService = {
          const { data, error } = await supabase.rpc('get_platform_stats');
          if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
          return fromSupabase(data) as PlatformStats;
+    },
+    async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
+        const bucket = 'archivos_conjuntos';
+        const { data: fileObjects, error } = await supabase.storage.from(bucket).list(conjuntoId, {
+            limit: 100,
+            offset: 0,
+            sortBy: { column: 'created_at', order: 'desc' },
+        });
+
+        if (error) {
+            handleApiError(error, `listFilesForConjunto for ${conjuntoId}`);
+            return [];
+        }
+        if (!fileObjects) return [];
+
+        const filesWithUrls: StoredFile[] = fileObjects.map(file => {
+            const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(`${conjuntoId}/${file.name}`);
+            return {
+                id: file.id ?? file.name,
+                name: file.name,
+                url: publicUrlData.publicUrl,
+                size: file.metadata?.size ?? 0,
+                mimeType: file.metadata?.mimetype ?? 'application/octet-stream',
+                createdAt: file.created_at,
+            };
+        });
+
+        return filesWithUrls;
+    },
+    async uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
+        const { error } = await supabase.storage
+            .from('archivos_conjuntos')
+            .upload(`${conjuntoId}/${file.name}`, file, {
+                cacheControl: '3600',
+                upsert: true
+            });
+        if (error) handleApiError(error, `uploadFileForConjunto`);
+    },
+    async deleteFileForConjunto(conjuntoId: string, fileName: string): Promise<void> {
+         const { error } = await supabase.storage
+            .from('archivos_conjuntos')
+            .remove([`${conjuntoId}/${fileName}`]);
+        if (error) handleApiError(error, 'deleteFileForConjunto');
     },
     
     // Dashboard Specific

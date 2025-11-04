@@ -72,6 +72,7 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
+                await apiService.seedDatabase(parsedUser.conjuntoId); // Seed database if empty
                 let infoToSet: ConjuntoInfo | null = null;
                 const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
 
@@ -176,6 +177,7 @@ const App: React.FC = () => {
     localStorage.setItem('paic_userProfile', JSON.stringify(profile));
     
     if (profile.conjuntoId) {
+        await apiService.seedDatabase(profile.conjuntoId); // Seed database if empty
         const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
         if (info) {
             setConjuntoInfo(info);

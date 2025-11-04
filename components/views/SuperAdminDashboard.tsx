@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SuperAdminProfile, ConjuntoInfo, PlatformStats } from '../../types';
 import { apiService } from '../../services/apiService';
 import { Icon } from '../ui/Icon';
+import FileManagerModal from '../FileManagerModal'; // Import the new modal
 
 interface SuperAdminDashboardProps {
     profile: SuperAdminProfile;
@@ -25,6 +26,8 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
     const [conjuntos, setConjuntos] = useState<ConjuntoInfo[]>([]);
     const [stats, setStats] = useState<PlatformStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
+    const [selectedConjunto, setSelectedConjunto] = useState<ConjuntoInfo | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -44,6 +47,11 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
         };
         fetchData();
     }, []);
+
+    const handleManageFiles = (conjunto: ConjuntoInfo) => {
+        setSelectedConjunto(conjunto);
+        setIsFilesModalOpen(true);
+    };
     
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
@@ -101,9 +109,9 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                                                     {conjunto.subscriptionPlan === 'Paid' ? 'Pagado' : 'Gratuito'}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right space-x-2">
+                                            <td className="px-6 py-4 text-right space-x-4">
                                                 <button className="font-medium text-blue-600 hover:underline">Ver Panel</button>
-                                                <button className="font-medium text-gray-600 hover:underline">Gestionar</button>
+                                                <button onClick={() => handleManageFiles(conjunto)} className="font-medium text-purple-600 hover:underline">Gestionar Archivos</button>
                                             </td>
                                         </tr>
                                     ))}
@@ -113,6 +121,14 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                     )}
                 </div>
             </main>
+
+            {isFilesModalOpen && selectedConjunto && (
+                <FileManagerModal
+                    isOpen={isFilesModalOpen}
+                    onClose={() => setIsFilesModalOpen(false)}
+                    conjunto={selectedConjunto}
+                />
+            )}
         </div>
     );
 };
