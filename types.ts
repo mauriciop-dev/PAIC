@@ -28,7 +28,7 @@ export interface PlatformUser {
   name: string;
   email: string;
   role: UserRole | string; // Can be a standard role or a custom role name
-  phone?: string;
+  phoneNumber?: string;
   password?: string;
   conjuntoId: string;
 }
@@ -104,7 +104,7 @@ export interface UserProfile {
     name: string;
     email: string;
     picture?: string;
-    phone?: string;
+    phoneNumber?: string;
     role: UserRole | string;
     conjuntoId?: string;
 }

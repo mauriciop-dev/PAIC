@@ -15,7 +15,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
     name: '',
     email: '',
-    phone: '',
+    phoneNumber: '',
     role: UserRole.Guard,
     password: '',
   });
@@ -28,7 +28,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         id: userToEdit.id,
         name: userToEdit.name,
         email: userToEdit.email,
-        phone: userToEdit.phone || '',
+        phoneNumber: userToEdit.phoneNumber || '',
         role: userToEdit.role,
         password: '', // Password field is for changing, not displaying
       });
@@ -37,7 +37,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
       setFormData({
         name: '',
         email: '',
-        phone: '',
+        phoneNumber: '',
         role: UserRole.Guard,
         password: '',
       });
@@ -97,8 +97,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
               <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
             </div>
              <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Teléfono</label>
-              <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Teléfono</label>
+              <input type="tel" id="phoneNumber" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
             </div>
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</label>

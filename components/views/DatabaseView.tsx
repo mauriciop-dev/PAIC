@@ -393,7 +393,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{user.name}</td>
                                   <td className="px-6 py-4">{user.email}</td>
-                                  <td className="px-6 py-4">{user.phone || 'N/A'}</td>
+                                  <td className="px-6 py-4">{user.phoneNumber || 'N/A'}</td>
                                   <td className="px-6 py-4">
                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.role === UserRole.Admin ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
                                       {user.role}

@@ -104,8 +104,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <input
                 type="tel"
                 id="phone"
-                name="phone"
-                value={profileData.phone || ''}
+                name="phoneNumber"
+                value={profileData.phoneNumber || ''}
                 onChange={handleProfileChange}
                 placeholder="Agrega tu número de teléfono"
                 className="mt-1 w-full p-2 border border-gray-300 rounded-md"
