@@ -385,6 +385,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               <th scope="col" className="px-6 py-3">Correo</th>
                               <th scope="col" className="px-6 py-3">Teléfono</th>
                               <th scope="col" className="px-6 py-3">Rol</th>
+                              <th scope="col" className="px-6 py-3">Contraseña</th>
                               <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
                       </thead>
@@ -399,6 +400,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                       {user.role}
                                     </span>
                                   </td>
+                                  <td className="px-6 py-4">{user.password ? '********' : 'N/A'}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button>
                                      <button onClick={() => handleDeleteUser(user.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
