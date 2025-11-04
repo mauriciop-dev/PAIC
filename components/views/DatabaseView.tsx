@@ -55,6 +55,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,7 +89,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   }, [userProfile.conjuntoId]);
 
   // Modal Handlers
-  const handleUserModalOpen = (user: PlatformUser | null) => { setSelectedUser(user); setIsUserModalOpen(true); };
+  const handleUserModalOpen = (user: PlatformUser | null) => { setModalError(null); setSelectedUser(user); setIsUserModalOpen(true); };
   const handleResidentModalOpen = (resident: Resident | null) => { setSelectedResident(resident); setIsResidentModalOpen(true); };
   const handleProviderModalOpen = (provider: Provider | null) => { setSelectedProvider(provider); setIsProviderModalOpen(true); };
   const handleStaffModalOpen = (staff: InternalStaff | null) => { setSelectedStaff(staff); setIsStaffModalOpen(true); };
@@ -98,13 +99,18 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   // Save Handlers
   const handleSaveUser = async (user: PlatformUser) => {
       if (!userProfile.conjuntoId) return;
-      if(user.id) {
-          await apiService.updateUser(userProfile.conjuntoId, user);
-      } else {
-          await apiService.addUser(userProfile.conjuntoId, user);
+      setModalError(null);
+      try {
+        if(user.id) {
+            await apiService.updateUser(userProfile.conjuntoId, user);
+        } else {
+            await apiService.addUser(userProfile.conjuntoId, user);
+        }
+        fetchData();
+        setIsUserModalOpen(false);
+      } catch (error: any) {
+        setModalError(error.message);
       }
-      fetchData();
-      setIsUserModalOpen(false);
   };
   
   const handleSaveResident = async (resident: Resident) => {
@@ -593,6 +599,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             onSave={handleSaveUser}
             userToEdit={selectedUser}
             availableRoles={roles}
+            error={modalError}
           />
       )}
     </div>

@@ -8,9 +8,10 @@ interface UserModalProps {
   onSave: (user: PlatformUser) => void;
   userToEdit: PlatformUser | null;
   availableRoles: UserRoleDefinition[];
+  error?: string | null;
 }
 
-const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles }) => {
+const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles, error }) => {
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
     name: '',
     email: '',
@@ -52,8 +53,12 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if(isNewUser && formData.role === UserRole.Guard && !formData.password){
-        alert("La contraseña es obligatoria para nuevos usuarios 'Portero'.");
+    if (isNewUser && formData.role !== UserRole.Admin && (!formData.password || formData.password.trim().length === 0)) {
+        alert("La contraseña es obligatoria para todos los roles que no son 'Administrador'.");
+        return;
+    }
+    if (formData.password && formData.password.length > 0 && formData.password.length < 6) {
+        alert("La contraseña debe tener al menos 6 caracteres.");
         return;
     }
     onSave(formData as PlatformUser);
@@ -106,8 +111,18 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
             </div>
              <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">Contraseña</label>
-              <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" placeholder={isNewUser ? "Obligatorio para rol 'Portero'" : "Dejar en blanco para no cambiar"} />
+              <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                value={formData.password} 
+                onChange={handleChange} 
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md disabled:bg-gray-100" 
+                placeholder={isNewUser ? (formData.role !== UserRole.Admin ? "Contraseña (obligatoria)" : "No aplica para Admin") : "Dejar en blanco para no cambiar"}
+                disabled={formData.role === UserRole.Admin}
+              />
             </div>
+             {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
           </div>
           <div className="mt-8 flex justify-end gap-4">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">

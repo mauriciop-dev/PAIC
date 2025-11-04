@@ -30,17 +30,28 @@ import { PostgrestError } from '@supabase/supabase-js';
 
 // FIX: Broadened the error type to accept any error object with a `message` property,
 // resolving a type conflict between `PostgrestError` and `StorageError`.
-const handleApiError = (error: { message: string }, context: string) => {
+const handleApiError = (error: any, context: string) => {
     console.error(`Error in ${context}:`, error);
-    // In a real app, you might want to throw the error or handle it more gracefully
-    return null;
+    if (error && error.code === '23505') { // unique_violation (PostgrestError)
+        if (error.message && error.message.includes('platform_users_email_key')) {
+            throw new Error('Ya existe un usuario con este correo electrónico.');
+        }
+        throw new Error('Este registro ya existe o viola una restricción de unicidad.');
+    }
+    // Generic error from either PostgrestError or StorageError
+    const message = error?.message || 'Ocurrió un error inesperado en la base de datos.';
+    throw new Error(message);
 }
+
 
 export const apiService = {
     // Conjunto & User
     async fetchConjuntoInfo(conjuntoId: string): Promise<ConjuntoInfo | null> {
         const { data, error } = await supabase.from('conjuntos').select('*').eq('id', conjuntoId).single();
-        if (error) return handleApiError(error, `fetchConjuntoInfo for ${conjuntoId}`);
+        if (error) {
+             handleApiError(error, `fetchConjuntoInfo for ${conjuntoId}`);
+             return null;
+        }
         return fromSupabase(data) as ConjuntoInfo | null;
     },
     async updateConjuntoInfo(info: ConjuntoInfo): Promise<void> {
@@ -80,7 +91,7 @@ export const apiService = {
     // DatabaseView related
     async fetchResidents(conjuntoId: string): Promise<Resident[]> {
         const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchResidents') || [];
+        if (error) { handleApiError(error, 'fetchResidents'); return []; }
         return fromSupabase(data) as Resident[];
     },
      async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
@@ -103,12 +114,12 @@ export const apiService = {
 
     async fetchAccountStatus(conjuntoId: string): Promise<AccountStatus[]> {
         const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchAccountStatus') || [];
+        if (error) { handleApiError(error, 'fetchAccountStatus'); return []; }
         return fromSupabase(data) as AccountStatus[];
     },
      async fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
         const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
-        if (error) return handleApiError(error, 'fetchAccountStatusByApartment');
+        if (error) { handleApiError(error, 'fetchAccountStatusByApartment'); return null; }
         return fromSupabase(data) as AccountStatus | null;
     },
     async addAccountStatus(conjuntoId: string, account: Omit<AccountStatus, 'id'>): Promise<void> {
@@ -131,7 +142,7 @@ export const apiService = {
 
     async fetchProviders(conjuntoId: string): Promise<Provider[]> {
         const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchProviders') || [];
+        if (error) { handleApiError(error, 'fetchProviders'); return []; }
         return fromSupabase(data) as Provider[];
     },
      async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
@@ -154,7 +165,7 @@ export const apiService = {
 
     async fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
         const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchInternalStaff') || [];
+        if (error) { handleApiError(error, 'fetchInternalStaff'); return []; }
         return fromSupabase(data) as InternalStaff[];
     },
     async addInternalStaff(conjuntoId: string, staff: Omit<InternalStaff, 'id'>): Promise<void> {
@@ -177,7 +188,7 @@ export const apiService = {
 
     async fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
         const { data, error } = await supabase.from('platform_users').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchUsers') || [];
+        if (error) { handleApiError(error, 'fetchUsers'); return []; }
         return fromSupabase(data) as PlatformUser[];
     },
     async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
@@ -206,7 +217,12 @@ export const apiService = {
         if (error) handleApiError(error, 'addUser');
     },
     async updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
-        const { error } = await supabase.from('platform_users').update(toSupabase(user)).eq('id', user.id).eq('conjunto_id', conjuntoId);
+        const updatePayload = { ...user };
+        // Don't send password for update if it's empty
+        if (!updatePayload.password || updatePayload.password.trim() === '') {
+            delete (updatePayload as Partial<PlatformUser>).password;
+        }
+        const { error } = await supabase.from('platform_users').update(toSupabase(updatePayload)).eq('id', user.id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'updateUser');
     },
     async deleteUser(conjuntoId: string, userId: number): Promise<void> {
@@ -217,7 +233,7 @@ export const apiService = {
     // Due Dates & Tasks
     async fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
         const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchDueDates') || [];
+        if (error) { handleApiError(error, 'fetchDueDates'); return []; }
         return fromSupabase(data) as DueDate[];
     },
     async addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
@@ -235,7 +251,7 @@ export const apiService = {
 
     async fetchTasks(conjuntoId: string): Promise<Task[]> {
         const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchTasks') || [];
+        if (error) { handleApiError(error, 'fetchTasks'); return []; }
         return fromSupabase(data) as Task[];
     },
     async addTask(conjuntoId: string, task: Omit<Task, 'id'|'completed'> & {completed?: boolean}): Promise<void> {
@@ -255,7 +271,7 @@ export const apiService = {
     // Common Areas
     async fetchCommonAreas(conjuntoId: string): Promise<CommonArea[]> {
         const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchCommonAreas') || [];
+        if (error) { handleApiError(error, 'fetchCommonAreas'); return []; }
         return fromSupabase(data) as CommonArea[];
     },
     async addCommonArea(conjuntoId: string, name: string): Promise<void> {
@@ -276,7 +292,7 @@ export const apiService = {
     },
     async fetchBookings(conjuntoId: string): Promise<Booking[]> {
         const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchBookings') || [];
+        if (error) { handleApiError(error, 'fetchBookings'); return []; }
         return fromSupabase(data) as Booking[];
     },
     async addBooking(conjuntoId: string, booking: Omit<Booking, 'id'>): Promise<void> {
@@ -287,7 +303,7 @@ export const apiService = {
     // Financial
     async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
         const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) return handleApiError(error, 'fetchExpenses') || [];
+        if (error) { handleApiError(error, 'fetchExpenses'); return []; }
         return fromSupabase(data) as Expense[];
     },
     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
@@ -300,7 +316,7 @@ export const apiService = {
     },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
         const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) return handleApiError(error, 'fetchIncomes') || [];
+        if (error) { handleApiError(error, 'fetchIncomes'); return []; }
         return fromSupabase(data) as Income[];
     },
     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
@@ -315,7 +331,7 @@ export const apiService = {
     // Security
     async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
         const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchVisitorLogs') || [];
+        if (error) { handleApiError(error, 'fetchVisitorLogs'); return []; }
         return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
@@ -328,7 +344,7 @@ export const apiService = {
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
         const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
-        if (error) return handleApiError(error, 'fetchPackageLogs') || [];
+        if (error) { handleApiError(error, 'fetchPackageLogs'); return []; }
         return fromSupabase(data) as PackageLog[];
     },
     async addPackageLog(conjuntoId: string, pkg: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
@@ -379,7 +395,7 @@ export const apiService = {
     // Settings
     async fetchAccessPoints(conjuntoId: string): Promise<AccessPoint[]> {
         const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
-        if (error) return handleApiError(error, 'fetchAccessPoints') || [];
+        if (error) { handleApiError(error, 'fetchAccessPoints'); return []; }
         return fromSupabase(data) as AccessPoint[];
     },
     async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
@@ -394,12 +410,12 @@ export const apiService = {
     // Super Admin
     async fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
         const { data, error } = await supabase.from('conjuntos').select('*');
-        if (error) return handleApiError(error, 'fetchAllConjuntos') || [];
+        if (error) { handleApiError(error, 'fetchAllConjuntos'); return []; }
         return fromSupabase(data) as ConjuntoInfo[];
     },
     async fetchPlatformStats(): Promise<PlatformStats | null> {
          const { data, error } = await supabase.rpc('get_platform_stats');
-         if (error) return handleApiError(error, 'fetchPlatformStats');
+         if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
          return fromSupabase(data) as PlatformStats;
     },
     
