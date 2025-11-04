@@ -269,7 +269,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               const workbook = XLSX.read(data, { type: 'array' });
               const sheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[sheetName];
-              // FIX: Use { cellDates: true } to correctly parse Excel date serial numbers into JS Date objects.
               const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
 
               if (json.length === 0) {
@@ -278,14 +277,30 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               
               if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
               
+              // FIX: This helper function sanitizes uploaded data, ignoring any columns that don't match
+              // the expected schema for the current tab. This prevents crashes when a user uploads
+              // the wrong file (e.g., an account status file on the residents tab).
+              const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
+                  return data.map((row: any) => 
+                      Object.keys(row).reduce((acc: any, key: string) => {
+                          if (allowedKeys.has(key)) {
+                              acc[key] = row[key];
+                          }
+                          return acc;
+                      }, {})
+                  );
+              };
+
               switch(activeDbTab) {
                   case DbTab.Residents:
-                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, json as Resident[]);
+                      const residentKeys = new Set(['apartment', 'name', 'email', 'phone']);
+                      const sanitizedResidents = sanitizeData(json, residentKeys);
+                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, sanitizedResidents as Resident[]);
                       break;
                   case DbTab.AccountStatus:
-                      // FIX: Format the parsed Date object to 'YYYY-MM-DD' string before sending to DB.
-                      // This corrects for timezone issues and matches the database's expected 'date' type.
-                      const formattedAccounts = json.map((account: any) => ({
+                      const accountKeys = new Set(['apartment', 'lastPaymentDate', 'adminFeeValue', 'pendingInstallments', 'otherCharges', 'outstandingBalance']);
+                      const sanitizedAccounts = sanitizeData(json, accountKeys);
+                      const formattedAccounts = sanitizedAccounts.map((account: any) => ({
                           ...account,
                           lastPaymentDate: account.lastPaymentDate
                             ? new Date(account.lastPaymentDate.getTime() - (account.lastPaymentDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
@@ -294,10 +309,14 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                       await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
                       break;
                   case DbTab.Providers:
-                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, json as Provider[]);
+                      const providerKeys = new Set(['company', 'specialty', 'email', 'phone']);
+                      const sanitizedProviders = sanitizeData(json, providerKeys);
+                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, sanitizedProviders as Provider[]);
                       break;
                   case DbTab.Internal:
-                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, json as InternalStaff[]);
+                      const staffKeys = new Set(['name', 'position', 'email', 'phone']);
+                      const sanitizedStaff = sanitizeData(json, staffKeys);
+                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, sanitizedStaff as InternalStaff[]);
                       break;
                   default:
                       throw new Error(`La carga masiva para ${activeDbTab} no está implementada.`);
