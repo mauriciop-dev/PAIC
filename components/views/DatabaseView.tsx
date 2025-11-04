@@ -277,9 +277,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               
               if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
               
-              // FIX: This helper function sanitizes uploaded data, ignoring any columns that don't match
-              // the expected schema for the current tab. This prevents crashes when a user uploads
-              // the wrong file (e.g., an account status file on the residents tab).
               const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
                   return data.map((row: any) => 
                       Object.keys(row).reduce((acc: any, key: string) => {
@@ -300,12 +297,35 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                   case DbTab.AccountStatus:
                       const accountKeys = new Set(['apartment', 'lastPaymentDate', 'adminFeeValue', 'pendingInstallments', 'otherCharges', 'outstandingBalance']);
                       const sanitizedAccounts = sanitizeData(json, accountKeys);
-                      const formattedAccounts = sanitizedAccounts.map((account: any) => ({
-                          ...account,
-                          lastPaymentDate: account.lastPaymentDate
-                            ? new Date(account.lastPaymentDate.getTime() - (account.lastPaymentDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-                            : null,
-                      }));
+                      
+                      const formattedAccounts = sanitizedAccounts.map((account: any) => {
+                          let formattedDate: string | null = null;
+                          const dateValue = account.lastPaymentDate;
+                          
+                          if (dateValue) {
+                              if (dateValue instanceof Date) {
+                                  // Path 1: It's a Date object from an Excel serial number.
+                                  // Correct for timezone offset, as xlsx library might create it in local time.
+                                  const adjustedDate = new Date(dateValue.getTime() - (dateValue.getTimezoneOffset() * 60000));
+                                  if (!isNaN(adjustedDate.getTime())) {
+                                      formattedDate = adjustedDate.toISOString().split('T')[0];
+                                  }
+                              } else {
+                                  // Path 2: It's not a Date object, likely a string or number.
+                                  const parsedDate = new Date(dateValue);
+                                  if (!isNaN(parsedDate.getTime())) {
+                                      // Correct for timezone if it's just a date string like '2024-05-04'
+                                      const adjustedDate = new Date(parsedDate.getTime() - (parsedDate.getTimezoneOffset() * 60000));
+                                      formattedDate = adjustedDate.toISOString().split('T')[0];
+                                  }
+                              }
+                          }
+                          return {
+                              ...account,
+                              lastPaymentDate: formattedDate,
+                          };
+                      });
+
                       await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
                       break;
                   case DbTab.Providers:
