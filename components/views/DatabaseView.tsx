@@ -56,6 +56,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [tempUserData, setTempUserData] = useState<Partial<PlatformUser> | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -164,8 +165,24 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     } else {
         await apiService.addRole(userProfile.conjuntoId, role);
     }
-    fetchData();
+    
+    await fetchData(); // Refetch roles
     setIsRoleModalOpen(false);
+
+    if (tempUserData) {
+        // If we came from the user modal, re-open it with the data and new role selected
+        const updatedUserData = { ...tempUserData, role: role.name };
+        setSelectedUser(updatedUserData as PlatformUser); 
+        setTempUserData(null);
+        setIsUserModalOpen(true);
+    }
+  };
+
+  const handleRequestNewRole = (currentUserData: Partial<PlatformUser>) => {
+    setTempUserData(currentUserData);
+    setIsUserModalOpen(false);
+    setSelectedRole(null);
+    setIsRoleModalOpen(true);
   };
 
   // Delete Handlers
@@ -602,6 +619,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             userToEdit={selectedUser}
             availableRoles={roles}
             error={modalError}
+            onRequestNewRole={handleRequestNewRole}
           />
       )}
     </div>
