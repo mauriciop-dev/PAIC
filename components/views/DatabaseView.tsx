@@ -56,7 +56,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [tempUserData, setTempUserData] = useState<Partial<PlatformUser> | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -166,23 +165,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         await apiService.addRole(userProfile.conjuntoId, role);
     }
     
-    await fetchData(); // Refetch roles
+    await fetchData();
     setIsRoleModalOpen(false);
-
-    if (tempUserData) {
-        // If we came from the user modal, re-open it with the data and new role selected
-        const updatedUserData = { ...tempUserData, role: role.name };
-        setSelectedUser(updatedUserData as PlatformUser); 
-        setTempUserData(null);
-        setIsUserModalOpen(true);
-    }
-  };
-
-  const handleRequestNewRole = (currentUserData: Partial<PlatformUser>) => {
-    setTempUserData(currentUserData);
-    setIsUserModalOpen(false);
-    setSelectedRole(null);
-    setIsRoleModalOpen(true);
   };
 
   // Delete Handlers
@@ -325,7 +309,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   
     const renderTableActions = () => {
         const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
-        
+        const isAdminSection = [DbTab.Users, DbTab.Roles].includes(activeDbTab);
+
         return (
             <div className="flex justify-between items-center p-4 border-b">
                 <div className="flex items-center gap-4">
@@ -344,21 +329,38 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                         </p>
                     )}
                 </div>
-                <button 
-                    onClick={() => {
-                        switch(activeDbTab) {
-                            case DbTab.Residents: handleResidentModalOpen(null); break;
-                            case DbTab.AccountStatus: handleAccountStatusModalOpen(null); break;
-                            case DbTab.Providers: handleProviderModalOpen(null); break;
-                            case DbTab.Internal: handleStaffModalOpen(null); break;
-                            case DbTab.Users: handleUserModalOpen(null); break;
-                            case DbTab.Roles: handleRoleModalOpen(null); break;
-                        }
-                    }}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
-                  <Icon name="user-plus" className="w-4 h-4" />
-                  {activeDbTab === DbTab.Users ? 'Agregar Usuario' : activeDbTab === DbTab.Roles ? 'Agregar Rol' : 'Agregar Registro'}
-                </button>
+                <div className="flex items-center gap-2">
+                    {isAdminSection ? (
+                        <>
+                            <button 
+                                onClick={() => handleRoleModalOpen(null)}
+                                className="px-3 py-1.5 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 transition-colors text-xs flex items-center gap-1">
+                              <Icon name="key" className="w-4 h-4" />
+                              Agregar Rol
+                            </button>
+                            <button 
+                                onClick={() => handleUserModalOpen(null)}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
+                              <Icon name="user-plus" className="w-4 h-4" />
+                              Agregar Usuario
+                            </button>
+                        </>
+                    ) : (
+                        <button 
+                            onClick={() => {
+                                switch(activeDbTab) {
+                                    case DbTab.Residents: handleResidentModalOpen(null); break;
+                                    case DbTab.AccountStatus: handleAccountStatusModalOpen(null); break;
+                                    case DbTab.Providers: handleProviderModalOpen(null); break;
+                                    case DbTab.Internal: handleStaffModalOpen(null); break;
+                                }
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
+                          <Icon name="user-plus" className="w-4 h-4" />
+                          Agregar Registro
+                        </button>
+                    )}
+                </div>
             </div>
         );
     };
@@ -619,7 +621,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             userToEdit={selectedUser}
             availableRoles={roles}
             error={modalError}
-            onRequestNewRole={handleRequestNewRole}
           />
       )}
     </div>

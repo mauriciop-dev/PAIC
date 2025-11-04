@@ -9,10 +9,9 @@ interface UserModalProps {
   userToEdit: PlatformUser | null;
   availableRoles: UserRoleDefinition[];
   error?: string | null;
-  onRequestNewRole: (currentUserData: Partial<PlatformUser>) => void;
 }
 
-const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles, error, onRequestNewRole }) => {
+const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles, error }) => {
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
     name: '',
     email: '',
@@ -49,11 +48,7 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    if (name === 'role' && value === 'CREATE_NEW_ROLE') {
-        onRequestNewRole(formData);
-    } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -111,9 +106,6 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
                 {allRoles.map(role => (
                     <option key={role.id} value={role.name}>{role.name}</option>
                 ))}
-                <option value="CREATE_NEW_ROLE" className="font-bold text-blue-600 border-t mt-2 pt-2">
-                    + Crear nuevo rol...
-                </option>
               </select>
                <p className="text-xs text-gray-500 mt-1">El rol 'Administrador' solo puede iniciar sesión con Google.</p>
             </div>
