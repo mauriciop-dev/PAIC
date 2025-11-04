@@ -309,7 +309,6 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   
     const renderTableActions = () => {
         const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
-        const isAdminSection = [DbTab.Users, DbTab.Roles].includes(activeDbTab);
 
         return (
             <div className="flex justify-between items-center p-4 border-b">
@@ -330,7 +329,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {isAdminSection ? (
+                    {activeDbTab === DbTab.Users && (
                         <>
                             <button 
                                 onClick={() => handleRoleModalOpen(null)}
@@ -345,7 +344,16 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               Agregar Usuario
                             </button>
                         </>
-                    ) : (
+                    )}
+                    {activeDbTab === DbTab.Roles && (
+                         <button 
+                            onClick={() => handleRoleModalOpen(null)}
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 transition-colors text-xs flex items-center gap-1">
+                          <Icon name="key" className="w-4 h-4" />
+                          Agregar Rol
+                        </button>
+                    )}
+                    {canManageData && (
                         <button 
                             onClick={() => {
                                 switch(activeDbTab) {
