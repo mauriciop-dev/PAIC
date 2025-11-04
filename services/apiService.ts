@@ -47,17 +47,18 @@ const getRandomDate = (start: Date, end: Date) => new Date(start.getTime() + Mat
 // This flag prevents multiple seeding attempts during a single app session.
 let hasSeededForSession = false;
 
-// FIX: Broadened the error type to accept any error object with a `message` property,
-// resolving a type conflict between `PostgrestError` and `StorageError`.
 const handleApiError = (error: any, context: string) => {
     console.error(`Error in ${context}:`, error);
     if (error && error.code === '23505') { // unique_violation (PostgrestError)
         if (error.message && error.message.includes('users_email_key')) {
             throw new Error('Ya existe un usuario con este correo electrónico.');
         }
+        if (error.message && error.message.includes('user_roles_name_conjunto_id_key')) {
+            throw new Error('Ya existe un rol con este nombre para un usuario de este conjunto.');
+        }
         throw new Error('Este registro ya existe o viola una restricción de unicidad.');
     }
-    // Generic error from either PostgrestError or StorageError
+    // Generic error for any other database issue
     const message = error?.message || 'Ocurrió un error inesperado en la base de datos.';
     throw new Error(message);
 }
