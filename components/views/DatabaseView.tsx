@@ -17,7 +17,7 @@ enum DbTab {
   Providers = 'Proveedores',
   Internal = 'Internos',
   Users = 'Usuarios',
-  Roles = 'Roles'
+  Roles = 'Permisos de usuario'
 }
 
 interface DatabaseViewProps {
