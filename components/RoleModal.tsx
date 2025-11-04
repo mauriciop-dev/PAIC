@@ -1,29 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { UserRoleDefinition, Tab } from '../types';
+import { UserRoleDefinition, Tab, PlatformUser } from '../types';
 import { Icon } from './ui/Icon';
 
 interface RoleModalProps {
   isOpen: boolean;
   roleToEdit: UserRoleDefinition | null;
   onClose: () => void;
-  onSave: (role: UserRoleDefinition) => void;
+  onSave: (role: UserRoleDefinition, userIdToAssign?: number) => void;
+  users: PlatformUser[];
+  allRoles: UserRoleDefinition[];
 }
 
 const allPermissions = Object.values(Tab);
 
-const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSave }) => {
-  const [formData, setFormData] = useState<Partial<UserRoleDefinition>>({});
+const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSave, users, allRoles }) => {
+  const [formData, setFormData] = useState<Partial<UserRoleDefinition>>({ name: '', permissions: [] });
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const isNew = !roleToEdit;
 
   useEffect(() => {
     if (roleToEdit) {
       setFormData(roleToEdit);
+      setSelectedUserId('');
     } else {
       setFormData({
-        id: '',
         name: '',
         permissions: [],
       });
+      setSelectedUserId('');
     }
   }, [roleToEdit, isOpen]);
 
@@ -41,15 +45,40 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
         : [...currentPermissions, permission];
       setFormData(prev => ({ ...prev, permissions: newPermissions }));
   }
+  
+  const handleUserChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const userId = e.target.value;
+    setSelectedUserId(userId);
+    if (userId) {
+      const user = users.find(u => u.id === parseInt(userId, 10));
+      if (user) {
+        const userRoleDef = allRoles.find(r => r.name === user.role);
+        setFormData({
+          name: `Personalizado para ${user.name}`, // Auto-generated name
+          permissions: userRoleDef ? userRoleDef.permissions : [],
+        });
+      }
+    } else {
+      // This case is not reachable if dropdown is required, but good practice
+      setFormData({ name: '', permissions: [] });
+    }
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if(!formData.name) return;
-    const finalData = {
-        ...formData,
-        id: isNew ? formData.name!.toLowerCase().replace(' ', '-') : roleToEdit.id,
+    if (isNew && !selectedUserId) {
+        alert("Por favor, selecciona un usuario.");
+        return;
     }
-    onSave(finalData as UserRoleDefinition);
+    if(!formData.name?.trim()) return;
+
+    const finalData: UserRoleDefinition = {
+        id: roleToEdit?.id || '',
+        name: formData.name,
+        permissions: formData.permissions || []
+    };
+    onSave(finalData, selectedUserId ? parseInt(selectedUserId, 10) : undefined);
   };
 
   return (
@@ -60,10 +89,20 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
         </button>
         <h2 className="text-2xl font-bold text-gray-800 mb-6">{isNew ? 'Agregar Permisos' : 'Editar Permisos'}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre del Rol</label>
-                <input type="text" id="name" name="name" value={formData.name || ''} onChange={handleTextChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-            </div>
+            {isNew ? (
+                <div>
+                    <label htmlFor="user" className="block text-sm font-medium text-gray-700">Nombre de usuario</label>
+                    <select id="user" value={selectedUserId} onChange={handleUserChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
+                        <option value="">Selecciona un usuario...</option>
+                        {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+                    </select>
+                </div>
+            ) : (
+                <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre del Rol</label>
+                    <input type="text" id="name" name="name" value={formData.name || ''} onChange={handleTextChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+                </div>
+            )}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Permisos</label>
                 <div className="mt-2 grid grid-cols-2 gap-2 border border-gray-200 p-2 rounded-md max-h-48 overflow-y-auto">

@@ -192,25 +192,21 @@ export const apiService = {
         return fromSupabase(data) as PlatformUser[];
     },
     async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
-        // This is mocked for now. In a real app, this would fetch from a `user_roles` table.
-        return Promise.resolve([
-            { id: 'contador', name: 'Contador', permissions: [Tab.Finanzas] },
-        ]);
+        const { data, error } = await supabase.from('user_roles').select('*').eq('conjunto_id', conjuntoId);
+        if (error) { handleApiError(error, 'fetchRoles'); return []; }
+        return fromSupabase(data) as UserRoleDefinition[];
     },
     async addRole(conjuntoId: string, role: Omit<UserRoleDefinition, 'id'>): Promise<void> {
-        // Mocked
-        console.log('Mocked addRole:', { ...role, conjuntoId });
-        return Promise.resolve();
+        const { error } = await supabase.from('user_roles').insert(toSupabase({ ...role, conjuntoId }));
+        if (error) handleApiError(error, 'addRole');
     },
     async updateRole(conjuntoId: string, role: UserRoleDefinition): Promise<void> {
-        // Mocked
-        console.log('Mocked updateRole:', { ...role, conjuntoId });
-        return Promise.resolve();
+        const { error } = await supabase.from('user_roles').update(toSupabase(role)).eq('id', role.id).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'updateRole');
     },
     async deleteRole(conjuntoId: string, roleId: string): Promise<void> {
-        // Mocked
-        console.log('Mocked deleteRole:', { roleId, conjuntoId });
-        return Promise.resolve();
+        const { error } = await supabase.from('user_roles').delete().eq('id', roleId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, 'deleteRole');
     },
     async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
         const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));

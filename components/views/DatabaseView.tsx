@@ -157,12 +157,23 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     setIsAccountStatusModalOpen(false);
   };
   
-  const handleSaveRole = async (role: UserRoleDefinition) => {
+  const handleSaveRole = async (role: UserRoleDefinition, userIdToAssign?: number) => {
     if (!userProfile.conjuntoId) return;
     if (selectedRole) {
         await apiService.updateRole(userProfile.conjuntoId, role);
     } else {
-        await apiService.addRole(userProfile.conjuntoId, role);
+        const newRole = {
+            ...role,
+            id: `${role.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+        };
+        await apiService.addRole(userProfile.conjuntoId, newRole);
+        if (userIdToAssign) {
+            const user = platformUsers.find(u => u.id === userIdToAssign);
+            if (user) {
+                const userToUpdate = { ...user, role: newRole.name };
+                await apiService.updateUser(userProfile.conjuntoId, userToUpdate);
+            }
+        }
     }
     
     await fetchData();
@@ -611,6 +622,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
           roleToEdit={selectedRole}
           onClose={() => setIsRoleModalOpen(false)}
           onSave={handleSaveRole}
+          users={platformUsers}
+          allRoles={roles}
         />
       )}
       {isUserModalOpen && (
