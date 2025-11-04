@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { VisitorLog, PackageLog, Resident, UserProfile } from '../../types';
+import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint } from '../../types';
 
 type SeguridadTab = 'Visitantes' | 'Paquetes';
 
@@ -13,6 +13,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
     const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
     const [residents, setResidents] = useState<Resident[]>([]);
+    const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Package Form State
@@ -33,14 +34,16 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
-            const [visitors, packages, res] = await Promise.all([
+            const [visitors, packages, res, points] = await Promise.all([
                 apiService.fetchVisitorLogs(userProfile.conjuntoId),
                 apiService.fetchPackageLogs(userProfile.conjuntoId),
                 apiService.fetchResidents(userProfile.conjuntoId),
+                apiService.fetchAccessPoints(userProfile.conjuntoId),
             ]);
             setVisitorLogs(visitors.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id - a.id));
             setPackageLogs(packages);
             setResidents(res);
+            setAccessPoints(points);
             if (res.length > 0) {
                 if (!pkgApartment) setPkgApartment(res[0].apartment);
                 if (!visitorApartment) setVisitorApartment(res[0].apartment);
@@ -131,12 +134,13 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const handleRegisterEntry = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
         const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
 
         // Optimistic UI Update
         setVisitorLogs(currentLogs =>
             currentLogs.map(log =>
                 log.id === logId
-                    ? { ...log, status: 'Ingresó', entryTime: now }
+                    ? { ...log, status: 'Ingresó', entryTime: now, accessPointId: firstAccessPointId }
                     : log
             )
         );
@@ -145,6 +149,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
             await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
                 status: 'Ingresó',
                 entryTime: now,
+                accessPointId: firstAccessPointId,
             });
         } catch (error) {
             console.error("Failed to register entry:", error);

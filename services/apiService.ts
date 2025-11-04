@@ -26,7 +26,8 @@ import {
     UserRoleDefinition,
     StoredFile,
     ExpenseCategory,
-    IncomeCategory
+    IncomeCategory,
+    SuperAdminChartData
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
@@ -749,6 +750,61 @@ export const apiService = {
          if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
          return fromSupabase(data) as PlatformStats;
     },
+    // FIX: Implement fetchSuperAdminChartData to provide analytics for the super admin dashboard.
+    async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
+        const now = new Date();
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    
+        const [chatbotRes, packageRes, visitorRes, accessPointsRes] = await Promise.all([
+            supabase.from('chatbot_logs').select('created_at').gte('created_at', sixMonthsAgo.toISOString()),
+            supabase.from('package_logs').select('received_date').gte('received_date', sixMonthsAgo.toISOString()),
+            supabase.from('visitor_logs').select('access_point_id').not('access_point_id', 'is', null),
+            supabase.from('access_points').select('id, name')
+        ]);
+    
+        const errors = [chatbotRes.error, packageRes.error, visitorRes.error, accessPointsRes.error].filter(Boolean);
+        if (errors.length > 0) handleApiError(errors, 'fetchSuperAdminChartData');
+        
+        const monthKeys: string[] = [];
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            monthKeys.push(monthNames[d.getMonth()]);
+        }
+        
+        const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
+    
+        const chatbotUsageData = {...monthlyDataTemplate};
+        (chatbotRes.data || []).forEach(log => {
+            const monthName = monthNames[new Date(log.created_at).getMonth()];
+            if(chatbotUsageData.hasOwnProperty(monthName)) chatbotUsageData[monthName]++;
+        });
+    
+        const packageVolumeData = {...monthlyDataTemplate};
+        (packageRes.data || []).forEach(log => {
+            const monthName = monthNames[new Date(log.received_date).getMonth()];
+            if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
+        });
+    
+        const accessPointMap = new Map((accessPointsRes.data || []).map(ap => [ap.id, ap.name]));
+        const visitorTrafficData: Record<string, number> = {};
+        (visitorRes.data || []).forEach(log => {
+            const apName = accessPointMap.get(log.access_point_id!) || 'Desconocido';
+            visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
+        });
+    
+        const formatForChart = (data: Record<string, number>): ChartData[] => Object.entries(data).map(([name, value]) => ({
+            name,
+            value,
+            fill: '', 
+        }));
+    
+        return {
+            chatbotUsage: formatForChart(chatbotUsageData),
+            packageVolume: formatForChart(packageVolumeData),
+            visitorTraffic: formatForChart(visitorTrafficData)
+        };
+    },
     async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
         const bucket = 'archivos_conjuntos';
         const { data: fileObjects, error } = await supabase.storage.from(bucket).list(conjuntoId, {
@@ -992,5 +1048,10 @@ export const apiService = {
             return { success: true, message: `¡Correo enviado a ${emailList.length} destinatarios!` };
         }
         return { success: false, message: `Error al enviar: ${result.error}` };
-    }
+    },
+    // FIX: Implement logChatbotInteraction to record AI usage for analytics.
+    async logChatbotInteraction(conjuntoId: string): Promise<void> {
+        const { error } = await supabase.from('chatbot_logs').insert({ conjunto_id: conjuntoId });
+        if (error) handleApiError(error, 'logChatbotInteraction');
+    },
 };

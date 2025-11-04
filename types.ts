@@ -1,4 +1,5 @@
 
+
 export enum Tab {
   Dashboard = 'Centro de Control',
   Database = 'Base de datos',
@@ -173,6 +174,7 @@ export interface VisitorLog {
     entryTime?: string;
     exitTime?: string;
     conjuntoId?: string;
+    accessPointId?: number;
 }
 
 export interface PackageLog {
@@ -210,6 +212,12 @@ export interface PlatformStats {
     totalResidents: number;
     monthlyRecurringRevenue: number;
     newThisMonth: number;
+}
+
+export interface SuperAdminChartData {
+    chatbotUsage: ChartData[];
+    packageVolume: ChartData[];
+    visitorTraffic: ChartData[];
 }
 
 export interface StoredFile {

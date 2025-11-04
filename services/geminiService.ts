@@ -72,7 +72,7 @@ When a user asks to perform an action, you MUST ask for all necessary informatio
       - User: "cuanto debe el 305"
       - You: \`{"function": "queryDatabase", "payload": {"query_description": "Get account status for apartment 305"}}\`
       - User: "que dias esta alquilado el salon comunal el proximo mes"
-      - You: \`{"function": "queryDatabase", "payload": {"query_description": "Get all bookings for 'Salón Comunal' in the next month"}}\`
+      - You: \`{"function": "queryDatabase", "payload": {"query_description": "Get all bookings for 'Salón Communal' in the next month"}}\`
 
 For general questions or conversation, provide a helpful text response.
     `.trim();
@@ -102,6 +102,8 @@ const processApiResponse = async (response: string): Promise<string> => {
         const cleanResponse = response.replace(/```json/g, '').replace(/```/g, '').trim();
         const action = JSON.parse(cleanResponse);
         if (action.function && action.payload && currentConjuntoId) {
+             // Log interaction before executing action
+            apiService.logChatbotInteraction(currentConjuntoId);
             switch (action.function) {
                 case 'addTask':
                     await apiService.addTask(currentConjuntoId, action.payload);

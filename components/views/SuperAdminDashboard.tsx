@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { SuperAdminProfile, ConjuntoInfo, PlatformStats } from '../../types';
+import { SuperAdminProfile, ConjuntoInfo, PlatformStats, SuperAdminChartData } from '../../types';
 import { apiService } from '../../services/apiService';
 import { Icon } from '../ui/Icon';
 import FileManagerModal from '../FileManagerModal'; // Import the new modal
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
 
 interface SuperAdminDashboardProps {
     profile: SuperAdminProfile;
@@ -25,6 +27,7 @@ const StatCard: React.FC<{ title: string; value: string; icon: string; iconColor
 const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLogout }) => {
     const [conjuntos, setConjuntos] = useState<ConjuntoInfo[]>([]);
     const [stats, setStats] = useState<PlatformStats | null>(null);
+    const [chartData, setChartData] = useState<SuperAdminChartData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
     const [selectedConjunto, setSelectedConjunto] = useState<ConjuntoInfo | null>(null);
@@ -33,12 +36,14 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [conjuntosData, statsData] = await Promise.all([
+                const [conjuntosData, statsData, charts] = await Promise.all([
                     apiService.fetchAllConjuntos(),
                     apiService.fetchPlatformStats(),
+                    apiService.fetchSuperAdminChartData(),
                 ]);
                 setConjuntos(conjuntosData);
                 setStats(statsData);
+                setChartData(charts);
             } catch (error) {
                 console.error("Failed to fetch platform data", error);
             } finally {
@@ -52,6 +57,8 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
         setSelectedConjunto(conjunto);
         setIsFilesModalOpen(true);
     };
+    
+    const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
     
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
@@ -78,6 +85,50 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                     <StatCard title="Suscripciones Activas" value={stats?.paidSubscriptions.toString() ?? '...'} icon="shield-check" iconColor="bg-green-500" />
                     <StatCard title="Ingresos (MRR)" value={stats ? stats.monthlyRecurringRevenue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }) : '...'} icon="dollarSign" iconColor="bg-yellow-500" />
                     <StatCard title="Nuevos (Mes)" value={stats?.newThisMonth.toString() ?? '...'} icon="trending-up" iconColor="bg-indigo-500" />
+                </div>
+
+                {/* --- ANALYTICS CHARTS --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
+                        <h3 className="text-md font-semibold text-gray-700 mb-4">Uso Mensual del Asistente IA</h3>
+                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData.chatbotUsage} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                    <XAxis dataKey="name" fontSize={12} />
+                                    <YAxis fontSize={12} allowDecimals={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" name="Interacciones" fill="#8884d8" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                     <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
+                        <h3 className="text-md font-semibold text-gray-700 mb-4">Volumen de Paquetes Mensual</h3>
+                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData.packageVolume} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                    <XAxis dataKey="name" fontSize={12} />
+                                    <YAxis fontSize={12} allowDecimals={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" name="Paquetes" fill="#82ca9d" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                     <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
+                        <h3 className="text-md font-semibold text-gray-700 mb-4">Tráfico de Visitantes por Portería</h3>
+                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
+                             <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={chartData.visitorTraffic} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                        {chartData.visitorTraffic.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                                    </Pie>
+                                    <Tooltip formatter={(value) => `${value} visitantes`} />
+                                    <Legend wrapperStyle={{fontSize: "12px"}}/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-md overflow-hidden">
