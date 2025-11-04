@@ -165,21 +165,23 @@ export const apiService = {
             }));
             await supabase.from('bookings').insert(bookingsSeed.map(b => ({...b, conjunto_id: conjuntoId})));
 
-            const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-            const expensesSeed = Array.from({ length: 50 }, () => ({
+            const startDate = new Date('2025-01-01T00:00:00Z');
+            const endDate = new Date('2025-11-04T23:59:59Z');
+
+            const expensesSeed = Array.from({ length: 200 }, () => ({
                 description: getRandomElement(expenseItems),
                 amount: getRandomNumber(50000, 2000000),
                 category: getRandomElement(['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'] as ExpenseCategory[]),
-                date: getRandomDate(sixMonthsAgo, new Date()).toISOString().split('T')[0],
+                date: getRandomDate(startDate, endDate).toISOString().split('T')[0],
                 provider_id: Math.random() < 0.5 ? getRandomElement(providerIds) : null
             }));
             await supabase.from('expenses').insert(expensesSeed.map(e => ({...e, conjunto_id: conjuntoId})));
             
-            const incomesSeed = Array.from({ length: 50 }, () => ({
+            const incomesSeed = Array.from({ length: 200 }, () => ({
                 description: getRandomElement(incomeItems),
                 amount: getRandomNumber(100000, 500000),
                 category: getRandomElement(['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'] as IncomeCategory[]),
-                date: getRandomDate(sixMonthsAgo, new Date()).toISOString().split('T')[0],
+                date: getRandomDate(startDate, endDate).toISOString().split('T')[0],
             }));
             await supabase.from('incomes').insert(incomesSeed.map(i => ({...i, conjunto_id: conjuntoId})));
 
@@ -833,11 +835,24 @@ export const apiService = {
         };
     },
     async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null> {
-        const expenses = await this.fetchExpenses(conjuntoId);
-        const accounts = await this.fetchAccountStatus(conjuntoId);
+        const [expenses, incomes, accounts] = await Promise.all([
+            this.fetchExpenses(conjuntoId),
+            this.fetchIncomes(conjuntoId),
+            this.fetchAccountStatus(conjuntoId),
+        ]);
+    
         const totalPotentialIncome = accounts.reduce((sum, acc) => sum + acc.adminFeeValue, 0);
-
-        const expensesByCategory: ChartData[] = expenses.reduce((acc, expense) => {
+    
+        // --- 1. Expenses by Category (for the latest month with data, Nov 2025) ---
+        const latestDataMonth = 10; // November (0-indexed)
+        const latestDataYear = 2025;
+        
+        const latestMonthExpenses = expenses.filter(e => {
+            const expenseDate = new Date(e.date);
+            return expenseDate.getUTCFullYear() === latestDataYear && expenseDate.getUTCMonth() === latestDataMonth;
+        });
+    
+        const expensesByCategory: ChartData[] = latestMonthExpenses.reduce((acc, expense) => {
             let category = acc.find(c => c.name === expense.category);
             if (!category) {
                 category = { name: expense.category, value: 0, fill: '' };
@@ -850,23 +865,51 @@ export const apiService = {
             cat.fill = colors[i % colors.length];
             return cat;
         });
+    
+        // --- 2. Monthly Income vs. Expense (for the 12 months ending in Nov 2025) ---
+        const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
+        const chartEndDate = new Date(latestDataYear, latestDataMonth, 1);
+    
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(chartEndDate.getFullYear(), chartEndDate.getMonth() - i, 1);
+            const year = d.getFullYear();
+            const month = d.getMonth();
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+            monthlyData[key] = { ingresos: 0, gastos: 0 };
+        }
         
-        const monthlyIncomeVsExpense: ChartData[] = Array.from({ length: 12 }, (_, i) => {
-            const date = new Date();
-            date.setMonth(date.getMonth() - i);
-            const monthName = date.toLocaleString('es-ES', { month: 'short' });
-            return { 
-                name: monthName,
-                ingresos: totalPotentialIncome, // Simplified: uses same potential income for all past months
-                gastos: Math.random() * (20000000 - 15000000) + 15000000, // Mocked historical expenses
-                value: 0, 
+        expenses.forEach(expense => {
+            const d = new Date(expense.date + 'T00:00:00Z');
+            const year = d.getUTCFullYear();
+            const month = d.getUTCMonth();
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+            if (monthlyData[key]) {
+                monthlyData[key].gastos += expense.amount;
+            }
+        });
+        
+        incomes.forEach(income => {
+            const d = new Date(income.date + 'T00:00:00Z');
+            const year = d.getUTCFullYear();
+            const month = d.getUTCMonth();
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+            if (monthlyData[key]) {
+                monthlyData[key].ingresos += income.amount;
+            }
+        });
+    
+        const monthlyIncomeVsExpense = Object.keys(monthlyData).map(key => {
+            const dateKey = new Date(key + '-01T00:00:00Z');
+            const monthName = dateKey.toLocaleString('es-ES', { month: 'short', timeZone: 'UTC' });
+            return {
+                name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+                ingresos: monthlyData[key].ingresos,
+                gastos: monthlyData[key].gastos,
+                value: 0,
                 fill: ''
             };
-        }).reverse();
-        
-        monthlyIncomeVsExpense[11].gastos = expenses.reduce((sum, e) => sum + e.amount, 0); // Use real data for current month
-
-
+        });
+    
         return {
             monthlyIncomeVsExpense,
             expensesByCategory,

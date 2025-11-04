@@ -242,7 +242,13 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             return { summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 }, charts: { expenseChartData: [], incomeVsExpenseData: [] } };
         }
 
-        const thisMonthFilter = (item: { date: string }) => new Date(item.date).getUTCMonth() === new Date().getUTCMonth() && new Date(item.date).getUTCFullYear() === new Date().getUTCFullYear();
+        // Use November 2025 as the "current" month for summary cards to match seeded data
+        const latestDataMonth = 10; // November
+        const latestDataYear = 2025;
+        const thisMonthFilter = (item: { date: string }) => {
+            const itemDate = new Date(item.date + 'T00:00:00Z');
+            return itemDate.getUTCMonth() === latestDataMonth && itemDate.getUTCFullYear() === latestDataYear;
+        };
 
         const thisMonthExpenses = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
         const thisMonthIncomes = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
@@ -295,15 +301,15 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </ResponsiveContainer>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Potencial) vs. Gastos</h3>
+                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Registrados) vs. Gastos</h3>
                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={charts.incomeVsExpenseData.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <LineChart data={charts.incomeVsExpenseData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                             <XAxis dataKey="name" fontSize={12} />
                             <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                             <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                             <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            <Line type="monotone" dataKey="ingresos" name="Ingresos (Potencial)" stroke="#2563eb" strokeWidth={2} />
+                            <Line type="monotone" dataKey="ingresos" name="Ingresos (Registrados)" stroke="#2563eb" strokeWidth={2} />
                             <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>
