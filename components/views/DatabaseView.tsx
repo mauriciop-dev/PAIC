@@ -170,26 +170,31 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             throw new Error("Usuario no encontrado.");
         }
 
-        const defaultRoles = Object.values(UserRole);
-        const userHasCustomRole = user.role && !defaultRoles.includes(user.role as UserRole);
-        const existingCustomRole = userHasCustomRole ? roles.find(r => r.name === user.role) : null;
+        const customRoleName = `Personalizado para ${user.name}`;
+        const existingRoleDef = roles.find(r => r.name === customRoleName);
 
-        if (existingCustomRole) {
+        if (existingRoleDef) {
+            // A role for this user already exists. Update it.
             const updatedRole = {
-                ...existingCustomRole,
+                ...existingRoleDef,
                 permissions: role.permissions,
             };
             await apiService.updateRole(userProfile.conjuntoId, updatedRole);
+
+            // Also ensure the user is assigned this role, in case they were reverted to a default role.
+            if (user.role !== customRoleName) {
+                const userToUpdate = { ...user, role: customRoleName };
+                await apiService.updateUser(userProfile.conjuntoId, userToUpdate);
+            }
         } else {
-            const roleName = `Personalizado para ${user.name}`;
+            // No custom role exists for this user. Create it and assign it.
             const newRolePayload = {
-                name: roleName,
+                name: customRoleName,
                 permissions: role.permissions,
             };
-
             await apiService.addRole(userProfile.conjuntoId, newRolePayload);
             
-            const userToUpdate = { ...user, role: roleName };
+            const userToUpdate = { ...user, role: customRoleName };
             await apiService.updateUser(userProfile.conjuntoId, userToUpdate);
         }
         

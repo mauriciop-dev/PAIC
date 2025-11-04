@@ -36,9 +36,15 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
         name: '',
         permissions: [],
       });
-      setSelectedUserId('');
+      if (users.length > 0) {
+        // Pre-select first user if available
+        // setSelectedUserId(String(users[0].id));
+        // handleUserChange({ target: { value: String(users[0].id) } } as any);
+      } else {
+        setSelectedUserId('');
+      }
     }
-  }, [roleToEdit, isOpen]);
+  }, [roleToEdit, isOpen, users]);
 
   if (!isOpen) return null;
 
@@ -113,8 +119,9 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
                     <label htmlFor="user" className="block text-sm font-medium text-gray-700">Nombre de usuario</label>
                     <select id="user" value={selectedUserId} onChange={handleUserChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
                         <option value="">Selecciona un usuario...</option>
-                        {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+                        {users.filter(u => u.role !== UserRole.Admin).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
                     </select>
+                     <p className="text-xs text-gray-500 mt-1">Solo se pueden asignar permisos personalizados a roles no-administradores.</p>
                 </div>
             ) : (
                 <div>
@@ -133,6 +140,7 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
                                 checked={formData.permissions?.includes(perm) || false}
                                 onChange={() => handlePermissionChange(perm)}
                                 className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                disabled={!selectedUserId && isNew}
                             />
                             <label htmlFor={`perm-${perm}`} className="ml-2 block text-sm text-gray-900">{perm}</label>
                         </div>
