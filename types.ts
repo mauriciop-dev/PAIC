@@ -1,3 +1,4 @@
+
 export enum Tab {
   Dashboard = 'Centro de Control',
   Database = 'Base de datos',
@@ -80,7 +81,6 @@ export interface Provider {
 }
 
 export interface InternalStaff {
-    id: number;
     name: string;
     position: string;
     email: string;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition, Tab } from '../../types';
@@ -230,9 +231,9 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     }
   };
 
-  const handleDeleteStaff = async (id: number) => {
+  const handleDeleteStaff = async (name: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar a este miembro del personal?') && userProfile.conjuntoId) {
-        await apiService.deleteInternalStaff(userProfile.conjuntoId, id);
+        await apiService.deleteInternalStaff(userProfile.conjuntoId, name);
         fetchData();
     }
   };
@@ -636,14 +637,14 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                       </thead>
                       <tbody>
                           {internalStaff.map((staff) => (
-                              <tr key={staff.id} className="bg-white border-b hover:bg-gray-50">
+                              <tr key={staff.name} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{staff.name}</td>
                                   <td className="px-6 py-4">{staff.position}</td>
                                   <td className="px-6 py-4">{staff.email}</td>
                                   <td className="px-6 py-4">{staff.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleStaffModalOpen(staff)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                     <button onClick={() => handleDeleteStaff(staff.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                     <button onClick={() => handleDeleteStaff(staff.name)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
                           ))}

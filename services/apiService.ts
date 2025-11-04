@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import { 
@@ -373,21 +374,21 @@ export const apiService = {
         }
         return (fromSupabase(data) as InternalStaff[] | null) || [];
     },
-    async addInternalStaff(conjuntoId: string, staff: Omit<InternalStaff, 'id'>): Promise<void> {
+    async addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
         const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
         if (error) handleApiError(error, 'addInternalStaff');
     },
     async updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
-        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('id', staff.id).eq('conjunto_id', conjuntoId);
+        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('name', staff.name).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'updateInternalStaff');
     },
-    async deleteInternalStaff(conjuntoId: string, staffId: number): Promise<void> {
-        const { error } = await supabase.from('internal_staff').delete().eq('id', staffId).eq('conjunto_id', conjuntoId);
+    async deleteInternalStaff(conjuntoId: string, staffName: string): Promise<void> {
+        const { error } = await supabase.from('internal_staff').delete().eq('name', staffName).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteInternalStaff');
     },
     async bulkUpsertInternalStaff(conjuntoId: string, staff: any[]): Promise<void> {
-        const payload = staff.map(s => toSupabase({ ...s, id: s.id || undefined, conjuntoId }));
-        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'id,conjunto_id' });
+        const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
+        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'name,conjunto_id' });
         if (error) handleApiError(error, 'bulkUpsertInternalStaff');
     },
 
