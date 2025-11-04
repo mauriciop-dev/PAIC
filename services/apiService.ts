@@ -33,7 +33,7 @@ import { PostgrestError } from '@supabase/supabase-js';
 const handleApiError = (error: any, context: string) => {
     console.error(`Error in ${context}:`, error);
     if (error && error.code === '23505') { // unique_violation (PostgrestError)
-        if (error.message && error.message.includes('platform_users_email_key')) {
+        if (error.message && error.message.includes('users_email_key')) {
             throw new Error('Ya existe un usuario con este correo electrónico.');
         }
         throw new Error('Este registro ya existe o viola una restricción de unicidad.');
@@ -70,7 +70,7 @@ export const apiService = {
         return !!data;
     },
     async findUserByEmail(email: string): Promise<PlatformUser | null> {
-        const { data, error } = await supabase.from('platform_users').select('*').eq('email', email).single();
+        const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
         if (error) {
             if (error.code !== 'PGRST116') {
                 handleApiError(error, `findUserByEmail for ${email}`);
@@ -187,7 +187,7 @@ export const apiService = {
     },
 
     async fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
-        const { data, error } = await supabase.from('platform_users').select('*').eq('conjunto_id', conjuntoId);
+        const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
         if (error) { handleApiError(error, 'fetchUsers'); return []; }
         return fromSupabase(data) as PlatformUser[];
     },
@@ -213,7 +213,7 @@ export const apiService = {
         return Promise.resolve();
     },
     async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
-        const { error } = await supabase.from('platform_users').insert(toSupabase({ ...user, conjuntoId }));
+        const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));
         if (error) handleApiError(error, 'addUser');
     },
     async updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
@@ -222,11 +222,11 @@ export const apiService = {
         if (!updatePayload.password || updatePayload.password.trim() === '') {
             delete (updatePayload as Partial<PlatformUser>).password;
         }
-        const { error } = await supabase.from('platform_users').update(toSupabase(updatePayload)).eq('id', user.id).eq('conjunto_id', conjuntoId);
+        const { error } = await supabase.from('users').update(toSupabase(updatePayload)).eq('id', user.id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'updateUser');
     },
     async deleteUser(conjuntoId: string, userId: number): Promise<void> {
-        const { error } = await supabase.from('platform_users').delete().eq('id', userId).eq('conjunto_id', conjuntoId);
+        const { error } = await supabase.from('users').delete().eq('id', userId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteUser');
     },
 
