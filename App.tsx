@@ -8,7 +8,7 @@ import InitialSetupModal from './components/InitialSetupModal';
 import SettingsModal from './components/SettingsModal';
 import LoginView from './components/views/LoginView';
 import SuperAdminDashboard from './components/views/SuperAdminDashboard';
-import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog } from './types';
+import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog, PlatformUser } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 import { Icon } from './components/ui/Icon';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
@@ -72,6 +72,23 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
+                // FIX: Ensures the admin user exists in the `users` table to satisfy RLS policies.
+                // This handles existing admins who logged in before this logic was added.
+                if (parsedUser.role === UserRole.Admin) {
+                    const dbUser = await apiService.findUserByEmail(parsedUser.email);
+                    if (!dbUser) {
+                        console.log(`Admin user ${parsedUser.email} not in DB, creating entry for RLS.`);
+                        const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
+                            name: parsedUser.name,
+                            email: parsedUser.email,
+                            phoneNumber: parsedUser.phoneNumber,
+                            role: UserRole.Admin,
+                            conjuntoId: parsedUser.conjuntoId,
+                        };
+                        await apiService.addUser(parsedUser.conjuntoId, adminForDb);
+                    }
+                }
+
                 await apiService.seedDatabase(parsedUser.conjuntoId); // Seed database if empty
                 let infoToSet: ConjuntoInfo | null = null;
                 const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
@@ -228,6 +245,22 @@ const App: React.FC = () => {
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     // 1. Persist the new info to our simulated backend
     await apiService.updateConjuntoInfo(info);
+
+    // FIX: After creating the conjunto, create the admin user record.
+    // This is crucial for RLS policies on other tables to work correctly.
+    if (userProfile && userProfile.role === UserRole.Admin) {
+        const dbUser = await apiService.findUserByEmail(userProfile.email);
+        if (!dbUser) {
+            const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
+                name: info.adminName,
+                email: info.adminEmail,
+                phoneNumber: info.adminPhone,
+                role: UserRole.Admin,
+                conjuntoId: info.id,
+            };
+            await apiService.addUser(info.id, adminForDb);
+        }
+    }
 
     // 2. Update the local state to trigger re-render
     setConjuntoInfo(info);
