@@ -172,6 +172,7 @@ export interface VisitorLog {
     status: 'Autorizado' | 'Ingresó' | 'Salió';
     entryTime?: string;
     exitTime?: string;
+    conjuntoId?: string;
 }
 
 export interface PackageLog {
