@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserRoleDefinition, Tab, PlatformUser } from '../types';
+import { UserRoleDefinition, Tab, PlatformUser, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 
 interface RoleModalProps {
@@ -9,11 +9,20 @@ interface RoleModalProps {
   onSave: (role: UserRoleDefinition, userIdToAssign?: number) => void;
   users: PlatformUser[];
   allRoles: UserRoleDefinition[];
+  error?: string | null;
 }
 
 const allPermissions = Object.values(Tab);
 
-const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSave, users, allRoles }) => {
+const getBasePermissions = (roleName: UserRole | string): Tab[] => {
+    switch (roleName) {
+        case UserRole.Guard: return [Tab.Seguridad];
+        case UserRole.Contador: return [Tab.Finanzas];
+        default: return [];
+    }
+};
+
+const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSave, users, allRoles, error }) => {
   const [formData, setFormData] = useState<Partial<UserRoleDefinition>>({ name: '', permissions: [] });
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const isNew = !roleToEdit;
@@ -50,17 +59,27 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
     const userId = e.target.value;
     setSelectedUserId(userId);
     if (userId) {
-      const user = users.find(u => u.id === parseInt(userId, 10));
-      if (user) {
-        const userRoleDef = allRoles.find(r => r.name === user.role);
-        setFormData({
-          name: `Personalizado para ${user.name}`, // Auto-generated name
-          permissions: userRoleDef ? userRoleDef.permissions : [],
-        });
-      }
+        const user = users.find(u => u.id === parseInt(userId, 10));
+        if (user) {
+            const userCustomRoleDef = allRoles.find(r => r.name === user.role);
+
+            let initialPermissions: Tab[] = [];
+            let roleName = `Personalizado para ${user.name}`;
+
+            if (userCustomRoleDef) {
+                initialPermissions = userCustomRoleDef.permissions;
+                roleName = userCustomRoleDef.name;
+            } else {
+                initialPermissions = getBasePermissions(user.role);
+            }
+
+            setFormData({
+                name: roleName,
+                permissions: initialPermissions,
+            });
+        }
     } else {
-      // This case is not reachable if dropdown is required, but good practice
-      setFormData({ name: '', permissions: [] });
+        setFormData({ name: '', permissions: [] });
     }
   };
 
@@ -120,6 +139,7 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
                     ))}
                 </div>
             </div>
+            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
           <div className="mt-8 flex justify-end gap-4">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
             <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar</button>

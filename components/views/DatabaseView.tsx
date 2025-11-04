@@ -94,7 +94,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const handleProviderModalOpen = (provider: Provider | null) => { setSelectedProvider(provider); setIsProviderModalOpen(true); };
   const handleStaffModalOpen = (staff: InternalStaff | null) => { setSelectedStaff(staff); setIsStaffModalOpen(true); };
   const handleAccountStatusModalOpen = (account: AccountStatus | null) => { setSelectedAccountStatus(account); setIsAccountStatusModalOpen(true); };
-  const handleRoleModalOpen = (role: UserRoleDefinition | null) => { setSelectedRole(role); setIsRoleModalOpen(true); };
+  const handleRoleModalOpen = (role: UserRoleDefinition | null) => { setModalError(null); setSelectedRole(role); setIsRoleModalOpen(true); };
 
   // Save Handlers
   const handleSaveUser = async (user: PlatformUser) => {
@@ -159,25 +159,47 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   
   const handleSaveRole = async (role: UserRoleDefinition, userIdToAssign?: number) => {
     if (!userProfile.conjuntoId) return;
-    if (selectedRole) {
-        await apiService.updateRole(userProfile.conjuntoId, role);
-    } else {
-        const newRole = {
-            ...role,
-            id: `${role.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
-        };
-        await apiService.addRole(userProfile.conjuntoId, newRole);
-        if (userIdToAssign) {
-            const user = platformUsers.find(u => u.id === userIdToAssign);
-            if (user) {
-                const userToUpdate = { ...user, role: newRole.name };
-                await apiService.updateUser(userProfile.conjuntoId, userToUpdate);
-            }
+    setModalError(null);
+
+    try {
+        if (!userIdToAssign) {
+            throw new Error("Se debe seleccionar un usuario para asignar los permisos.");
         }
+        const user = platformUsers.find(u => u.id === userIdToAssign);
+        if (!user) {
+            throw new Error("Usuario no encontrado.");
+        }
+
+        const defaultRoles = Object.values(UserRole);
+        const userHasCustomRole = user.role && !defaultRoles.includes(user.role as UserRole);
+        const existingCustomRole = userHasCustomRole ? roles.find(r => r.name === user.role) : null;
+
+        if (existingCustomRole) {
+            const updatedRole = {
+                ...existingCustomRole,
+                permissions: role.permissions,
+            };
+            await apiService.updateRole(userProfile.conjuntoId, updatedRole);
+        } else {
+            const roleName = `Personalizado para ${user.name}`;
+            const newRolePayload = {
+                name: roleName,
+                permissions: role.permissions,
+            };
+
+            await apiService.addRole(userProfile.conjuntoId, newRolePayload);
+            
+            const userToUpdate = { ...user, role: roleName };
+            await apiService.updateUser(userProfile.conjuntoId, userToUpdate);
+        }
+        
+        await fetchData();
+        setIsRoleModalOpen(false);
+
+    } catch (error: any) {
+        console.error("Error saving role:", error);
+        setModalError(error.message || "Ocurrió un error inesperado.");
     }
-    
-    await fetchData();
-    setIsRoleModalOpen(false);
   };
 
   // Delete Handlers
@@ -643,6 +665,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
           onSave={handleSaveRole}
           users={platformUsers}
           allRoles={roles}
+          error={modalError}
         />
       )}
       {isUserModalOpen && (
