@@ -26,6 +26,8 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+
 
     // Form states
     const [expenseDescription, setExpenseDescription] = useState('');
@@ -237,38 +239,66 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         XLSX.writeFile(wb, filename);
     };
 
+    const monthOptions = useMemo(() => {
+        const options: { value: string; label: string }[] = [];
+        const today = new Date();
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const value = d.toISOString().slice(0, 7); // "YYYY-MM" format
+            const label = d.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+            options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+        }
+        return options;
+    }, []);
+
     const { summary, charts } = useMemo(() => {
-        if (!chartData) {
+        if (!chartData || !expenses || !incomes) {
             return { summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 }, charts: { expenseChartData: [], incomeVsExpenseData: [] } };
         }
-
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
+    
+        const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+        const currentMonth = selectedMonthNum - 1; // JS months are 0-indexed
+        const currentYear = selectedYear;
+    
         const thisMonthFilter = (item: { date: string }) => {
+            if (!item.date) return false;
             const itemDate = new Date(item.date + 'T00:00:00Z');
             return itemDate.getUTCMonth() === currentMonth && itemDate.getUTCFullYear() === currentYear;
         };
-
-        const thisMonthExpenses = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
-        const thisMonthIncomes = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
-            
-        const budgetExecution = thisMonthIncomes > 0 ? (thisMonthExpenses / thisMonthIncomes) * 100 : 0;
-
+    
+        const thisMonthExpensesAmount = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
+        const thisMonthIncomesAmount = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
+    
+        const budgetExecution = thisMonthIncomesAmount > 0 ? (thisMonthExpensesAmount / thisMonthIncomesAmount) * 100 : 0;
+    
+        const currentMonthExpensesForPie = expenses.filter(thisMonthFilter);
+        const expensesByCategoryForPie: ChartData[] = currentMonthExpensesForPie.reduce((acc, expense) => {
+            let category = acc.find(c => c.name === expense.category);
+            if (!category) {
+                category = { name: expense.category, value: 0, fill: '' };
+                acc.push(category);
+            }
+            category.value += expense.amount;
+            return acc;
+        }, [] as ChartData[]).map((cat, i) => {
+            const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+            cat.fill = colors[i % colors.length];
+            return cat;
+        });
+    
         return {
             summary: {
-                thisMonthIncome: thisMonthIncomes,
-                thisMonthExpenses,
-                currentBalance: thisMonthIncomes - thisMonthExpenses,
+                thisMonthIncome: thisMonthIncomesAmount,
+                thisMonthExpenses: thisMonthExpensesAmount,
+                currentBalance: thisMonthIncomesAmount - thisMonthExpensesAmount,
                 budgetExecution: Math.min(100, budgetExecution),
             },
             charts: {
-                expenseChartData: chartData.expensesByCategory,
+                expenseChartData: expensesByCategoryForPie,
                 incomeVsExpenseData: chartData.monthlyIncomeVsExpense,
             }
         };
-    }, [expenses, incomes, chartData]);
+    }, [expenses, incomes, chartData, selectedMonth]);
     
     const expenseCategories: ExpenseCategory[] = ['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'];
     const incomeCategories: IncomeCategory[] = ['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'];
@@ -461,7 +491,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
 
     return (
         <div className="space-y-6">
-             <div className="mb-4 border-b border-gray-200">
+             <div className="mb-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-y-2">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     {(['Resumen', 'Gastos', 'Ingresos'] as FinanzasTab[]).map(tab => (
                         <button
@@ -477,6 +507,22 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                         </button>
                     ))}
                 </nav>
+                {activeTab === 'Resumen' && (
+                    <div className="flex items-center gap-2 pr-1">
+                        <label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Mes:</label>
+                        <select
+                            id="month-filter"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="py-1 pl-2 pr-8 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            aria-label="Seleccionar mes a visualizar"
+                        >
+                            {monthOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
             {isLoading ? <div className="text-center p-10">Cargando datos financieros...</div> : renderContent()}
         </div>
