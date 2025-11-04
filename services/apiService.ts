@@ -165,24 +165,33 @@ export const apiService = {
             }));
             await supabase.from('bookings').insert(bookingsSeed.map(b => ({...b, conjunto_id: conjuntoId})));
 
-            const startDate = new Date('2025-01-01T00:00:00Z');
-            const endDate = new Date('2025-11-04T23:59:59Z');
+            // Generate financial data for the last 12 months for realism
+            const today = new Date();
+            const expensesSeed: any[] = [];
+            const incomesSeed: any[] = [];
+            for (let i = 11; i >= 0; i--) {
+                const monthStartDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                const monthEndDate = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
 
-            const expensesSeed = Array.from({ length: 200 }, () => ({
-                description: getRandomElement(expenseItems),
-                amount: getRandomNumber(50000, 2000000),
-                category: getRandomElement(['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'] as ExpenseCategory[]),
-                date: getRandomDate(startDate, endDate).toISOString().split('T')[0],
-                provider_id: Math.random() < 0.5 ? getRandomElement(providerIds) : null
-            }));
+                for (let j = 0; j < getRandomNumber(15, 25); j++) {
+                    expensesSeed.push({
+                        description: getRandomElement(expenseItems),
+                        amount: getRandomNumber(50000, 2000000),
+                        category: getRandomElement(['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'] as ExpenseCategory[]),
+                        date: getRandomDate(monthStartDate, monthEndDate).toISOString().split('T')[0],
+                        provider_id: Math.random() < 0.5 ? getRandomElement(providerIds) : null
+                    });
+                }
+                 for (let k = 0; k < getRandomNumber(20, 30); k++) {
+                    incomesSeed.push({
+                        description: getRandomElement(incomeItems),
+                        amount: getRandomNumber(100000, 500000),
+                        category: getRandomElement(['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'] as IncomeCategory[]),
+                        date: getRandomDate(monthStartDate, monthEndDate).toISOString().split('T')[0],
+                    });
+                }
+            }
             await supabase.from('expenses').insert(expensesSeed.map(e => ({...e, conjunto_id: conjuntoId})));
-            
-            const incomesSeed = Array.from({ length: 200 }, () => ({
-                description: getRandomElement(incomeItems),
-                amount: getRandomNumber(100000, 500000),
-                category: getRandomElement(['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'] as IncomeCategory[]),
-                date: getRandomDate(startDate, endDate).toISOString().split('T')[0],
-            }));
             await supabase.from('incomes').insert(incomesSeed.map(i => ({...i, conjunto_id: conjuntoId})));
 
             const visitorLogsSeed = Array.from({ length: 50 }, () => {
@@ -842,17 +851,15 @@ export const apiService = {
         ]);
     
         const totalPotentialIncome = accounts.reduce((sum, acc) => sum + acc.adminFeeValue, 0);
+        const now = new Date();
     
-        // --- 1. Expenses by Category (for the latest month with data, Nov 2025) ---
-        const latestDataMonth = 10; // November (0-indexed)
-        const latestDataYear = 2025;
-        
-        const latestMonthExpenses = expenses.filter(e => {
-            const expenseDate = new Date(e.date);
-            return expenseDate.getUTCFullYear() === latestDataYear && expenseDate.getUTCMonth() === latestDataMonth;
+        // --- 1. Expenses by Category (for the current calendar month) ---
+        const currentMonthExpenses = expenses.filter(e => {
+            const expenseDate = new Date(e.date + 'T00:00:00Z');
+            return expenseDate.getUTCFullYear() === now.getUTCFullYear() && expenseDate.getUTCMonth() === now.getUTCMonth();
         });
     
-        const expensesByCategory: ChartData[] = latestMonthExpenses.reduce((acc, expense) => {
+        const expensesByCategory: ChartData[] = currentMonthExpenses.reduce((acc, expense) => {
             let category = acc.find(c => c.name === expense.category);
             if (!category) {
                 category = { name: expense.category, value: 0, fill: '' };
@@ -866,12 +873,10 @@ export const apiService = {
             return cat;
         });
     
-        // --- 2. Monthly Income vs. Expense (for the 12 months ending in Nov 2025) ---
+        // --- 2. Monthly Income vs. Expense (for the last 6 months) ---
         const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
-        const chartEndDate = new Date(latestDataYear, latestDataMonth, 1);
-    
-        for (let i = 11; i >= 0; i--) {
-            const d = new Date(chartEndDate.getFullYear(), chartEndDate.getMonth() - i, 1);
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const year = d.getFullYear();
             const month = d.getMonth();
             const key = `${year}-${String(month + 1).padStart(2, '0')}`;

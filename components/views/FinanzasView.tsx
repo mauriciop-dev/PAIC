@@ -242,12 +242,13 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             return { summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 }, charts: { expenseChartData: [], incomeVsExpenseData: [] } };
         }
 
-        // Use November 2025 as the "current" month for summary cards to match seeded data
-        const latestDataMonth = 10; // November
-        const latestDataYear = 2025;
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
         const thisMonthFilter = (item: { date: string }) => {
             const itemDate = new Date(item.date + 'T00:00:00Z');
-            return itemDate.getUTCMonth() === latestDataMonth && itemDate.getUTCFullYear() === latestDataYear;
+            return itemDate.getUTCMonth() === currentMonth && itemDate.getUTCFullYear() === currentYear;
         };
 
         const thisMonthExpenses = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
@@ -301,7 +302,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </ResponsiveContainer>
                 </div>
                 <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Registrados) vs. Gastos</h3>
+                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Registrados) vs. Gastos (Últimos 6 meses)</h3>
                      <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={charts.incomeVsExpenseData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
