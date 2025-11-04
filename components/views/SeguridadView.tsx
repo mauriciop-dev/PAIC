@@ -22,6 +22,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [residents, setResidents] = useState<Resident[]>([]);
     const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [updatingLogId, setUpdatingLogId] = useState<number | null>(null);
 
     // Package Form State
     const [pkgApartment, setPkgApartment] = useState('');
@@ -139,54 +140,38 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     };
 
     const handleRegisterEntry = async (logId: number) => {
-        if (!userProfile.conjuntoId) return;
-        const now = formatTime(new Date());
-        const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
-
-        // Optimistic UI Update
-        setVisitorLogs(currentLogs =>
-            currentLogs.map(log =>
-                log.id === logId
-                    ? { ...log, status: 'Ingresó', entryTime: now, accessPointId: firstAccessPointId }
-                    : log
-            )
-        );
-
+        if (!userProfile.conjuntoId || updatingLogId) return;
+        setUpdatingLogId(logId);
         try {
+            const now = formatTime(new Date());
+            const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
             await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
                 status: 'Ingresó',
                 entryTime: now,
                 accessPointId: firstAccessPointId,
             });
+            await fetchData();
         } catch (error) {
             console.error("Failed to register entry:", error);
-            // Revert state on failure by refetching from the database
-            fetchData(); 
+        } finally {
+            setUpdatingLogId(null);
         }
     };
 
     const handleRegisterExit = async (logId: number) => {
-        if (!userProfile.conjuntoId) return;
-        const now = formatTime(new Date());
-
-        // Optimistic UI Update
-        setVisitorLogs(currentLogs =>
-            currentLogs.map(log =>
-                log.id === logId
-                    ? { ...log, status: 'Salió', exitTime: now }
-                    : log
-            )
-        );
-        
+        if (!userProfile.conjuntoId || updatingLogId) return;
+        setUpdatingLogId(logId);
         try {
+            const now = formatTime(new Date());
             await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
                 status: 'Salió',
                 exitTime: now,
             });
+            await fetchData();
         } catch (error) {
              console.error("Failed to register exit:", error);
-            // Revert state on failure
-            fetchData();
+        } finally {
+            setUpdatingLogId(null);
         }
     };
 
@@ -274,15 +259,17 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                                      {log.status === 'Autorizado' && (
                                          <button 
                                             onClick={() => handleRegisterEntry(log.id)}
-                                            className="font-medium text-blue-600 hover:underline text-xs">
-                                            Registrar Ingreso
+                                            disabled={updatingLogId === log.id}
+                                            className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:cursor-wait">
+                                            {updatingLogId === log.id ? 'Registrando...' : 'Registrar Ingreso'}
                                          </button>
                                      )}
                                      {log.status === 'Ingresó' && (
                                          <button 
                                             onClick={() => handleRegisterExit(log.id)}
-                                            className="font-medium text-green-600 hover:underline text-xs">
-                                            Registrar Salida
+                                            disabled={updatingLogId === log.id}
+                                            className="font-medium text-green-600 hover:underline text-xs disabled:text-gray-400 disabled:cursor-wait">
+                                            {updatingLogId === log.id ? 'Registrando...' : 'Registrar Salida'}
                                          </button>
                                      )}
                                      {log.status === 'Salió' && (

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, UserProfile } from '../types';
+import { Message, UserProfile, ConjuntoInfo } from '../types';
 import { Icon } from './ui/Icon';
 import { geminiService } from '../services/geminiService';
 
@@ -7,25 +7,22 @@ interface ChatbotProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   userProfile: UserProfile | null;
+  conjuntoInfo: ConjuntoInfo | null;
 }
 
-const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    { sender: 'ai', text: `¡Hola! Soy PAIC, tu asistente inteligente. Estoy aquí para ayudarte a administrar tu conjunto.
-
-¿Qué necesitas hacer hoy? Puedes escribirlo o elegir una de estas opciones comunes:
-
-1. Registrar un gasto o ingreso.
-2. Crear un recordatorio de tarea.
-3. Consultar el saldo de un apartamento (ej: "cuánto debe el apto 101?")
-4. Enviar un comunicado a los residentes.
-5. Agendar un área común (ej: "reservar el BBQ para el sábado")
-
-También puedo ayudarte a cargar datos desde un archivo Excel.` }
-  ]);
+const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conjuntoInfo }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (userProfile && conjuntoInfo && messages.length === 0) {
+        setMessages([
+            { sender: 'ai', text: `Hola ${userProfile.name}, soy PAIC y te ayudaré a administrar ${conjuntoInfo.name}.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
+        ]);
+    }
+  }, [userProfile, conjuntoInfo, isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,8 +42,7 @@ También puedo ayudarte a cargar datos desde un archivo Excel.` }
     setIsLoading(true);
 
     try {
-      // FIX: Pass userProfile.conjuntoId to runChat for tenant-specific context.
-      const aiResponseText = await geminiService.runChat(currentInput, userProfile?.conjuntoId);
+      const aiResponseText = await geminiService.runChat(currentInput, userProfile, conjuntoInfo);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {

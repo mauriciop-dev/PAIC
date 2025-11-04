@@ -297,7 +297,7 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
       <NotificationToast message={notification} onClose={() => setNotification(null)} />
-      <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} />
+      <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       
       {userProfile.role === UserRole.Admin && (
         <div className={`fixed top-0 left-0 h-full z-20 transition-opacity duration-300 ease-in-out ${isChatbotOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>

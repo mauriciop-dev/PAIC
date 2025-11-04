@@ -302,6 +302,11 @@ export const apiService = {
         }
         return (fromSupabase(data) as Resident[] | null) || [];
     },
+    async fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
+        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+        if (error) { handleApiError(error, `fetchResidentByApartment for apt ${apartment}`); return null; }
+        return fromSupabase(data) as Resident | null;
+    },
      async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
         const { error } = await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
         if (error) handleApiError(error, 'addResident');
@@ -358,6 +363,11 @@ export const apiService = {
             return [];
         }
         return (fromSupabase(data) as Provider[] | null) || [];
+    },
+    async fetchProviderById(conjuntoId: string, id: number): Promise<Provider | null> {
+        const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId).eq('id', id).single();
+        if (error) { handleApiError(error, `fetchProviderById for id ${id}`); return null; }
+        return fromSupabase(data) as Provider | null;
     },
      async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
         const { error } = await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
@@ -423,6 +433,11 @@ export const apiService = {
         }
         return (fromSupabase(data) as InternalStaff[] | null) || [];
     },
+    async fetchInternalStaffByName(conjuntoId: string, name: string): Promise<InternalStaff | null> {
+        const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId).eq('name', name).single();
+        if (error) { handleApiError(error, `fetchInternalStaffByName for name ${name}`); return null; }
+        return fromSupabase(data) as InternalStaff | null;
+    },
     async addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
         const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
         if (error) handleApiError(error, 'addInternalStaff');
@@ -483,6 +498,11 @@ export const apiService = {
             return [];
         }
         return (fromSupabase(data) as PlatformUser[] | null) || [];
+    },
+    async fetchUserById(conjuntoId: string, id: number): Promise<PlatformUser | null> {
+        const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId).eq('id', id).single();
+        if (error) { handleApiError(error, `fetchUserById for id ${id}`); return null; }
+        return fromSupabase(data) as PlatformUser | null;
     },
     async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
         const { data, error } = await supabase.from('user_roles').select('*').eq('conjunto_id', conjuntoId);
@@ -788,9 +808,7 @@ export const apiService = {
     
         const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
         const visitorTrafficData: Record<string, number> = {};
-        // FIX: Explicitly cast the data from Supabase to resolve the "Type 'unknown' cannot be used as an index type" error.
-        // This ensures TypeScript understands the shape of the `log` object.
-// FIX: Explicitly cast the data from Supabase to resolve the "Type 'unknown' cannot be used as an index type" error. This ensures TypeScript understands the shape of the `log` object.
+        // FIX: Explicitly cast the `visitorRes.data` array to ensure `log` is correctly typed, resolving the "Type 'unknown' cannot be used as an index type" error.
         (visitorRes.data as { access_point_id: number }[] || []).forEach(log => {
             const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
