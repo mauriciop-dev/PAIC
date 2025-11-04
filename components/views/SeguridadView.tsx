@@ -9,7 +9,7 @@ interface SeguridadViewProps {
 }
 
 const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
-    const [activeTab, setActiveTab] = useState<SeguridadTab>('Paquetes');
+    const [activeTab, setActiveTab] = useState<SeguridadTab>('Visitantes');
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
     const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
     const [residents, setResidents] = useState<Resident[]>([]);
@@ -101,38 +101,46 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         fetchData();
     };
 
-    const handleRegisterVisitorEntry = async (e: React.FormEvent) => {
+    const handleAuthorizeVisitor = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!visitorName || !visitorApartment || !userProfile.conjuntoId) return;
 
         setIsSubmittingVisitor(true);
         setVisitorFeedback(null);
         try {
-            const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
             await apiService.addVisitorLog(userProfile.conjuntoId, {
                 visitorName,
                 apartment: visitorApartment,
                 date: visitorDate,
-                status: 'Ingresó',
-                entryTime: now
+                status: 'Autorizado',
             });
             
             setVisitorName('');
-            setVisitorFeedback('¡Ingreso de visitante registrado exitosamente!');
+            setVisitorFeedback('¡Visitante autorizado exitosamente!');
             setTimeout(() => setVisitorFeedback(null), 3000);
             
             fetchData();
         } catch (error) {
-            console.error("Error registering visitor entry:", error);
-            setVisitorFeedback("Error al registrar el ingreso del visitante.");
+            console.error("Error authorizing visitor:", error);
+            setVisitorFeedback("Error al autorizar al visitante.");
         } finally {
             setIsSubmittingVisitor(false);
         }
     };
 
+    const handleRegisterEntry = async (logId: number) => {
+        if (!userProfile.conjuntoId) return;
+        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+            status: 'Ingresó',
+            entryTime: now,
+        });
+        fetchData();
+    };
+
     const handleRegisterExit = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
-        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
         await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
             status: 'Salió',
             exitTime: now,
@@ -142,8 +150,8 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
 
     const renderVisitorForm = () => (
         <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Ingreso de Visitante</h3>
-            <form onSubmit={handleRegisterVisitorEntry} className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Autorizar Ingreso de Visitante</h3>
+            <form onSubmit={handleAuthorizeVisitor} className="space-y-4">
                  <div>
                     <label htmlFor="visitorName" className="block text-sm font-medium text-gray-700">Nombre del Visitante</label>
                     <input type="text" id="visitorName" value={visitorName} onChange={e => setVisitorName(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
@@ -159,7 +167,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                     <input type="date" id="visitDate" value={visitorDate} onChange={e => setVisitorDate(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
                 </div>
                 <button type="submit" disabled={isSubmittingVisitor} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
-                    {isSubmittingVisitor ? 'Registrando...' : 'Registrar Ingreso'}
+                    {isSubmittingVisitor ? 'Autorizando...' : 'Autorizar Ingreso'}
                 </button>
                 {visitorFeedback && <p className="text-sm text-green-600 text-center">{visitorFeedback}</p>}
             </form>
@@ -204,7 +212,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                             <th scope="col" className="px-6 py-3">Estado</th>
                             <th scope="col" className="px-6 py-3">Hora Ingreso</th>
                             <th scope="col" className="px-6 py-3">Hora Salida</th>
-                            <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                            <th scope="col" className="px-6 py-3 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -220,13 +228,24 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                                 </td>
                                 <td className="px-6 py-4">{log.entryTime || 'N/A'}</td>
                                 <td className="px-6 py-4">{log.exitTime || 'N/A'}</td>
-                                <td className="px-6 py-4 text-right">
-                                     <button 
-                                        onClick={() => handleRegisterExit(log.id)}
-                                        disabled={log.status !== 'Ingresó'}
-                                        className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed">
-                                        Registrar Salida
-                                     </button>
+                                <td className="px-6 py-4 text-center">
+                                     {log.status === 'Autorizado' && (
+                                         <button 
+                                            onClick={() => handleRegisterEntry(log.id)}
+                                            className="font-medium text-blue-600 hover:underline text-xs">
+                                            Registrar Ingreso
+                                         </button>
+                                     )}
+                                     {log.status === 'Ingresó' && (
+                                         <button 
+                                            onClick={() => handleRegisterExit(log.id)}
+                                            className="font-medium text-green-600 hover:underline text-xs">
+                                            Registrar Salida
+                                         </button>
+                                     )}
+                                     {log.status === 'Salió' && (
+                                         <span className="text-gray-500 text-xs font-medium">Visita Completada</span>
+                                     )}
                                 </td>
                             </tr>
                         ))}
