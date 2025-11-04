@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import { 
@@ -360,10 +359,48 @@ export const apiService = {
         const { error } = await supabase.from('providers').delete().eq('id', providerId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteProvider');
     },
-    async bulkUpsertProviders(conjuntoId: string, providers: any[]): Promise<void> {
-        const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
-        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'company,conjunto_id' });
-        if (error) handleApiError(error, 'bulkUpsertProviders');
+    async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
+        // Step 1: Fetch existing providers to know who to update vs. insert
+        const { data: existingData, error: fetchError } = await supabase
+            .from('providers')
+            .select('company')
+            .eq('conjunto_id', conjuntoId);
+
+        if (fetchError) handleApiError(fetchError, 'bulkUpsertProviders (fetch)');
+
+        const existingCompanies = new Set(existingData?.map(p => p.company) || []);
+
+        // Step 2: Partition the incoming data
+        const providersToInsert = [];
+        const providersToUpdate = [];
+
+        for (const provider of providers) {
+            if (existingCompanies.has(provider.company)) {
+                providersToUpdate.push(provider);
+            } else {
+                providersToInsert.push(provider);
+            }
+        }
+
+        // Step 3: Execute the operations
+        if (providersToInsert.length > 0) {
+            const payload = providersToInsert.map(p => toSupabase({ ...p, conjuntoId }));
+            const { error: insertError } = await supabase.from('providers').insert(payload);
+            if (insertError) handleApiError(insertError, 'bulkUpsertProviders (insert)');
+        }
+
+        if (providersToUpdate.length > 0) {
+            const updatePromises = providersToUpdate.map(p =>
+                supabase.from('providers')
+                    .update(toSupabase(p))
+                    .eq('company', p.company)
+                    .eq('conjunto_id', conjuntoId)
+            );
+            const results = await Promise.all(updatePromises);
+            results.forEach(res => {
+                if (res.error) handleApiError(res.error, 'bulkUpsertProviders (update)');
+            });
+        }
     },
 
     async fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
@@ -386,10 +423,45 @@ export const apiService = {
         const { error } = await supabase.from('internal_staff').delete().eq('name', staffName).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteInternalStaff');
     },
-    async bulkUpsertInternalStaff(conjuntoId: string, staff: any[]): Promise<void> {
-        const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
-        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'name,conjunto_id' });
-        if (error) handleApiError(error, 'bulkUpsertInternalStaff');
+    async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
+        const { data: existingData, error: fetchError } = await supabase
+            .from('internal_staff')
+            .select('name')
+            .eq('conjunto_id', conjuntoId);
+
+        if (fetchError) handleApiError(fetchError, 'bulkUpsertInternalStaff (fetch)');
+
+        const existingNames = new Set(existingData?.map(s => s.name) || []);
+        
+        const staffToInsert = [];
+        const staffToUpdate = [];
+
+        for (const person of staff) {
+            if (existingNames.has(person.name)) {
+                staffToUpdate.push(person);
+            } else {
+                staffToInsert.push(person);
+            }
+        }
+        
+        if (staffToInsert.length > 0) {
+            const payload = staffToInsert.map(s => toSupabase({ ...s, conjuntoId }));
+            const { error: insertError } = await supabase.from('internal_staff').insert(payload);
+            if (insertError) handleApiError(insertError, 'bulkUpsertInternalStaff (insert)');
+        }
+
+        if (staffToUpdate.length > 0) {
+            const updatePromises = staffToUpdate.map(s =>
+                supabase.from('internal_staff')
+                    .update(toSupabase(s))
+                    .eq('name', s.name)
+                    .eq('conjunto_id', conjuntoId)
+            );
+             const results = await Promise.all(updatePromises);
+            results.forEach(res => {
+                if (res.error) handleApiError(res.error, 'bulkUpsertInternalStaff (update)');
+            });
+        }
     },
 
     async fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
