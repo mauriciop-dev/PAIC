@@ -609,6 +609,11 @@ export const apiService = {
         const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteExpense');
     },
+    async bulkUpsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
+        const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
+        const { error } = await supabase.from('expenses').insert(payload);
+        if(error) handleApiError(error, 'bulkUpsertExpenses');
+    },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
         const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
         if (error) {
@@ -624,6 +629,11 @@ export const apiService = {
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {
         const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteIncome');
+    },
+    async bulkUpsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
+        const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
+        const { error } = await supabase.from('incomes').insert(payload);
+        if(error) handleApiError(error, 'bulkUpsertIncomes');
     },
     
     // Security

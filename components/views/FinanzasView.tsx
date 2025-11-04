@@ -145,8 +145,84 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        // ... (Implementation for bulk upload would go here)
-        console.log("File upload not fully implemented in bulk yet.");
+        const file = event.target.files?.[0];
+        if (!file || !userProfile.conjuntoId) return;
+
+        setIsUploading(true);
+        setUploadFeedback(null);
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
+
+                if (json.length === 0) {
+                    throw new Error("El archivo está vacío o tiene un formato incorrecto.");
+                }
+
+                const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
+                    return data.map((row: any) =>
+                        Object.keys(row).reduce((acc: any, key: string) => {
+                            if (allowedKeys.has(key)) {
+                                acc[key] = row[key];
+                            }
+                            return acc;
+                        }, {})
+                    );
+                };
+
+                const formatDate = (dateValue: any): string | null => {
+                     if (!dateValue) return null;
+                     if (dateValue instanceof Date) {
+                        const adjustedDate = new Date(dateValue.getTime() - (dateValue.getTimezoneOffset() * 60000));
+                        return isNaN(adjustedDate.getTime()) ? null : adjustedDate.toISOString().split('T')[0];
+                     }
+                     const parsedDate = new Date(dateValue);
+                     if (!isNaN(parsedDate.getTime())) {
+                        const adjustedDate = new Date(parsedDate.getTime() - (parsedDate.getTimezoneOffset() * 60000));
+                        return adjustedDate.toISOString().split('T')[0];
+                     }
+                     return null;
+                };
+
+                if (activeTab === 'Gastos') {
+                    const expenseKeys = new Set(['description', 'amount', 'category', 'date', 'providerId']);
+                    const sanitizedExpenses = sanitizeData(json, expenseKeys);
+                    const formattedExpenses = sanitizedExpenses.map((exp: any) => ({
+                        ...exp,
+                        amount: parseFloat(exp.amount) || 0,
+                        date: formatDate(exp.date) || new Date().toISOString().split('T')[0],
+                        providerId: exp.providerId ? parseInt(exp.providerId, 10) : null,
+                    }));
+                    await apiService.bulkUpsertExpenses(userProfile.conjuntoId!, formattedExpenses);
+                } else if (activeTab === 'Ingresos') {
+                    const incomeKeys = new Set(['description', 'amount', 'category', 'date']);
+                    const sanitizedIncomes = sanitizeData(json, incomeKeys);
+                    const formattedIncomes = sanitizedIncomes.map((inc: any) => ({
+                        ...inc,
+                        amount: parseFloat(inc.amount) || 0,
+                        date: formatDate(inc.date) || new Date().toISOString().split('T')[0],
+                    }));
+                    await apiService.bulkUpsertIncomes(userProfile.conjuntoId!, formattedIncomes);
+                }
+
+                setUploadFeedback({ type: 'success', text: `¡${json.length} registros cargados exitosamente!` });
+                await fetchData();
+            } catch (error: any) {
+                setUploadFeedback({ type: 'error', text: `Error al cargar: ${error.message}` });
+            } finally {
+                setIsUploading(false);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+                setTimeout(() => setUploadFeedback(null), 7000);
+            }
+        };
+        reader.readAsArrayBuffer(file);
     };
 
     const handleDownloadTemplate = () => {
@@ -257,11 +333,20 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-700">Últimos Gastos Registrados</h3>
-                  <div className="flex items-center gap-2">
-                    <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
-                  </div>
+                    <h3 className="text-lg font-semibold text-gray-700">Últimos Gastos Registrados</h3>
+                    <div className="flex items-center gap-4">
+                        <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
+                        <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
+                            {isUploading ? 'Cargando...' : 'Cargar Información'}
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                    </div>
                 </div>
+                {uploadFeedback && (
+                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        {uploadFeedback.text}
+                    </p>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
@@ -315,10 +400,19 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-700">Últimos Ingresos Registrados</h3>
-                  <div className="flex items-center gap-2">
-                    <a href="#" onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</a>
+                  <div className="flex items-center gap-4">
+                    <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
+                    <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
+                        {isUploading ? 'Cargando...' : 'Cargar Información'}
+                    </button>
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
                   </div>
                 </div>
+                 {uploadFeedback && (
+                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        {uploadFeedback.text}
+                    </p>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
