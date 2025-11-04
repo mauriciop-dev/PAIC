@@ -330,25 +330,17 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     {activeDbTab === DbTab.Users && (
-                        <>
-                            <button 
-                                onClick={() => handleRoleModalOpen(null)}
-                                className="px-3 py-1.5 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 transition-colors text-xs flex items-center gap-1">
-                              <Icon name="key" className="w-4 h-4" />
-                              Agregar Rol
-                            </button>
-                            <button 
-                                onClick={() => handleUserModalOpen(null)}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
-                              <Icon name="user-plus" className="w-4 h-4" />
-                              Agregar Usuario
-                            </button>
-                        </>
+                        <button 
+                            onClick={() => handleUserModalOpen(null)}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
+                          <Icon name="user-plus" className="w-4 h-4" />
+                          Agregar Usuario
+                        </button>
                     )}
                     {activeDbTab === DbTab.Roles && (
                          <button 
                             onClick={() => handleRoleModalOpen(null)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-md font-semibold hover:bg-green-700 transition-colors text-xs flex items-center gap-1">
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
                           <Icon name="key" className="w-4 h-4" />
                           Agregar Rol
                         </button>
