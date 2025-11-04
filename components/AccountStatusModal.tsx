@@ -56,6 +56,12 @@ const AccountStatusModal: React.FC<AccountStatusModalProps> = ({ isOpen, account
 
             <label htmlFor="adminFeeValue" className="block text-sm font-medium text-gray-700">Valor Cuota Admin.</label>
             <input type="number" id="adminFeeValue" name="adminFeeValue" value={formData.adminFeeValue || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+            
+            <label htmlFor="pendingInstallments" className="block text-sm font-medium text-gray-700">Cuotas Pendientes</label>
+            <input type="number" id="pendingInstallments" name="pendingInstallments" value={formData.pendingInstallments || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+
+            <label htmlFor="otherCharges" className="block text-sm font-medium text-gray-700">Otros Cargos</label>
+            <input type="number" id="otherCharges" name="otherCharges" value={formData.otherCharges || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
 
             <label htmlFor="outstandingBalance" className="block text-sm font-medium text-gray-700">Saldo Pendiente</label>
             <input type="number" id="outstandingBalance" name="outstandingBalance" value={formData.outstandingBalance || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />

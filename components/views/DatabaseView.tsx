@@ -269,7 +269,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               const workbook = XLSX.read(data, { type: 'array' });
               const sheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[sheetName];
-              const json = XLSX.utils.sheet_to_json(worksheet);
+              // FIX: Use { cellDates: true } to correctly parse Excel date serial numbers into JS Date objects.
+              const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
 
               if (json.length === 0) {
                   throw new Error("El archivo está vacío o tiene un formato incorrecto.");
@@ -282,7 +283,15 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                       await apiService.bulkUpsertResidents(userProfile.conjuntoId, json as Resident[]);
                       break;
                   case DbTab.AccountStatus:
-                      await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, json as AccountStatus[]);
+                      // FIX: Format the parsed Date object to 'YYYY-MM-DD' string before sending to DB.
+                      // This corrects for timezone issues and matches the database's expected 'date' type.
+                      const formattedAccounts = json.map((account: any) => ({
+                          ...account,
+                          lastPaymentDate: account.lastPaymentDate
+                            ? new Date(account.lastPaymentDate.getTime() - (account.lastPaymentDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+                            : null,
+                      }));
+                      await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
                       break;
                   case DbTab.Providers:
                       await apiService.bulkUpsertProviders(userProfile.conjuntoId, json as Provider[]);
@@ -522,6 +531,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                               <th scope="col" className="px-6 py-3">Apartamento</th>
                               <th scope="col" className="px-6 py-3">Fecha último pago</th>
                               <th scope="col" className="px-6 py-3">Valor Cuota</th>
+                              <th scope="col" className="px-6 py-3">Cuotas Pendientes</th>
+                              <th scope="col" className="px-6 py-3">Otros Cargos</th>
                               <th scope="col" className="px-6 py-3">Saldo pendiente</th>
                               <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                           </tr>
@@ -532,6 +543,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4 font-medium text-gray-900">{account.apartment}</td>
                                   <td className="px-6 py-4">{account.lastPaymentDate}</td>
                                   <td className="px-6 py-4">${account.adminFeeValue.toLocaleString()}</td>
+                                  <td className="px-6 py-4">{account.pendingInstallments}</td>
+                                  <td className="px-6 py-4">${account.otherCharges.toLocaleString()}</td>
                                   <td className="px-6 py-4 font-semibold">${account.outstandingBalance.toLocaleString()}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                       <button onClick={() => handleAccountStatusModalOpen(account)} className="font-medium text-blue-600 hover:underline">Editar</button>
