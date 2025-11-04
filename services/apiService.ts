@@ -790,6 +790,7 @@ export const apiService = {
         const visitorTrafficData: Record<string, number> = {};
         // FIX: Explicitly cast the data from Supabase to resolve the "Type 'unknown' cannot be used as an index type" error.
         // This ensures TypeScript understands the shape of the `log` object.
+// FIX: Explicitly cast the data from Supabase to resolve the "Type 'unknown' cannot be used as an index type" error. This ensures TypeScript understands the shape of the `log` object.
         (visitorRes.data as { access_point_id: number }[] || []).forEach(log => {
             const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;

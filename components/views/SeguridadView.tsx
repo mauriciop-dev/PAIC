@@ -8,6 +8,13 @@ interface SeguridadViewProps {
     userProfile: UserProfile;
 }
 
+// Helper to format time consistently as HH:mm
+const formatTime = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
 const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [activeTab, setActiveTab] = useState<SeguridadTab>('Visitantes');
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
@@ -133,7 +140,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
 
     const handleRegisterEntry = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
-        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const now = formatTime(new Date());
         const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
 
         // Optimistic UI Update
@@ -160,7 +167,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
 
     const handleRegisterExit = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
-        const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const now = formatTime(new Date());
 
         // Optimistic UI Update
         setVisitorLogs(currentLogs =>
