@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
-import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition } from '../../types';
+import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition, Tab } from '../../types';
 import ResidentModal from '../ResidentModal';
 import ProviderModal from '../ProviderModal';
 import InternalStaffModal from '../InternalStaffModal';
@@ -376,6 +376,21 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         );
     };
 
+    const getPermissionsForRole = (roleName: string, allCustomRoles: UserRoleDefinition[]): string[] => {
+        switch (roleName) {
+            case UserRole.Admin:
+                return Object.values(Tab);
+            case UserRole.Guard:
+                return [Tab.Seguridad];
+            case UserRole.Contador:
+                return [Tab.Finanzas];
+            default:
+                const customRole = allCustomRoles.find(r => r.name === roleName);
+                return customRole ? customRole.permissions : [];
+        }
+    };
+
+
   const renderContent = () => {
       if (isLoading) {
           return <div className="text-center p-10 text-gray-500">Cargando datos...</div>;
@@ -387,22 +402,26 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                  <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
-                            <th scope="col" className="px-6 py-3">Nombre del Rol</th>
+                            <th scope="col" className="px-6 py-3">Nombre de Usuario</th>
                             <th scope="col" className="px-6 py-3">Permisos</th>
                             <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {roles.map((role) => (
-                            <tr key={role.id} className="bg-white border-b hover:bg-gray-50">
-                                <td className="px-6 py-4 font-medium text-gray-900">{role.name}</td>
-                                <td className="px-6 py-4">{role.permissions.join(', ')}</td>
-                                <td className="px-6 py-4 text-right space-x-2">
-                                   <button onClick={() => handleRoleModalOpen(role)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                   <button onClick={() => handleDeleteRole(role.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
-                                </td>
-                            </tr>
-                        ))}
+                        {platformUsers.map((user) => {
+                            const userPermissions = getPermissionsForRole(user.role as string, roles);
+                            const permissionsText = user.role === UserRole.Admin ? 'Todos' : userPermissions.join(', ');
+
+                            return (
+                                <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-medium text-gray-900">{user.name}</td>
+                                    <td className="px-6 py-4">{permissionsText || 'Sin permisos definidos'}</td>
+                                    <td className="px-6 py-4 text-right space-x-2">
+                                       <button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar Rol</button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                  </table>
              );
