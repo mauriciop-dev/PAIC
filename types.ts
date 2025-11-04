@@ -27,8 +27,8 @@ export interface PlatformUser {
   id: number;
   name: string;
   email: string;
-  role: UserRole | string; // Can be a standard role or a custom role name
   phoneNumber?: string;
+  role: UserRole | string; // Can be a standard role or a custom role name
   password?: string;
   conjuntoId: string;
 }

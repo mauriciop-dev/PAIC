@@ -96,9 +96,9 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
               <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
             </div>
-             <div>
+            <div>
               <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Teléfono</label>
-              <input type="tel" id="phoneNumber" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+              <input type="tel" id="phoneNumber" name="phoneNumber" value={formData.phoneNumber || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
             </div>
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</label>
