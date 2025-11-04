@@ -131,21 +131,51 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const handleRegisterEntry = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
         const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
-        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
-            status: 'Ingresó',
-            entryTime: now,
-        });
-        fetchData();
+
+        // Optimistic UI Update
+        setVisitorLogs(currentLogs =>
+            currentLogs.map(log =>
+                log.id === logId
+                    ? { ...log, status: 'Ingresó', entryTime: now }
+                    : log
+            )
+        );
+
+        try {
+            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+                status: 'Ingresó',
+                entryTime: now,
+            });
+        } catch (error) {
+            console.error("Failed to register entry:", error);
+            // Revert state on failure by refetching from the database
+            fetchData(); 
+        }
     };
 
     const handleRegisterExit = async (logId: number) => {
         if (!userProfile.conjuntoId) return;
         const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
-        await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
-            status: 'Salió',
-            exitTime: now,
-        });
-        fetchData();
+
+        // Optimistic UI Update
+        setVisitorLogs(currentLogs =>
+            currentLogs.map(log =>
+                log.id === logId
+                    ? { ...log, status: 'Salió', exitTime: now }
+                    : log
+            )
+        );
+        
+        try {
+            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+                status: 'Salió',
+                exitTime: now,
+            });
+        } catch (error) {
+             console.error("Failed to register exit:", error);
+            // Revert state on failure
+            fetchData();
+        }
     };
 
     const renderVisitorForm = () => (
