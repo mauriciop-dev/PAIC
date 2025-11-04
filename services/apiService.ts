@@ -247,13 +247,38 @@ export const apiService = {
         }
         return fromSupabase(data) as PlatformUser | null;
     },
-    async authenticateUser(email: string, password: string):Promise<PlatformUser | null> {
-        const { data, error } = await supabase.rpc('authenticate_user', { p_email: email, p_password: password });
-        if(error) {
+    async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
+        try {
+            // 1. Fetch the user by email
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .single();
+
+            // If user not found or other DB error
+            if (error) {
+                if (error.code === 'PGRST116') { // PGRST116 is "No rows found"
+                    return null; // User doesn't exist, authentication fails
+                }
+                // For other errors, let the handler manage it
+                throw error;
+            }
+
+            // 2. If user is found, verify the password
+            if (data && data.password === password) {
+                // Password matches, return the user profile
+                return fromSupabase(data) as PlatformUser;
+            }
+
+            // 3. If password doesn't match or no user data
+            return null;
+
+        } catch (error) {
+            // Let the generic error handler process the error
             handleApiError(error, `authenticateUser for ${email}`);
             return null;
         }
-        return fromSupabase(data) as PlatformUser | null;
     },
 
     // DatabaseView related
