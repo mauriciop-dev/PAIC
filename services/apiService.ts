@@ -165,11 +165,11 @@ export const apiService = {
             }));
             await supabase.from('bookings').insert(bookingsSeed.map(b => ({...b, conjunto_id: conjuntoId})));
 
-            // Generate financial data for the last 12 months for realism
+            // Generate financial data for the last 6 months for realism
             const today = new Date();
             const expensesSeed: any[] = [];
             const incomesSeed: any[] = [];
-            for (let i = 11; i >= 0; i--) {
+            for (let i = 5; i >= 0; i--) {
                 const monthStartDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
                 const monthEndDate = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
 
