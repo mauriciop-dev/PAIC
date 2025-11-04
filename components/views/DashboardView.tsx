@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, BarChart, Bar } from 'recharts';
 import { apiService } from '../../services/apiService';
 import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
@@ -74,7 +74,12 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
 
 const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile }) => {
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
-    const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[] } | null>(null);
+    const [chartData, setChartData] = useState<{ 
+        monthlyIncomeVsExpense: ChartData[], 
+        expensesByCategory: ChartData[],
+        packageVolume: ChartData[],
+        visitorTraffic: ChartData[]
+    } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
     const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -84,12 +89,19 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
             if (!userProfile.conjuntoId) return;
             setIsLoading(true);
             try {
-                const [summaryData, chartData] = await Promise.all([
+                const [summaryData, chartDataResult] = await Promise.all([
                     apiService.fetchDashboardSummary(userProfile.conjuntoId),
                     apiService.fetchFinancialChartData(userProfile.conjuntoId),
                 ]);
                 setSummary(summaryData);
-                setChartData(chartData);
+                if (chartDataResult) {
+                    setChartData({
+                        monthlyIncomeVsExpense: chartDataResult.monthlyIncomeVsExpense,
+                        expensesByCategory: chartDataResult.expensesByCategory,
+                        packageVolume: chartDataResult.packageVolume,
+                        visitorTraffic: chartDataResult.visitorTraffic,
+                    });
+                }
             } catch (error) {
                 console.error("Failed to fetch dashboard summary", error);
             } finally {
@@ -119,6 +131,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     
     const { stats, notifications } = summary;
     
+    const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+
     const charts = [
         {
             title: 'Ingresos vs Gastos (Últimos 6 meses)',
@@ -129,8 +143,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                     <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos (Potencial)" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                    <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos (Registrados)" stroke="#2563eb" strokeWidth={2} />
+                    <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} />
                 </LineChart>
             )
         },
@@ -142,6 +156,31 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                         {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                     </Pie>
                     <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                    <Legend wrapperStyle={{fontSize: "12px"}}/>
+                </PieChart>
+            )
+        },
+        {
+            title: 'Volumen de Paquetes (Últimos 6 meses)',
+            component: (
+                <BarChart data={chartData.packageVolume} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis dataKey="name" fontSize={12} />
+                    <YAxis fontSize={12} allowDecimals={false} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{fontSize: "12px"}}/>
+                    <Bar dataKey="value" name="Paquetes" fill="#82ca9d" />
+                </BarChart>
+            )
+        },
+        {
+            title: 'Tráfico de Visitantes por Portería',
+            component: (
+               <PieChart>
+                    <Pie data={chartData.visitorTraffic} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                        {chartData.visitorTraffic.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value} visitantes`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
                 </PieChart>
             )

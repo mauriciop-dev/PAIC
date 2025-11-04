@@ -58,8 +58,6 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
         setIsFilesModalOpen(true);
     };
     
-    const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
-    
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
             <header className="bg-white shadow-sm p-4 flex justify-between items-center">
@@ -88,47 +86,19 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                 </div>
 
                 {/* --- ANALYTICS CHARTS --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                        <h3 className="text-md font-semibold text-gray-700 mb-4">Uso Mensual del Asistente IA</h3>
-                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData.chatbotUsage} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                    <XAxis dataKey="name" fontSize={12} />
-                                    <YAxis fontSize={12} allowDecimals={false} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" name="Interacciones" fill="#8884d8" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
-                     <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                        <h3 className="text-md font-semibold text-gray-700 mb-4">Volumen de Paquetes Mensual</h3>
-                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData.packageVolume} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                    <XAxis dataKey="name" fontSize={12} />
-                                    <YAxis fontSize={12} allowDecimals={false} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" name="Paquetes" fill="#82ca9d" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
-                     <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                        <h3 className="text-md font-semibold text-gray-700 mb-4">Tráfico de Visitantes por Portería</h3>
-                        {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
-                             <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={chartData.visitorTraffic} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                        {chartData.visitorTraffic.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
-                                    </Pie>
-                                    <Tooltip formatter={(value) => `${value} visitantes`} />
-                                    <Legend wrapperStyle={{fontSize: "12px"}}/>
-                                </PieChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
+                <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
+                    <h3 className="text-md font-semibold text-gray-700 mb-4">Uso Mensual del Asistente IA</h3>
+                    {isLoading || !chartData ? <div className="text-center pt-10">Cargando...</div> : (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.chatbotUsage} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <XAxis dataKey="name" fontSize={12} />
+                                <YAxis fontSize={12} allowDecimals={false} />
+                                <Tooltip />
+                                <Legend wrapperStyle={{fontSize: "12px"}}/>
+                                <Bar dataKey="value" name="Interacciones" fill="#8884d8" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-md overflow-hidden">

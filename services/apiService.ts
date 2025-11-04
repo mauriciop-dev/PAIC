@@ -775,21 +775,23 @@ export const apiService = {
         const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
     
         const chatbotUsageData = {...monthlyDataTemplate};
-        (chatbotRes.data || []).forEach(log => {
+        (chatbotRes.data as { created_at: string }[] || []).forEach(log => {
             const monthName = monthNames[new Date(log.created_at).getMonth()];
             if(chatbotUsageData.hasOwnProperty(monthName)) chatbotUsageData[monthName]++;
         });
     
         const packageVolumeData = {...monthlyDataTemplate};
-        (packageRes.data || []).forEach(log => {
+        (packageRes.data as { received_date: string }[] || []).forEach(log => {
             const monthName = monthNames[new Date(log.received_date).getMonth()];
             if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
         });
     
-        const accessPointMap = new Map((accessPointsRes.data || []).map(ap => [ap.id, ap.name]));
+        const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
         const visitorTrafficData: Record<string, number> = {};
-        (visitorRes.data || []).forEach(log => {
-            const apName = accessPointMap.get(log.access_point_id!) || 'Desconocido';
+        // FIX: Explicitly cast the data from Supabase to resolve the "Type 'unknown' cannot be used as an index type" error.
+        // This ensures TypeScript understands the shape of the `log` object.
+        (visitorRes.data as { access_point_id: number }[] || []).forEach(log => {
+            const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
         });
     
@@ -899,11 +901,20 @@ export const apiService = {
             notifications: [...dueDateNotifications, ...packageNotifications].slice(0,4),
         };
     },
-    async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null> {
-        const [expenses, incomes, accounts] = await Promise.all([
+    async fetchFinancialChartData(conjuntoId: string): Promise<{ 
+        monthlyIncomeVsExpense: ChartData[], 
+        expensesByCategory: ChartData[], 
+        monthlyBudget: number,
+        packageVolume: ChartData[],
+        visitorTraffic: ChartData[] 
+    } | null> {
+        const [expenses, incomes, accounts, packages, visitors, accessPoints] = await Promise.all([
             this.fetchExpenses(conjuntoId),
             this.fetchIncomes(conjuntoId),
             this.fetchAccountStatus(conjuntoId),
+            this.fetchPackageLogs(conjuntoId),
+            this.fetchVisitorLogs(conjuntoId),
+            this.fetchAccessPoints(conjuntoId)
         ]);
     
         const totalPotentialIncome = accounts.reduce((sum, acc) => sum + acc.adminFeeValue, 0);
@@ -929,9 +940,9 @@ export const apiService = {
             return cat;
         });
     
-        // --- 2. Monthly Income vs. Expense (for the last 6 months) ---
+        // --- 2. Monthly Income vs. Expense (for the last 12 months) ---
         const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
-        for (let i = 5; i >= 0; i--) {
+        for (let i = 11; i >= 0; i--) { // Fetch for 12 months for historical view
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const year = d.getFullYear();
             const month = d.getMonth();
@@ -970,11 +981,45 @@ export const apiService = {
                 fill: ''
             };
         });
+
+        // --- 3. Package and Visitor Analytics ---
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const monthKeys: string[] = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            monthKeys.push(monthNames[d.getMonth()]);
+        }
+        const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
+
+        // Package Volume
+        const packageVolumeData = {...monthlyDataTemplate};
+        packages.forEach(log => {
+            const monthName = monthNames[new Date(log.receivedDate).getMonth()];
+            if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
+        });
+
+        // Visitor Traffic
+        const accessPointMap = new Map(accessPoints.map(ap => [ap.id, ap.name]));
+        const visitorTrafficData: Record<string, number> = {};
+        visitors.forEach(log => {
+            if(log.accessPointId) {
+                const apName = accessPointMap.get(log.accessPointId) || 'Desconocido';
+                visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
+            }
+        });
+        
+        const formatForChart = (data: Record<string, number>): ChartData[] => Object.entries(data).map(([name, value]) => ({
+            name,
+            value,
+            fill: '', // Fill will be set in the component
+        }));
     
         return {
             monthlyIncomeVsExpense,
             expensesByCategory,
-            monthlyBudget: totalPotentialIncome
+            monthlyBudget: totalPotentialIncome,
+            packageVolume: formatForChart(packageVolumeData),
+            visitorTraffic: formatForChart(visitorTrafficData)
         };
     },
     
