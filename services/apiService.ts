@@ -360,8 +360,8 @@ export const apiService = {
         if (error) handleApiError(error, 'deleteProvider');
     },
     async bulkUpsertProviders(conjuntoId: string, providers: any[]): Promise<void> {
-        const payload = providers.map(p => toSupabase({ ...p, id: p.id || undefined, conjuntoId }));
-        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id,conjunto_id' });
+        const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
+        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'company,conjunto_id' });
         if (error) handleApiError(error, 'bulkUpsertProviders');
     },
 
