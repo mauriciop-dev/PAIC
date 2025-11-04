@@ -1,8 +1,63 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GOOGLE_CLIENT_ID } from '../../config';
 import { Icon } from '../ui/Icon';
-import { UserProfile, SuperAdminProfile, UserRole } from '../../types';
+import { UserProfile, UserRole } from '../../types';
 import { apiService } from '../../services/apiService';
+
+// Props for the new, separated LoginForm component
+interface LoginFormProps {
+    onSubmit: (e: React.FormEvent) => void;
+    email: string;
+    onEmailChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    password: string;
+    onPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    error: string;
+    isLoading: boolean;
+    title: string;
+}
+
+// DEFINING THE COMPONENT OUTSIDE: This is the key fix.
+// By defining LoginForm outside LoginView, React will not re-create it on every render,
+// which prevents the input field from being reset and causing the one-character bug.
+const LoginForm: React.FC<LoginFormProps> = ({
+    onSubmit,
+    email,
+    onEmailChange,
+    password,
+    onPasswordChange,
+    error,
+    isLoading,
+    title
+}) => (
+    <form onSubmit={onSubmit} className="space-y-4 pt-2">
+        <div>
+            <input 
+                type="email" 
+                value={email} 
+                onChange={onEmailChange} 
+                placeholder="Correo electrónico" 
+                className="w-full p-3 border border-gray-300 rounded-lg" 
+                required 
+            />
+        </div>
+        <div>
+            <input 
+                type="password" 
+                value={password} 
+                onChange={onPasswordChange} 
+                placeholder="Contraseña" 
+                className="w-full p-3 border border-gray-300 rounded-lg" 
+                required 
+            />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button type="submit" disabled={isLoading} className="w-full p-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-blue-300 flex items-center justify-center gap-2">
+            <Icon name="log-in" className="w-5 h-5" />
+            {isLoading ? 'Ingresando...' : title}
+        </button>
+    </form>
+);
+
 
 interface LoginViewProps {
   onAuthSuccess: (userProfile: UserProfile) => void;
@@ -61,29 +116,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
           } else {
               setError('Correo o contraseña incorrectos.');
           }
-      } catch (err) {
-          setError('Ocurrió un error. Inténtalo de nuevo.');
+      } catch (err: any) {
+          setError(err.message || 'Ocurrió un error. Inténtalo de nuevo.');
       } finally {
           setIsLoading(false);
       }
   };
   
-  const LoginForm = ({ title }: {title: string}) => (
-       <form onSubmit={handleLogin} className="space-y-4 pt-2">
-            <div>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full p-3 border border-gray-300 rounded-lg" required />
-            </div>
-            <div>
-                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" className="w-full p-3 border border-gray-300 rounded-lg" required />
-            </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <button type="submit" disabled={isLoading} className="w-full p-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-blue-300 flex items-center justify-center gap-2">
-                <Icon name="log-in" className="w-5 h-5" />
-                {isLoading ? 'Ingresando...' : title}
-            </button>
-        </form>
-  )
-
   const renderContent = () => {
       switch(loginMode) {
           case 'admin':
@@ -97,7 +136,16 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
               return (
                 <>
                     <p className="text-gray-600">Ingresa con tus credenciales de personal para acceder a tus funciones.</p>
-                    <LoginForm title="Iniciar Sesión" />
+                    <LoginForm
+                        title="Iniciar Sesión"
+                        onSubmit={handleLogin}
+                        email={email}
+                        onEmailChange={(e) => setEmail(e.target.value)}
+                        password={password}
+                        onPasswordChange={(e) => setPassword(e.target.value)}
+                        error={error}
+                        isLoading={isLoading}
+                    />
                 </>
               );
       }
