@@ -254,8 +254,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         const thisMonthExpenses = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
         const thisMonthIncomes = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
             
-        const potentialIncome = chartData.monthlyBudget;
-        const budgetExecution = potentialIncome > 0 ? (thisMonthExpenses / potentialIncome) * 100 : 0;
+        const budgetExecution = thisMonthIncomes > 0 ? (thisMonthExpenses / thisMonthIncomes) * 100 : 0;
 
         return {
             summary: {
@@ -286,6 +285,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
                         <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${summary.budgetExecution}%` }}></div>
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">Porcentaje de los ingresos gastados</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
