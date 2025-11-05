@@ -2,12 +2,13 @@
 let googleClientId: string | undefined;
 
 // Prioritize reading from `process.env` which seems to be how the platform provides variables.
+// Check for both the Vite-prefixed name and the plain name.
 if (typeof process !== 'undefined' && process.env) {
     // @ts-ignore
-    googleClientId = process.env.VITE_GOOGLE_CLIENT_ID;
+    googleClientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
 }
 
-// Fallback to Vite's standard `import.meta.env`.
+// Fallback to Vite's standard `import.meta.env` if not found in process.env.
 if (!googleClientId) {
     try {
         // @ts-ignore

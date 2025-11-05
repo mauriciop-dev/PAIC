@@ -13,16 +13,10 @@ const getAiClient = (): Promise<GoogleGenAI> => {
         aiPromise = new Promise((resolve, reject) => {
             let apiKey: string | undefined;
 
-            // Prioritize reading from `process.env` which seems to be how the platform provides variables.
+            // Prioritize reading from `process.env`, checking multiple common names.
             if (typeof process !== 'undefined' && process.env) {
                 // @ts-ignore
-                apiKey = process.env.VITE_GEMINI_API_KEY;
-
-                // The generic instructions also mention `API_KEY`, so check for that as a fallback.
-                if (!apiKey) {
-                    // @ts-ignore
-                    apiKey = process.env.API_KEY;
-                }
+                apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
             }
 
             // Fallback to Vite's standard `import.meta.env`.

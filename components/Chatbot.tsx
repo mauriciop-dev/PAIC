@@ -15,6 +15,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (userProfile && conjuntoInfo && messages.length === 0) {
@@ -23,6 +24,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
         ]);
     }
   }, [userProfile, conjuntoInfo, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Set a timeout to focus the input after the panel transition is complete
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300); // Corresponds to the transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +119,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
       <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => {
