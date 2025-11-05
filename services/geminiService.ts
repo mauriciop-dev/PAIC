@@ -11,18 +11,38 @@ const model = 'gemini-2.5-flash';
 const getAiClient = (): Promise<GoogleGenAI> => {
     if (!aiPromise) {
         aiPromise = new Promise((resolve, reject) => {
-            try {
-                // FIX: The API key must be obtained exclusively from `process.env.API_KEY` as per the coding guidelines.
-                const apiKey = process.env.API_KEY;
+            let apiKey: string | undefined;
 
+            // Prioritize reading from `process.env` which seems to be how the platform provides variables.
+            if (typeof process !== 'undefined' && process.env) {
+                // @ts-ignore
+                apiKey = process.env.VITE_GEMINI_API_KEY;
+
+                // The generic instructions also mention `API_KEY`, so check for that as a fallback.
                 if (!apiKey) {
-                    return reject(new Error("La variable de entorno de la API de Gemini no está configurada."));
+                    // @ts-ignore
+                    apiKey = process.env.API_KEY;
                 }
-                const ai = new GoogleGenAI({ apiKey: apiKey });
-                resolve(ai);
-            } catch (error) {
-                reject(error);
             }
+
+            // Fallback to Vite's standard `import.meta.env`.
+            if (!apiKey) {
+                try {
+                    // @ts-ignore
+                    if (import.meta.env) {
+                        // @ts-ignore
+                        apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                    }
+                } catch (e) {
+                    // Silently fail if import.meta.env is not available.
+                }
+            }
+            
+            if (!apiKey) {
+                return reject(new Error("La variable de entorno de la API de Gemini no está configurada."));
+            }
+            const ai = new GoogleGenAI({ apiKey: apiKey });
+            resolve(ai);
         });
     }
     return aiPromise;

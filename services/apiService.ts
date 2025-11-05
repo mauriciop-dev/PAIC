@@ -827,8 +827,8 @@ export const apiService = {
         const chatbotUsageData = {...monthlyDataTemplate};
         (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
             const monthName = monthNames[new Date(log.created_at).getMonth()];
-            // FIX: Replaced `hasOwnProperty` with the `in` operator to resolve a TypeScript error about using 'unknown' as an index type.
-            if (monthName && monthName in chatbotUsageData) {
+            // FIX: Using Object.prototype.hasOwnProperty.call for robust property checking to fix 'unknown index type' error.
+            if (monthName && Object.prototype.hasOwnProperty.call(chatbotUsageData, monthName)) {
                 chatbotUsageData[monthName]++;
             }
         });
@@ -836,8 +836,8 @@ export const apiService = {
         const packageVolumeData = {...monthlyDataTemplate};
         (packageRes.data as { received_date: string }[] || []).forEach((log: { received_date: string }) => {
             const monthName = monthNames[new Date(log.received_date).getMonth()];
-            // FIX: Replaced `hasOwnProperty` with the `in` operator to resolve a TypeScript error about using 'unknown' as an index type.
-            if (monthName && monthName in packageVolumeData) {
+            // FIX: Using Object.prototype.hasOwnProperty.call for robust property checking to fix 'unknown index type' error.
+            if (monthName && Object.prototype.hasOwnProperty.call(packageVolumeData, monthName)) {
                 packageVolumeData[monthName]++;
             }
         });
@@ -1042,7 +1042,7 @@ export const apiService = {
         const packageVolumeData = {...monthlyDataTemplate};
         packages.forEach(log => {
             const monthName = monthNames[new Date(log.receivedDate).getMonth()];
-            if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
+            if(monthName && monthName in packageVolumeData) packageVolumeData[monthName]++;
         });
 
         // Visitor Traffic
