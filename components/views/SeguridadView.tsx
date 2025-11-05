@@ -151,28 +151,10 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
         try {
             const now = formatTime(new Date());
 
-            let pointToRegister: number | undefined;
-
-            if (userProfile.role === UserRole.Guard) {
-                if (!selectedAccessPointId) {
-                    setActionFeedback({ type: 'error', text: 'Error: No se ha seleccionado un punto de acceso. Por favor, recarga la página.' });
-                    setUpdatingLogId(null);
-                    return;
-                }
-                pointToRegister = selectedAccessPointId;
-            } else {
-                // For Admins or other roles, default to the first available point.
-                pointToRegister = accessPoints.length > 0 ? accessPoints[0].id : undefined;
-            }
-
             const updates: Partial<Omit<VisitorLog, 'id'>> = {
                 status: 'Ingresó' as const,
                 entryTime: now,
             };
-
-            if (pointToRegister !== undefined) {
-                updates.accessPointId = pointToRegister;
-            }
 
             await apiService.updateVisitorLog(userProfile.conjuntoId, logId, updates);
             

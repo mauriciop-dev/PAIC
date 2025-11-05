@@ -805,14 +805,12 @@ export const apiService = {
         const now = new Date();
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     
-        const [chatbotRes, packageRes, visitorRes, accessPointsRes] = await Promise.all([
+        const [chatbotRes, packageRes] = await Promise.all([
             supabase.from('chatbot_logs').select('created_at').gte('created_at', sixMonthsAgo.toISOString()),
             supabase.from('package_logs').select('received_date').gte('received_date', sixMonthsAgo.toISOString()),
-            supabase.from('visitor_logs').select('access_point_id').not('access_point_id', 'is', null),
-            supabase.from('access_points').select('id, name')
         ]);
     
-        const errors = [chatbotRes.error, packageRes.error, visitorRes.error, accessPointsRes.error].filter(Boolean);
+        const errors = [chatbotRes.error, packageRes.error].filter(Boolean);
         if (errors.length > 0) {
             handleApiError(errors[0], 'fetchSuperAdminChartData');
         }
@@ -829,8 +827,8 @@ export const apiService = {
         const chatbotUsageData = {...monthlyDataTemplate};
         (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
             const monthName = monthNames[new Date(log.created_at).getMonth()];
-            // FIX: The type of `monthName` can be `string | undefined` with strict checks. Added a guard to ensure it's a string before using it as an index. This resolves two errors on this line related to indexing with a potentially undefined value.
-            if (monthName && chatbotUsageData.hasOwnProperty(monthName)) {
+            // FIX: Replaced `hasOwnProperty` with the `in` operator to resolve a TypeScript error about using 'unknown' as an index type.
+            if (monthName && monthName in chatbotUsageData) {
                 chatbotUsageData[monthName]++;
             }
         });
@@ -838,17 +836,10 @@ export const apiService = {
         const packageVolumeData = {...monthlyDataTemplate};
         (packageRes.data as { received_date: string }[] || []).forEach((log: { received_date: string }) => {
             const monthName = monthNames[new Date(log.received_date).getMonth()];
-            // FIX: The type of `monthName` can be `string | undefined` with strict checks. Added a guard to ensure it's a string before using it as an index. This resolves errors related to indexing with a potentially undefined value.
-            if (monthName && packageVolumeData.hasOwnProperty(monthName)) {
+            // FIX: Replaced `hasOwnProperty` with the `in` operator to resolve a TypeScript error about using 'unknown' as an index type.
+            if (monthName && monthName in packageVolumeData) {
                 packageVolumeData[monthName]++;
             }
-        });
-    
-        const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
-        const visitorTrafficData: Record<string, number> = {};
-        (visitorRes.data as { access_point_id: number }[] || []).forEach((log: { access_point_id: number }) => {
-            const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
-            visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
         });
     
         const formatForChart = (data: Record<string, number>): ChartData[] => Object.entries(data).map(([name, value]) => ({
@@ -860,7 +851,7 @@ export const apiService = {
         return {
             chatbotUsage: formatForChart(chatbotUsageData),
             packageVolume: formatForChart(packageVolumeData),
-            visitorTraffic: formatForChart(visitorTrafficData)
+            visitorTraffic: [] // Return empty array as the column doesn't exist
         };
     },
     async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
