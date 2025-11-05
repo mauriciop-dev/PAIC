@@ -138,9 +138,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const handlePaymentSuccess = async () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const paymentStatus = urlParams.get('payment_status');
+      const paymentStatus = urlParams.get('collection_status');
 
-      if (paymentStatus === 'success' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
+      if (paymentStatus === 'approved' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
         try {
           // Clean the URL to prevent re-triggering on refresh
           window.history.replaceState({}, document.title, window.location.pathname);

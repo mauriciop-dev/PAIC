@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, ConjuntoInfo, AccessPoint } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
-import { boldService } from '../services/boldService';
+import { mercadoPagoService } from '../services/mercadoPagoService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -26,6 +26,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [profileData, setProfileData] = useState<UserProfile>(userProfile);
   const [conjuntoData, setConjuntoData] = useState<ConjuntoInfo>(conjuntoInfo);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Access Points state
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
@@ -90,6 +92,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setHasChanges(false);
   };
   
+  const handleUpgradeClick = async () => {
+    setIsRedirectingToPayment(true);
+    setPaymentError(null);
+    try {
+        const checkoutUrl = await mercadoPagoService.createPreference(conjuntoData);
+        if (checkoutUrl) {
+            window.location.href = checkoutUrl;
+        } else {
+            throw new Error('No se recibió una URL de pago.');
+        }
+    } catch (error: any) {
+        console.error("Payment initiation failed:", error);
+        setPaymentError(error.message || 'No se pudo iniciar el pago. Intenta de nuevo.');
+        setIsRedirectingToPayment(false);
+    }
+  };
+
   const renderProfileTab = () => (
     <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
@@ -185,13 +204,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                  </ul>
                  <button
                     type="button"
-                    onClick={() => boldService.redirectToCheckout(conjuntoData)}
-                    className="mt-6 w-full px-4 py-3 text-white bg-blue-600 rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+                    onClick={handleUpgradeClick}
+                    disabled={isRedirectingToPayment}
+                    className="mt-6 w-full px-4 py-3 text-white bg-blue-600 rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center gap-2 disabled:bg-blue-300"
                  >
                     <Icon name="credit-card" className="w-5 h-5" />
-                    Mejorar Plan Ahora
+                    {isRedirectingToPayment ? 'Redirigiendo a Mercado Pago...' : 'Mejorar Plan Ahora'}
                  </button>
-                 <p className="text-xs text-gray-500 mt-2 text-center">Serás redirigido a la pasarela de pagos segura de Bold.</p>
+                 {paymentError && <p className="text-xs text-red-600 mt-2 text-center">{paymentError}</p>}
+                 <p className="text-xs text-gray-500 mt-2 text-center">Serás redirigido a la pasarela de pagos segura de Mercado Pago.</p>
             </div>
         )}
     </div>

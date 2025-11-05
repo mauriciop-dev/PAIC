@@ -28,3 +28,22 @@ if (!googleClientId) {
 // Provide an empty string as a fallback to prevent the app from crashing if the ID is missing.
 // This allows the UI to render, even if Google Auth will fail.
 export const GOOGLE_CLIENT_ID = (googleClientId || '') as string;
+
+
+// --- Mercado Pago Keys ---
+let mpPublicKey: string | undefined;
+let mpAccessToken: string | undefined;
+
+if (typeof process !== 'undefined' && process.env) {
+    // @ts-ignore
+    mpPublicKey = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY;
+    // @ts-ignore
+    mpAccessToken = process.env.VITE_MERCADO_PAGO_ACCESS_TOKEN;
+}
+
+if (!mpPublicKey || !mpAccessToken) {
+    console.error("Las claves de API de Mercado Pago (Pública y Access Token) no están configuradas.");
+}
+
+export const MERCADO_PAGO_PUBLIC_KEY = (mpPublicKey || '') as string;
+export const MERCADO_PAGO_ACCESS_TOKEN = (mpAccessToken || '') as string;
