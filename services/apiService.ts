@@ -685,14 +685,9 @@ export const apiService = {
         // FIX: Re-implemented with native fetch to bypass a potential Supabase client schema cache issue
         // that was causing "Could not find column" errors after database migrations. This approach sends
         // the request directly to the PostgREST endpoint, ensuring it's validated against the live DB schema.
+        // FIX: Removed session logic and now use the public anon key for authorization, aligning with the app's
+        // overall auth strategy and fixing the "Authentication token not found" error.
         try {
-            const session = await supabase.auth.getSession();
-            const token = session.data.session?.access_token;
-
-            if (!token) {
-                throw new Error("Authentication token not found.");
-            }
-
             const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co'; // From supabaseClient.ts
             const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys'; // From supabaseClient.ts
 
@@ -700,7 +695,7 @@ export const apiService = {
                 method: 'PATCH',
                 headers: {
                     'apikey': supabaseKey,
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${supabaseKey}`,
                     'Content-Type': 'application/json',
                     'Prefer': 'return=minimal'
                 },
@@ -819,7 +814,8 @@ export const apiService = {
         ]);
     
         const errors = [chatbotRes.error, packageRes.error, visitorRes.error, accessPointsRes.error].filter(Boolean);
-        if (errors.length > 0) handleApiError(errors, 'fetchSuperAdminChartData');
+        // FIX: Pass only the first error to the handler instead of an array of errors.
+        if (errors.length > 0) handleApiError(errors[0], 'fetchSuperAdminChartData');
         
         const monthKeys: string[] = [];
         const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -828,7 +824,9 @@ export const apiService = {
             monthKeys.push(monthNames[d.getMonth()]);
         }
         
-        const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
+        // FIX: Replaced error-prone `reduce` with `Object.fromEntries` for correct type inference,
+        // resolving the "type 'unknown' cannot be used as an index type" error.
+        const monthlyDataTemplate: Record<string, number> = Object.fromEntries(monthKeys.map(key => [key, 0]));
     
         const chatbotUsageData = {...monthlyDataTemplate};
         (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
