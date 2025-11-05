@@ -801,7 +801,6 @@ export const apiService = {
          if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
          return fromSupabase(data) as PlatformStats;
     },
-    // FIX: Implement fetchSuperAdminChartData to provide analytics for the super admin dashboard.
     async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
         const now = new Date();
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
@@ -814,8 +813,9 @@ export const apiService = {
         ]);
     
         const errors = [chatbotRes.error, packageRes.error, visitorRes.error, accessPointsRes.error].filter(Boolean);
-        // FIX: Pass only the first error to the handler instead of an array of errors.
-        if (errors.length > 0) handleApiError(errors[0], 'fetchSuperAdminChartData');
+        if (errors.length > 0) {
+            handleApiError(errors[0], 'fetchSuperAdminChartData');
+        }
         
         const monthKeys: string[] = [];
         const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -824,25 +824,28 @@ export const apiService = {
             monthKeys.push(monthNames[d.getMonth()]);
         }
         
-        // FIX: Replaced error-prone `reduce` with `Object.fromEntries` for correct type inference,
-        // resolving the "type 'unknown' cannot be used as an index type" error.
         const monthlyDataTemplate: Record<string, number> = Object.fromEntries(monthKeys.map(key => [key, 0]));
     
         const chatbotUsageData = {...monthlyDataTemplate};
         (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
             const monthName = monthNames[new Date(log.created_at).getMonth()];
-            if(chatbotUsageData.hasOwnProperty(monthName)) chatbotUsageData[monthName]++;
+            // FIX: The type of `monthName` can be `string | undefined` with strict checks. Added a guard to ensure it's a string before using it as an index. This resolves two errors on this line related to indexing with a potentially undefined value.
+            if (monthName && chatbotUsageData.hasOwnProperty(monthName)) {
+                chatbotUsageData[monthName]++;
+            }
         });
     
         const packageVolumeData = {...monthlyDataTemplate};
         (packageRes.data as { received_date: string }[] || []).forEach((log: { received_date: string }) => {
             const monthName = monthNames[new Date(log.received_date).getMonth()];
-            if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
+            // FIX: The type of `monthName` can be `string | undefined` with strict checks. Added a guard to ensure it's a string before using it as an index. This resolves errors related to indexing with a potentially undefined value.
+            if (monthName && packageVolumeData.hasOwnProperty(monthName)) {
+                packageVolumeData[monthName]++;
+            }
         });
     
         const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
         const visitorTrafficData: Record<string, number> = {};
-        // FIX: Add type assertion to visitorRes.data to fix type inference issue.
         (visitorRes.data as { access_point_id: number }[] || []).forEach((log: { access_point_id: number }) => {
             const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
@@ -1042,7 +1045,7 @@ export const apiService = {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             monthKeys.push(monthNames[d.getMonth()]);
         }
-        const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
+        const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {} as Record<string, number>);
 
         // Package Volume
         const packageVolumeData = {...monthlyDataTemplate};
