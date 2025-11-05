@@ -76,6 +76,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
   const [isLoading, setIsLoading] = useState(false);
   
   useEffect(() => {
+    // FIX: Add a guard to prevent initialization if the Google Client ID is not configured.
+    // This stops the app from crashing with a blank screen in environments where the
+    // environment variable is missing.
+    if (loginMode !== 'admin' || !GOOGLE_CLIENT_ID) {
+        return;
+    }
+      
     const initializeGoogleSignIn = () => {
       if (window.google && googleButtonRef.current && googleButtonRef.current.childElementCount === 0) {
         window.google.accounts.id.initialize({
@@ -126,6 +133,16 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
   const renderContent = () => {
       switch(loginMode) {
           case 'admin':
+              // FIX: Display a clear error message if the Google Client ID is missing,
+              // preventing a blank screen and informing the user of the configuration issue.
+              if (!GOOGLE_CLIENT_ID) {
+                  return (
+                      <div className="p-4 mt-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm text-left">
+                          <p className="font-bold">Error de Configuración</p>
+                          <p>La autenticación de Google no está disponible. El administrador de la plataforma debe configurar la variable de entorno <strong>VITE_GOOGLE_CLIENT_ID</strong>.</p>
+                      </div>
+                  );
+              }
               return (
                 <>
                     <p className="text-gray-600">Inicia sesión con tu cuenta de Google para acceder al panel de administrador.</p>
