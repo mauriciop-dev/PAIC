@@ -37,6 +37,10 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const [visitorDate, setVisitorDate] = useState(new Date().toISOString().split('T')[0]);
     const [isSubmittingVisitor, setIsSubmittingVisitor] = useState(false);
     const [visitorFeedback, setVisitorFeedback] = useState<string | null>(null);
+    
+    // Shared feedback state for table actions
+    const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
 
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
@@ -142,17 +146,32 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const handleRegisterEntry = async (logId: number) => {
         if (!userProfile.conjuntoId || updatingLogId) return;
         setUpdatingLogId(logId);
+        setActionFeedback(null);
         try {
             const now = formatTime(new Date());
             const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
-            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
-                status: 'Ingresó',
+
+            const updates = {
+                status: 'Ingresó' as const,
                 entryTime: now,
                 accessPointId: firstAccessPointId,
-            });
-            await fetchData();
+            };
+
+            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, updates);
+            
+            // Local state update instead of refetch
+            setVisitorLogs(prevLogs => 
+                prevLogs.map(log => 
+                    log.id === logId 
+                        ? { ...log, ...updates } 
+                        : log
+                )
+            );
         } catch (error) {
+            const message = error instanceof Error ? error.message : "Ocurrió un error desconocido.";
             console.error("Failed to register entry:", error);
+            setActionFeedback({ type: 'error', text: `Error al registrar ingreso: ${message}` });
+            setTimeout(() => setActionFeedback(null), 5000);
         } finally {
             setUpdatingLogId(null);
         }
@@ -161,15 +180,30 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     const handleRegisterExit = async (logId: number) => {
         if (!userProfile.conjuntoId || updatingLogId) return;
         setUpdatingLogId(logId);
+        setActionFeedback(null);
         try {
             const now = formatTime(new Date());
-            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
-                status: 'Salió',
+            
+            const updates = {
+                status: 'Salió' as const,
                 exitTime: now,
-            });
-            await fetchData();
+            };
+
+            await apiService.updateVisitorLog(userProfile.conjuntoId, logId, updates);
+            
+            // Local state update instead of refetch
+            setVisitorLogs(prevLogs => 
+                prevLogs.map(log => 
+                    log.id === logId 
+                        ? { ...log, ...updates } 
+                        : log
+                )
+            );
         } catch (error) {
+             const message = error instanceof Error ? error.message : "Ocurrió un error desconocido.";
              console.error("Failed to register exit:", error);
+             setActionFeedback({ type: 'error', text: `Error al registrar salida: ${message}` });
+             setTimeout(() => setActionFeedback(null), 5000);
         } finally {
             setUpdatingLogId(null);
         }
@@ -345,6 +379,12 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
                     ))}
                 </nav>
             </div>
+
+            {actionFeedback && (
+                <div className={`p-3 mb-4 rounded-md text-sm ${actionFeedback.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                    {actionFeedback.text}
+                </div>
+            )}
             
             {isLoading ? <div className="text-center p-10">Cargando datos...</div> : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

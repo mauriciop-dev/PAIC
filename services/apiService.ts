@@ -808,8 +808,8 @@ export const apiService = {
     
         const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
         const visitorTrafficData: Record<string, number> = {};
-        // FIX: Explicitly cast the `visitorRes.data` array to ensure `log` is correctly typed, resolving the "Type 'unknown' cannot be used as an index type" error.
-        (visitorRes.data as { access_point_id: number }[] || []).forEach(log => {
+        // FIX: By explicitly typing the `log` parameter, we ensure correct type inference even if `visitorRes.data` is `any[]`.
+        (visitorRes.data || []).forEach((log: { access_point_id: number }) => {
             const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
         });
