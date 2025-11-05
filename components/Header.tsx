@@ -29,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
   if (!userProfile) return null;
 
   return (
-    <header className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200 bg-white sticky top-0 z-10">
+    <header className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200 bg-white sticky top-0 z-20">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-lg md:text-xl font-bold text-gray-800">
