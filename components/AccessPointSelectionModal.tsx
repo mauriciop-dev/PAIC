@@ -7,9 +7,10 @@ interface AccessPointSelectionModalProps {
     isOpen: boolean;
     onClose: () => void;
     conjuntoId: string;
+    onSelect: (accessPointId: number) => void;
 }
 
-const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ isOpen, onClose, conjuntoId }) => {
+const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ isOpen, onClose, conjuntoId, onSelect }) => {
     const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
     const [selectedPoint, setSelectedPoint] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
@@ -43,8 +44,7 @@ const AccessPointSelectionModal: React.FC<AccessPointSelectionModalProps> = ({ i
             alert('Por favor, selecciona un punto de acceso para continuar.');
             return;
         }
-        // In a real app, you might save this selection to a session or global state.
-        console.log(`User at conjunto ${conjuntoId} selected access point ID: ${selectedPoint}`);
+        onSelect(parseInt(selectedPoint, 10));
         onClose();
     };
 

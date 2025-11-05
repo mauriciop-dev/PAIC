@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
-import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint } from '../../types';
+import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint, UserRole } from '../../types';
 
 type SeguridadTab = 'Visitantes' | 'Paquetes';
 
 interface SeguridadViewProps {
     userProfile: UserProfile;
+    selectedAccessPointId: number | null;
 }
 
 // Helper to format time consistently as HH:mm
@@ -15,7 +16,7 @@ const formatTime = (date: Date): string => {
     return `${hours}:${minutes}`;
 }
 
-const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
+const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAccessPointId }) => {
     const [activeTab, setActiveTab] = useState<SeguridadTab>('Visitantes');
     const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
     const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
@@ -149,17 +150,32 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         setActionFeedback(null);
         try {
             const now = formatTime(new Date());
-            const firstAccessPointId = accessPoints.length > 0 ? accessPoints[0].id : undefined;
 
-            const updates = {
+            let pointToRegister: number | undefined;
+
+            if (userProfile.role === UserRole.Guard) {
+                if (!selectedAccessPointId) {
+                    setActionFeedback({ type: 'error', text: 'Error: No se ha seleccionado un punto de acceso. Por favor, recarga la página.' });
+                    setUpdatingLogId(null);
+                    return;
+                }
+                pointToRegister = selectedAccessPointId;
+            } else {
+                // For Admins or other roles, default to the first available point.
+                pointToRegister = accessPoints.length > 0 ? accessPoints[0].id : undefined;
+            }
+
+            const updates: Partial<Omit<VisitorLog, 'id'>> = {
                 status: 'Ingresó' as const,
                 entryTime: now,
-                accessPointId: firstAccessPointId,
             };
+
+            if (pointToRegister !== undefined) {
+                updates.accessPointId = pointToRegister;
+            }
 
             await apiService.updateVisitorLog(userProfile.conjuntoId, logId, updates);
             
-            // Local state update instead of refetch
             setVisitorLogs(prevLogs => 
                 prevLogs.map(log => 
                     log.id === logId 

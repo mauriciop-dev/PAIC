@@ -15,9 +15,10 @@ interface DashboardProps {
   conjuntoName: string;
   userProfile: UserProfile;
   conjuntoInfo: ConjuntoInfo | null;
+  selectedAccessPointId: number | null;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile, conjuntoInfo }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile, conjuntoInfo, selectedAccessPointId }) => {
   const renderContent = () => {
     // The loading/setup state is now handled by the parent App component, making this one cleaner.
     // We can assume conjuntoInfo is valid when this component's content is rendered.
@@ -41,7 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
       case Tab.Finanzas:
           return <FinanzasView userProfile={userProfile} />;
       case Tab.Seguridad:
-          return <SeguridadView userProfile={userProfile} />;
+          return <SeguridadView userProfile={userProfile} selectedAccessPointId={selectedAccessPointId} />;
       default:
         return <DashboardView setActiveTab={setActiveTab} userProfile={userProfile} />;
     }

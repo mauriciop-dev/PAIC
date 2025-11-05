@@ -682,8 +682,44 @@ export const apiService = {
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
-        const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateVisitorLog');
+        // FIX: Re-implemented with native fetch to bypass a potential Supabase client schema cache issue
+        // that was causing "Could not find column" errors after database migrations. This approach sends
+        // the request directly to the PostgREST endpoint, ensuring it's validated against the live DB schema.
+        try {
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+
+            if (!token) {
+                throw new Error("Authentication token not found.");
+            }
+
+            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co'; // From supabaseClient.ts
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys'; // From supabaseClient.ts
+
+            const response = await fetch(`${supabaseUrl}/rest/v1/visitor_logs?id=eq.${logId}&conjunto_id=eq.${conjuntoId}`, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(toSupabase(updates))
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                const error: PostgrestError = {
+                    message: errorData.message || `Failed to update visitor log with status ${response.status}`,
+                    details: errorData.details || '',
+                    hint: errorData.hint || '',
+                    code: errorData.code || String(response.status),
+                };
+                handleApiError(error, 'updateVisitorLog (manual fetch)');
+            }
+        } catch (e) {
+            handleApiError(e, 'updateVisitorLog (manual fetch wrapper)');
+        }
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
         const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
@@ -795,21 +831,21 @@ export const apiService = {
         const monthlyDataTemplate: Record<string, number> = monthKeys.reduce((acc, key) => ({...acc, [key]: 0 }), {});
     
         const chatbotUsageData = {...monthlyDataTemplate};
-        (chatbotRes.data as { created_at: string }[] || []).forEach(log => {
+        (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
             const monthName = monthNames[new Date(log.created_at).getMonth()];
             if(chatbotUsageData.hasOwnProperty(monthName)) chatbotUsageData[monthName]++;
         });
     
         const packageVolumeData = {...monthlyDataTemplate};
-        (packageRes.data as { received_date: string }[] || []).forEach(log => {
+        (packageRes.data as { received_date: string }[] || []).forEach((log: { received_date: string }) => {
             const monthName = monthNames[new Date(log.received_date).getMonth()];
             if(packageVolumeData.hasOwnProperty(monthName)) packageVolumeData[monthName]++;
         });
     
         const accessPointMap = new Map((accessPointsRes.data as { id: number, name: string }[] || []).map(ap => [ap.id, ap.name]));
         const visitorTrafficData: Record<string, number> = {};
-        // FIX: By explicitly typing the `log` parameter, we ensure correct type inference even if `visitorRes.data` is `any[]`.
-        (visitorRes.data || []).forEach((log: { access_point_id: number }) => {
+        // FIX: Add type assertion to visitorRes.data to fix type inference issue.
+        (visitorRes.data as { access_point_id: number }[] || []).forEach((log: { access_point_id: number }) => {
             const apName = accessPointMap.get(log.access_point_id) || 'Desconocido';
             visitorTrafficData[apName] = (visitorTrafficData[apName] || 0) + 1;
         });

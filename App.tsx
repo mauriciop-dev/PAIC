@@ -36,6 +36,7 @@ const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [superAdminProfile, setSuperAdminProfile] = useState<SuperAdminProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
+  const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
     setUserProfile(null);
     setSuperAdminProfile(null);
     setConjuntoInfo(null);
+    setSelectedAccessPointId(null);
     localStorage.removeItem('paic_userProfile');
     localStorage.removeItem('paic_superAdminProfile');
     localStorage.removeItem('paic_conjuntoInfo');
@@ -327,7 +329,7 @@ const App: React.FC = () => {
                 </p>
             </div>
           ) : (
-            <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+            <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
           )}
         </div>
       </main>
@@ -344,7 +346,7 @@ const App: React.FC = () => {
           <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} onSave={handleSaveSettings} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       )}
       {isAccessPointModalOpen && userProfile.conjuntoId && (
-        <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} />
+        <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
       )}
     </div>
   );
