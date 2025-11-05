@@ -1,191 +1,88 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GOOGLE_CLIENT_ID } from '../../config';
+import { UserProfile } from '../../types';
+import LoginForm from '../LoginForm';
 import { Icon } from '../ui/Icon';
-import { UserProfile, UserRole } from '../../types';
-import { apiService } from '../../services/apiService';
+import { GOOGLE_CLIENT_ID } from '../../config';
 
-// Props for the new, separated LoginForm component
-interface LoginFormProps {
-    onSubmit: (e: React.FormEvent) => void;
-    email: string;
-    onEmailChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    password: string;
-    onPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    error: string;
-    isLoading: boolean;
-    title: string;
+declare global {
+  interface Window {
+    google: any;
+  }
 }
 
-// DEFINING THE COMPONENT OUTSIDE: This is the key fix.
-// By defining LoginForm outside LoginView, React will not re-create it on every render,
-// which prevents the input field from being reset and causing the one-character bug.
-const LoginForm: React.FC<LoginFormProps> = ({
-    onSubmit,
-    email,
-    onEmailChange,
-    password,
-    onPasswordChange,
-    error,
-    isLoading,
-    title
-}) => (
-    <form onSubmit={onSubmit} className="space-y-4 pt-2">
-        <div>
-            <input 
-                type="email" 
-                value={email} 
-                onChange={onEmailChange} 
-                placeholder="Correo electrónico" 
-                className="w-full p-3 border border-gray-300 rounded-lg" 
-                required 
-            />
-        </div>
-        <div>
-            <input 
-                type="password" 
-                value={password} 
-                onChange={onPasswordChange} 
-                placeholder="Contraseña" 
-                className="w-full p-3 border border-gray-300 rounded-lg" 
-                required 
-            />
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={isLoading} className="w-full p-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-blue-300 flex items-center justify-center gap-2">
-            <Icon name="log-in" className="w-5 h-5" />
-            {isLoading ? 'Ingresando...' : title}
-        </button>
-    </form>
-);
-
-
 interface LoginViewProps {
-  onAuthSuccess: (userProfile: UserProfile) => void;
+  onAuthSuccess: (profile: UserProfile) => void;
   onGoogleLoginSuccess: (credentialResponse: any) => void;
 }
 
-type LoginMode = 'admin' | 'staff';
+type LoginType = 'Administrador' | 'Personal';
 
 const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSuccess }) => {
+  const [loginType, setLoginType] = useState<LoginType>('Administrador');
   const googleButtonRef = useRef<HTMLDivElement>(null);
-  const [loginMode, setLoginMode] = useState<LoginMode>('admin');
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  
+
   useEffect(() => {
-    // FIX: Add a guard to prevent initialization if the Google Client ID is not configured.
-    // This stops the app from crashing with a blank screen in environments where the
-    // environment variable is missing.
-    if (loginMode !== 'admin' || !GOOGLE_CLIENT_ID) {
-        return;
+    // Check if the script has loaded.
+    if (typeof window.google === 'undefined' || !window.google.accounts || !window.google.accounts.id) {
+      console.error("Google Identity Services script not loaded.");
+      // You could add a state here to show an error message to the user
+      return;
     }
-      
-    const initializeGoogleSignIn = () => {
-      if (window.google && googleButtonRef.current && googleButtonRef.current.childElementCount === 0) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: onGoogleLoginSuccess,
-        });
+    
+    // Initialize the Google client.
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: onGoogleLoginSuccess,
+    });
+
+    // Render the button, but only if the ref is available.
+    // This effect runs only once, so we ensure the button is rendered into its persistent container.
+    if (googleButtonRef.current && googleButtonRef.current.childElementCount === 0) {
         window.google.accounts.id.renderButton(
           googleButtonRef.current,
-          { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', logo_alignment: 'left', width: '280' }
+          { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
         );
-      }
-    };
-
-    if (loginMode === 'admin') {
-        if (document.getElementById('google-identity-script')) {
-            initializeGoogleSignIn();
-            return;
-        }
-        const script = document.createElement('script');
-        script.id = 'google-identity-script';
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.onload = initializeGoogleSignIn;
-        document.body.appendChild(script);
     }
-  }, [onGoogleLoginSuccess, loginMode]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setError('');
-      setIsLoading(true);
-      try {
-          const user = await apiService.authenticateUser(email, password);
-          if (user) {
-              const userProfile: UserProfile = { name: user.name, email: user.email, role: user.role, conjuntoId: user.conjuntoId };
-              onAuthSuccess(userProfile);
-          } else {
-              setError('Correo o contraseña incorrectos.');
-          }
-      } catch (err: any) {
-          setError(err.message || 'Ocurrió un error. Inténtalo de nuevo.');
-      } finally {
-          setIsLoading(false);
-      }
-  };
-  
-  const renderContent = () => {
-      switch(loginMode) {
-          case 'admin':
-              // FIX: Display a clear error message if the Google Client ID is missing,
-              // preventing a blank screen and informing the user of the configuration issue.
-              if (!GOOGLE_CLIENT_ID) {
-                  return (
-                      <div className="p-4 mt-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm text-left">
-                          <p className="font-bold">Error de Configuración</p>
-                          <p>La autenticación de Google no está disponible. El administrador de la plataforma debe configurar la variable de entorno <strong>VITE_GOOGLE_CLIENT_ID</strong>.</p>
-                      </div>
-                  );
-              }
-              return (
-                <>
-                    <p className="text-gray-600">Inicia sesión con tu cuenta de Google para acceder al panel de administrador.</p>
-                    <div className="flex justify-center pt-4"><div ref={googleButtonRef}></div></div>
-                </>
-              );
-          case 'staff':
-              return (
-                <>
-                    <p className="text-gray-600">Ingresa con tus credenciales de personal para acceder a tus funciones.</p>
-                    <LoginForm
-                        title="Iniciar Sesión"
-                        onSubmit={handleLogin}
-                        email={email}
-                        onEmailChange={(e) => setEmail(e.target.value)}
-                        password={password}
-                        onPasswordChange={(e) => setPassword(e.target.value)}
-                        error={error}
-                        isLoading={isLoading}
-                    />
-                </>
-              );
-      }
-  }
+    
+  }, [onGoogleLoginSuccess]);
 
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 font-sans p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="p-8 bg-white rounded-xl shadow-lg text-center space-y-6">
-            <div className="flex justify-center">
-                <div className="p-3 bg-blue-100 rounded-full">
-                    <Icon name="bot" className="w-10 h-10 text-blue-600" />
+    <div className="flex h-screen bg-gray-50 font-sans">
+      <div className="w-full max-w-md m-auto bg-white rounded-lg border border-gray-200 shadow-md py-10 px-12">
+        <div className="flex flex-col items-center">
+            <Icon name="bot" className="w-12 h-12 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-800 mt-4">Bienvenido a PAIC</h1>
+        </div>
+        
+        <div className="mt-8">
+            <div className="p-1 bg-gray-100 rounded-full flex">
+                <button
+                    onClick={() => setLoginType('Administrador')}
+                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors ${loginType === 'Administrador' ? 'bg-white text-blue-600 shadow' : 'text-gray-600'}`}
+                >
+                    Administrador
+                </button>
+                <button
+                    onClick={() => setLoginType('Personal')}
+                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors ${loginType === 'Personal' ? 'bg-white text-blue-600 shadow' : 'text-gray-600'}`}
+                >
+                    Personal
+                </button>
+            </div>
+        </div>
+        
+        <div className="mt-6">
+            <div style={{ display: loginType === 'Administrador' ? 'block' : 'none' }}>
+                <div className="text-center">
+                    <p className="text-gray-600 mb-4">Inicia sesión con tu cuenta de Google para acceder al panel de administrador.</p>
+                    <div id="google-signin-button" ref={googleButtonRef} className="flex justify-center"></div>
                 </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">Bienvenido a PAIC</h1>
-            
-            <div className="bg-gray-100 p-1 rounded-full flex">
-                <button onClick={() => setLoginMode('admin')} className={`w-1/2 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'admin' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Administrador</button>
-                <button onClick={() => setLoginMode('staff')} className={`w-1/2 p-2 rounded-full font-semibold text-sm transition-colors ${loginMode === 'staff' ? 'bg-white shadow text-blue-700' : 'text-gray-600'}`}>Personal</button>
+
+            <div style={{ display: loginType === 'Personal' ? 'block' : 'none' }}>
+                <LoginForm onAuthSuccess={onAuthSuccess} />
             </div>
-            
-            {renderContent()}
         </div>
       </div>
     </div>
