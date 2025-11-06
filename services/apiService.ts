@@ -360,6 +360,21 @@ export const apiService = {
         const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id,apartment' });
         if(error) handleApiError(error, 'bulkUpsertAccountStatus');
     },
+    async fetchDebtors(conjuntoId: string): Promise<{ apartment: string; name: string; balance: number }[]> {
+        const [accounts, residents] = await Promise.all([
+            this.fetchAccountStatus(conjuntoId),
+            this.fetchResidents(conjuntoId)
+        ]);
+
+        const debtorsAccounts = accounts.filter(a => a.outstandingBalance > 0);
+        const residentsMap = new Map(residents.map(r => [r.apartment, r.name]));
+
+        return debtorsAccounts.map(account => ({
+            apartment: account.apartment,
+            name: residentsMap.get(account.apartment) || 'Nombre no encontrado',
+            balance: account.outstandingBalance
+        })).sort((a, b) => b.balance - a.balance); // Sort by highest balance
+    },
 
     async fetchProviders(conjuntoId: string): Promise<Provider[]> {
         const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);

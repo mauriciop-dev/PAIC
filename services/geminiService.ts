@@ -145,6 +145,16 @@ const processApiResponse = async (response: string): Promise<string> => {
                     }
                     return `No pude procesar la consulta: "${query_description}". Intenta de nuevo.`;
 
+                case 'queryDebtors':
+                    const debtors = await apiService.fetchDebtors(currentConjuntoId);
+                    if (debtors.length === 0) {
+                        return "¡Buenas noticias! No hay residentes en mora en este momento.";
+                    }
+                    const debtorsList = debtors
+                        .map(d => `- Apto ${d.apartment} (${d.name}): $${d.balance.toLocaleString('es-CO')}`)
+                        .join('\n');
+                    return `Claro, aquí está la lista de residentes en mora:\n\n${debtorsList}`;
+
                 // --- COMMON AREAS ---
                 case 'addBooking':
                     await apiService.addBooking(currentConjuntoId, action.payload as Booking);
