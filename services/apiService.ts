@@ -384,6 +384,22 @@ export const apiService = {
         }
         return (fromSupabase(data) as Provider[] | null) || [];
     },
+    async fetchProvidersBySpecialty(conjuntoId: string, specialty?: string): Promise<Provider[]> {
+        let query = supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+
+        if (specialty) {
+            // Use ilike for case-insensitive partial matching
+            query = query.ilike('specialty', `%${specialty}%`);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            handleApiError(error, `fetchProvidersBySpecialty for specialty ${specialty}`);
+            return [];
+        }
+        return (fromSupabase(data) as Provider[] | null) || [];
+    },
     async fetchProviderById(conjuntoId: string, id: number): Promise<Provider | null> {
         const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId).eq('id', id).single();
         if (error) { handleApiError(error, `fetchProviderById for id ${id}`); return null; }

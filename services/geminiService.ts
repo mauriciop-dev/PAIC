@@ -1,6 +1,6 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
-import { DueDate, UserProfile, ConjuntoInfo, Task, VisitorLog, PackageLog, Income, Expense, Booking, Resident } from "../types";
+import { DueDate, UserProfile, ConjuntoInfo, Task, VisitorLog, PackageLog, Income, Expense, Booking, Resident, Provider } from "../types";
 
 let aiPromise: Promise<GoogleGenAI> | null = null;
 let chat: Chat | null = null;
@@ -143,7 +143,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                     }
                      if (queryTable === 'residents' && apt) {
                         const resident = await apiService.fetchResidentByApartment(currentConjuntoId, apt);
-                         if(resident) return `Residente del Apto ${apt}:\nNombre: ${resident.name}\nEmail: ${resident.email}\nTeléfono: ${resident.phone}`;
+                         if(resident) return `Residente del Apto ${apt}:\n- Nombre: ${resident.name}\n- Email: ${resident.email}\n- Teléfono: ${resident.phone}`;
                          return `No encontré un residente para el Apto ${apt}.`;
                     }
                     return `No pude procesar la consulta: "${query_description}". Intenta de nuevo.`;
@@ -157,6 +157,19 @@ const processApiResponse = async (response: string): Promise<string> => {
                         .map(d => `- Apto ${d.apartment} (${d.name}): $${d.balance.toLocaleString('es-CO')}`)
                         .join('\n');
                     return `Claro, aquí está la lista de residentes en mora:\n\n${debtorsList}`;
+
+                case 'queryProviders':
+                    const { specialty } = action.payload;
+                    const providers: Provider[] = await apiService.fetchProvidersBySpecialty(currentConjuntoId, specialty);
+                     if (providers.length === 0) {
+                        return specialty 
+                            ? `No encontré proveedores con la especialidad "${specialty}" en la base de datos.`
+                            : `No hay proveedores registrados en la base de datos.`;
+                    }
+                    const providersList = providers
+                        .map(p => `- ${p.company} (${p.specialty}) - Contacto: ${p.phone || 'N/A'}, ${p.email || 'N/A'}`)
+                        .join('\n');
+                    return `Entendido. Consulté la base de datos y encontré estos proveedores:\n\n${providersList}`;
 
                 // --- COMMON AREAS ---
                 case 'addBooking':
