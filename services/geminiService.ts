@@ -7,34 +7,23 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 // Using a recommended model for complex text tasks.
 const model = 'gemini-2.5-pro';
 
-// Cache for the system prompt to avoid fetching it on every message
-let systemPromptTemplate: string | null = null;
+// The system prompt is now embedded directly to avoid fetch errors that cause a blank screen.
+const systemPromptTemplate = `Eres PAIC, un asistente IA experto en la administración de conjuntos residenciales en Colombia.
+Tu propósito es ayudar al administrador, {{userName}}, a gestionar el conjunto "{{conjuntoName}}".
+Responde en español, de forma concisa y profesional. Utiliza la información de contexto que se te proporciona.
+NO inventes información. Si no sabes la respuesta o no tienes la información, indícalo claramente.
+
+Aquí está el menú de opciones que le presentaste al usuario:
+{{initialAiMessage}}`;
 
 /**
- * Fetches the system prompt from the text file, using a cache to avoid repeated loads.
+ * Constructs the system prompt with dynamic data.
  * @param userName The name of the administrator.
  * @param conjuntoName The name of the residential complex.
  * @param initialAiMessage The initial welcome message shown to the user.
  * @returns The fully constructed system prompt.
  */
-const getSystemPrompt = async (userName: string, conjuntoName: string, initialAiMessage: string): Promise<string> => {
-    if (!systemPromptTemplate) {
-        try {
-            const response = await fetch('/src/prompts/system_prompt.txt');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            systemPromptTemplate = await response.text();
-        } catch (error) {
-            console.error("Could not fetch or read system prompt file:", error);
-            // Fallback prompt in case the file is missing or unreadable
-            systemPromptTemplate = `Eres PAIC, un asistente IA experto en la administración de conjuntos residenciales en Colombia.
-Tu propósito es ayudar al administrador, {{userName}}, a gestionar el conjunto "{{conjuntoName}}".
-Responde en español, de forma concisa y profesional.
-Aquí está el menú de opciones que le presentaste al usuario:
-{{initialAiMessage}}`;
-        }
-    }
+const getSystemPrompt = (userName: string, conjuntoName: string, initialAiMessage: string): string => {
     // Replace placeholders with dynamic data
     return systemPromptTemplate
         .replace('{{userName}}', userName)
@@ -54,7 +43,7 @@ const runChat = async (
     }
 
     try {
-        const systemInstruction = await getSystemPrompt(userProfile.name, conjuntoInfo.name, initialAiMessage || '');
+        const systemInstruction = getSystemPrompt(userProfile.name, conjuntoInfo.name, initialAiMessage || '');
         
         const response = await ai.models.generateContent({
             model: model,
