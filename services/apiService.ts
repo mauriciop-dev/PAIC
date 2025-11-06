@@ -145,13 +145,15 @@ export const apiService = {
     async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> { return mockPromise(mockDashboardSummary()); },
     async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[], monthlyBudget: number }> { 
         return mockPromise({
+            // FIX: Added missing 'value' and 'fill' properties to conform to the ChartData type.
+            // These values are not used by the LineChart, so dummy values are safe.
             monthlyIncomeVsExpense: [
-                { name: 'Ene', ingresos: 4000, gastos: 2400 },
-                { name: 'Feb', ingresos: 3000, gastos: 1398 },
-                { name: 'Mar', ingresos: 2000, gastos: 9800 },
-                { name: 'Abr', ingresos: 2780, gastos: 3908 },
-                { name: 'May', ingresos: 1890, gastos: 4800 },
-                { name: 'Jun', ingresos: 2390, gastos: 3800 },
+                { name: 'Ene', ingresos: 4000, gastos: 2400, value: 0, fill: '' },
+                { name: 'Feb', ingresos: 3000, gastos: 1398, value: 0, fill: '' },
+                { name: 'Mar', ingresos: 2000, gastos: 9800, value: 0, fill: '' },
+                { name: 'Abr', ingresos: 2780, gastos: 3908, value: 0, fill: '' },
+                { name: 'May', ingresos: 1890, gastos: 4800, value: 0, fill: '' },
+                { name: 'Jun', ingresos: 2390, gastos: 3800, value: 0, fill: '' },
             ],
             expensesByCategory: [
                 { name: 'Servicios', value: 400, fill: '#0088FE' },
@@ -159,9 +161,11 @@ export const apiService = {
                 { name: 'Nómina', value: 300, fill: '#FFBB28' },
                 { name: 'Otros', value: 200, fill: '#FF8042' },
             ],
+            // FIX: Added missing 'fill' property to conform to the ChartData type.
+            // This value is not used by the BarChart, which specifies its own fill color.
             packageVolume: [
-                { name: 'Ene', value: 50 }, { name: 'Feb', value: 65 }, { name: 'Mar', value: 70 },
-                { name: 'Abr', value: 82 }, { name: 'May', value: 95 }, { name: 'Jun', value: 110 },
+                { name: 'Ene', value: 50, fill: '' }, { name: 'Feb', value: 65, fill: '' }, { name: 'Mar', value: 70, fill: '' },
+                { name: 'Abr', value: 82, fill: '' }, { name: 'May', value: 95, fill: '' }, { name: 'Jun', value: 110, fill: '' },
             ],
             visitorTraffic: [
                 { name: 'Portería 1', value: 250, fill: '#0088FE' },
