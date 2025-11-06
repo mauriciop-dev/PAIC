@@ -59,10 +59,13 @@ const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoI
         }
     }
     
+    const formattedDate = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
     // Replace placeholders with actual data from the cached template
     const finalPrompt = (systemPromptTemplate || '')
         .replace(/{{userName}}/g, userProfile.name)
-        .replace(/{{conjuntoName}}/g, conjuntoInfo.name);
+        .replace(/{{conjuntoName}}/g, conjuntoInfo.name)
+        .replace(/{{currentDate}}/g, formattedDate);
         
     return finalPrompt;
 }
