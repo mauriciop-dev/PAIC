@@ -18,10 +18,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (userProfile && conjuntoInfo && messages.length === 0) {
+    if (userProfile && conjuntoInfo && messages.length === 0 && isOpen) {
         setMessages([
             { sender: 'ai', text: `Hola ${userProfile.name}, soy PAIC y te ayudaré a administrar ${conjuntoInfo.name}.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
         ]);
+    } else if (!isOpen) {
+        // Clear messages when chatbot is closed to ensure it re-initializes with the welcome message
+        setMessages([]);
     }
   }, [userProfile, conjuntoInfo, isOpen]);
 
@@ -53,7 +56,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
     setIsLoading(true);
 
     try {
-      const aiResponseText = await geminiService.runChat(currentInput, userProfile, conjuntoInfo);
+      // Pass the initial AI message from the UI state to give context to the model
+      const initialAiMessage = messages[0]?.sender === 'ai' ? messages[0].text : undefined;
+      const aiResponseText = await geminiService.runChat(currentInput, userProfile, conjuntoInfo, initialAiMessage);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
@@ -98,7 +103,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
             >
               <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
             </div>
-            {msg.sender === 'user' && userProfile && <img src={userProfile.picture} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
+            {msg.sender === 'user' && userProfile && userProfile.picture && <img src={userProfile.picture} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
           </div>
         ))}
         {isLoading && (

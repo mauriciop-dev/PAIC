@@ -5,6 +5,7 @@ import { DueDate, UserProfile, ConjuntoInfo, Task, VisitorLog, PackageLog, Incom
 let aiPromise: Promise<GoogleGenAI> | null = null;
 let chat: Chat | null = null;
 let currentConjuntoId: string | null = null;
+let systemPromptTemplate: string | null = null; // Cache for the prompt template
 
 const model = 'gemini-2.5-flash';
 
@@ -43,35 +44,42 @@ const getAiClient = (): Promise<GoogleGenAI> => {
 };
 
 const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo): Promise<string> => {
-    try {
-        const response = await fetch('/src/prompts/system_prompt.txt');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    // FIX: Cache the prompt template to avoid fetching it on every chat initialization, improving performance.
+    if (!systemPromptTemplate) { 
+        try {
+            const response = await fetch('/src/prompts/system_prompt.txt');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            systemPromptTemplate = await response.text(); // Cache the template
+        } catch (error) {
+            console.error("Failed to fetch and cache system prompt:", error);
+            // Fallback to a very basic prompt in case of failure
+            return `You are a helpful assistant for ${conjuntoInfo.name}. The user is ${userProfile.name}.`;
         }
-        const promptTemplate = await response.text();
-        
-        // Replace placeholders with actual data
-        const finalPrompt = promptTemplate
-            .replace(/{{userName}}/g, userProfile.name)
-            .replace(/{{conjuntoName}}/g, conjuntoInfo.name);
-            
-        return finalPrompt;
-    } catch (error) {
-        console.error("Failed to fetch system prompt:", error);
-        // Fallback to a very basic prompt in case of failure
-        return `You are a helpful assistant for ${conjuntoInfo.name}. The user is ${userProfile.name}.`;
     }
+    
+    // Replace placeholders with actual data from the cached template
+    const finalPrompt = (systemPromptTemplate || '')
+        .replace(/{{userName}}/g, userProfile.name)
+        .replace(/{{conjuntoName}}/g, conjuntoInfo.name);
+        
+    return finalPrompt;
 }
 
-const initializeChat = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo) => {
+// FIX: `initialAiMessage` is now optional. It's used to prime the chat history with the UI's welcome message, giving context to the AI for the user's first reply.
+const initializeChat = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo, initialAiMessage?: string) => {
     try {
         const aiClient = await getAiClient();
         const systemInstruction = await getSystemPrompt(userProfile, conjuntoInfo);
+        const history = initialAiMessage ? [{ role: 'model', parts: [{ text: initialAiMessage }] }] : undefined;
+
         chat = aiClient.chats.create({
             model: model,
             config: {
                 systemInstruction,
             },
+            history: history, // Provide the initial AI message as context if it exists
         });
         currentConjuntoId = conjuntoInfo.id;
     } catch (error) {
@@ -87,6 +95,9 @@ const processApiResponse = async (response: string): Promise<string> => {
         
         if (action.function && action.payload && currentConjuntoId) {
             apiService.logChatbotInteraction(currentConjuntoId); // Log interaction
+            
+            // This re-initializes the chat after a function call to keep the context clean.
+            // It correctly calls initializeChat without an initial message.
             await initializeChat(chat?.userProfile as UserProfile, chat?.conjuntoInfo as ConjuntoInfo);
 
             switch (action.function) {
@@ -202,7 +213,7 @@ const runStandaloneQuery = async (systemInstruction: string, prompt: string): Pr
 }
 
 export const geminiService = {
-  runChat: async (prompt: string, userProfile: UserProfile | null, conjuntoInfo: ConjuntoInfo | null): Promise<string> => {
+  runChat: async (prompt: string, userProfile: UserProfile | null, conjuntoInfo: ConjuntoInfo | null, initialAiMessage?: string): Promise<string> => {
     try {
         await getAiClient();
     } catch (error: any) {
@@ -215,7 +226,7 @@ export const geminiService = {
     }
       
     if (!chat || currentConjuntoId !== conjuntoInfo.id) {
-      await initializeChat(userProfile, conjuntoInfo);
+      await initializeChat(userProfile, conjuntoInfo, initialAiMessage);
     }
     
     if (!chat) {
