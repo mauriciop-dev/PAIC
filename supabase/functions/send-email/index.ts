@@ -20,7 +20,7 @@ const corsHeaders = {
 };
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const FALLBACK_SENDER_EMAIL = Deno.env.get('SENDER_EMAIL') || 'onboarding@resend.dev';
+const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL');
 const FALLBACK_SENDER_NAME = 'Administración PAIC';
 
 serve(async (req) => {
@@ -33,9 +33,12 @@ serve(async (req) => {
     if (!RESEND_API_KEY) {
       throw new Error('La variable de entorno RESEND_API_KEY no está configurada.');
     }
+    if (!SENDER_EMAIL) {
+        throw new Error('La variable de entorno SENDER_EMAIL (email de envío verificado) no está configurada.');
+    }
     
     const resend = new Resend(RESEND_API_KEY);
-    const { to, subject, html, fromName, fromEmail } = await req.json();
+    const { to, subject, html, fromName } = await req.json();
 
     // Valida que los campos necesarios estén presentes
     if (!to || !Array.isArray(to) || to.length === 0 || !subject || !html) {
@@ -48,7 +51,7 @@ serve(async (req) => {
     }
     
     const senderName = fromName || FALLBACK_SENDER_NAME;
-    const senderEmail = fromEmail || FALLBACK_SENDER_EMAIL;
+    const senderEmail = SENDER_EMAIL;
 
     // Lógica de envío de correo
     const { data, error } = await resend.emails.send({

@@ -270,11 +270,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     transform: 'translate(-50%, -100%)',
                     marginTop: '-10px',
                 }}
-                className="z-50 w-60 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg"
+                className="z-50 w-60 p-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg max-h-64 overflow-y-auto"
             >
                 <ul className="list-disc list-inside">
-                    {tooltip.content.slice(0, 5).map((item, i) => <li key={i}>{item}</li>)}
-                    {tooltip.content.length > 5 && <li>...y {tooltip.content.length - 5} más.</li>}
+                    {tooltip.content.map((item, i) => <li key={i}>{item}</li>)}
                 </ul>
                 <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800"></div>
             </div>

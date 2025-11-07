@@ -592,13 +592,16 @@ export const apiService = {
         }
 
         const { data, error } = await supabase.functions.invoke('send-email', {
-            body: {
+            body: JSON.stringify({
                 to: recipients,
                 subject,
                 html: finalHtml,
                 fromName,
                 fromEmail,
-            },
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            }
         });
 
         if (error) {
@@ -621,10 +624,31 @@ export const apiService = {
         // Mock data. A real implementation would run DB queries.
         return {
             stats: {
-                residentsInDebt: { count: 5, details: ['Apto 101', 'Apto 203'] },
-                pendingTasks: { count: 3, details: ['Revisar bomba de agua'] },
-                overduePayments: { count: 2, details: ['Pago de seguridad', 'Mantenimiento ascensor'] },
-                packagesToDeliver: { count: 8, details: ['Paquete para Apto 505'] },
+                residentsInDebt: { 
+                    count: 5, 
+                    details: ['Apto 101', 'Apto 203', 'Apto 305', 'Apto 401', 'Apto 502'] 
+                },
+                pendingTasks: { 
+                    count: 3, 
+                    details: ['Revisar bomba de agua', 'Comprar pintura pasillos', 'Llamar a empresa de jardinería'] 
+                },
+                overduePayments: { 
+                    count: 2, 
+                    details: ['Pago de seguridad (Vencido)', 'Mantenimiento ascensor (Vencido)'] 
+                },
+                packagesToDeliver: { 
+                    count: 8, 
+                    details: [
+                        'Paquete para Apto 505', 
+                        'Sobre para Apto 102', 
+                        'Caja para Apto 301', 
+                        'Paquete para Apto 604', 
+                        'Sobre para Apto 202', 
+                        'Paquete para Apto 701', 
+                        'Caja para Apto 403',
+                        'Paquete para Apto 104'
+                    ] 
+                },
             },
             notifications: [
                 { id: 1, type: 'due-date', text: 'Pago de vigilancia vence pronto', details: 'Vence en 3 días', urgency: 'high', linkTo: Tab.DueDates },
