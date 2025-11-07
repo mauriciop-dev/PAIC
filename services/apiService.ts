@@ -831,19 +831,28 @@ export const apiService = {
     // --- COMMUNICATIONS ---
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string; url: string }[]): Promise<{ success: boolean; message?: string; error?: string; }> {
         try {
-            const payload = { recipients, subject, body, attachments };
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!session) throw new Error('No active session found. Please log in again.');
+
+            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys';
             
-            // Reverting to the standard Supabase client invocation.
-            // This is the most robust and correct way to call an Edge Function.
-            // If this fails with a "Failed to fetch" or "Failed to send request" error,
-            // it is a strong indicator of a server-side CORS configuration issue,
-            // likely related to the recent DNS changes mentioned.
-            const { error } = await supabase.functions.invoke('send-email', {
-                body: payload,
+            const payload = { recipients, subject, body, attachments };
+
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
             });
 
-            if (error) {
-                throw error;
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(errorBody || `Request failed with status ${response.status}`);
             }
     
             return { success: true, message: 'Se ha iniciado el proceso de envío de correo.' };
