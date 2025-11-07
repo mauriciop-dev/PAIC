@@ -592,16 +592,13 @@ export const apiService = {
         }
 
         const { data, error } = await supabase.functions.invoke('send-email', {
-            body: JSON.stringify({
+            body: {
                 to: recipients,
                 subject,
                 html: finalHtml,
                 fromName,
                 fromEmail,
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-            }
+            },
         });
 
         if (error) {

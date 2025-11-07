@@ -38,7 +38,13 @@ serve(async (req) => {
     }
     
     const resend = new Resend(RESEND_API_KEY);
-    const { to, subject, html, fromName } = await req.json();
+    const body = await req.json();
+
+    if (!body || typeof body !== 'object') {
+        throw new Error("El cuerpo de la solicitud es inválido o no es un objeto JSON.");
+    }
+    
+    const { to, subject, html, fromName } = body;
 
     // Valida que los campos necesarios estén presentes
     if (!to || !Array.isArray(to) || to.length === 0 || !subject || !html) {
