@@ -191,7 +191,7 @@ const App: React.FC = () => {
       }
   }, [userProfile]);
   
-  const handleAuthSuccess = async (profile: UserProfile) => {
+  const handleAuthSuccess = useCallback(async (profile: UserProfile) => {
     setUserProfile(profile);
     localStorage.setItem('paic_userProfile', JSON.stringify(profile));
     
@@ -211,9 +211,28 @@ const App: React.FC = () => {
     if (profile.role === UserRole.Guard) {
       setIsAccessPointModalOpen(true);
     }
-  };
+  }, []);
 
   const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
+    // FIX: Authenticate with Supabase using the Google ID token to establish a valid session.
+    // This is required for subsequent authenticated API calls, like sending emails via Edge Functions.
+    const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: credentialResponse.credential,
+    });
+
+    if (error) {
+        console.error("Supabase sign-in error:", error);
+        setNotification(`Error de autenticación: ${error.message}`);
+        return;
+    }
+
+    if (!data.user) {
+        console.error("Supabase sign-in did not return a user.");
+        setNotification("Error de autenticación: No se pudo verificar el usuario.");
+        return;
+    }
+
     const profileObject: any = jwtDecode(credentialResponse.credential);
     if (!profileObject) {
       console.error("Failed to decode profile from credential response.");
@@ -242,7 +261,7 @@ const App: React.FC = () => {
       conjuntoId: existingUser?.conjuntoId || 'conj-123'
     };
     handleAuthSuccess(newUserProfile);
-  }, []);
+  }, [handleAuthSuccess]);
 
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     // 1. Persist the new info to our simulated backend
