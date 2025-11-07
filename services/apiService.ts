@@ -833,25 +833,17 @@ export const apiService = {
         try {
             const payload = { recipients, subject, body, attachments };
             
-            // FIX: Re-implemented with native fetch to bypass potential Supabase client issues when
-            // invoking Edge Functions from a custom domain, which might be causing the
-            // "Failed to send a request" error. This provides a more direct and robust invocation.
-            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co'; // From supabaseClient.ts
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys'; // From supabaseClient.ts
-            
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-                method: 'POST',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
+            // Reverting to the standard Supabase client invocation.
+            // This is the most robust and correct way to call an Edge Function.
+            // If this fails with a "Failed to fetch" or "Failed to send request" error,
+            // it is a strong indicator of a server-side CORS configuration issue,
+            // likely related to the recent DNS changes mentioned.
+            const { error } = await supabase.functions.invoke('send-email', {
+                body: payload,
             });
-    
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `La función de correo respondió con el estado ${response.status}.`);
+
+            if (error) {
+                throw error;
             }
     
             return { success: true, message: 'Se ha iniciado el proceso de envío de correo.' };
