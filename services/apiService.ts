@@ -1,995 +1,598 @@
+// services/apiService.ts
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
-import { 
-    UserProfile, 
-    ConjuntoInfo, 
-    Resident, 
+import {
+    Resident,
     AccountStatus,
     Provider,
     InternalStaff,
     PlatformUser,
+    UserRole,
+    UserRoleDefinition,
+    Booking,
+    CommonArea,
     DueDate,
     Task,
-    CommonArea,
-    Booking,
-    DashboardSummary,
-    ChartData,
-    NotificationItem,
-    Tab,
     Expense,
     Income,
     VisitorLog,
     PackageLog,
     AccessPoint,
+    ConjuntoInfo,
+    DashboardSummary,
+    ChartData,
+    NotificationItem,
+    Tab,
     PlatformStats,
-    UserRole,
-    UserRoleDefinition,
+    SuperAdminChartData,
     StoredFile,
-    ExpenseCategory,
-    IncomeCategory,
-    SuperAdminChartData
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
-// --- MOCK DATA GENERATION ---
-const firstNames = ['Juan', 'Maria', 'Carlos', 'Ana', 'Luis', 'Laura', 'Pedro', 'Sofia', 'Diego', 'Camila', 'Andres', 'Valentina', 'Jose', 'Daniela', 'Miguel', 'Paula', 'Javier', 'Isabella', 'Ricardo', 'Gabriela'];
-const lastNames = ['Garcia', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Perez', 'Sanchez', 'Ramirez', 'Torres', 'Gomez', 'Diaz', 'Vasquez', 'Rojas', 'Mora', 'Castro'];
-const companies = ['Plomería Express', 'Electricistas Certificados', 'Aseo Brillante', 'Seguridad Aguila', 'Jardinería El Oasis', 'Ascensores Andinos', 'Constructora G&G', 'Fumigaciones Stop', 'Impermeabilizaciones Total'];
-const specialties = ['Plomería', 'Electricidad', 'Aseo y Limpieza', 'Vigilancia', 'Jardinería', 'Mantenimiento Ascensores', 'Construcción', 'Fumigación', 'Impermeabilización'];
-const positions = ['Todero', 'Aseadora', 'Jardinero', 'Vigilante', 'Recepcionista', 'Jefe de Mantenimiento'];
-const couriers = ['Servientrega', 'Interrapidísimo', 'Coordinadora', 'Mercado Libre', 'Deprisa', 'DHL', 'TCC', 'Envia'];
-const expenseItems = ['Pago nómina vigilancia', 'Reparación bomba de agua', 'Compra de bombillos LED', 'Servicio de jardinería', 'Mantenimiento mensual ascensores', 'Seguro de áreas comunes', 'Factura de energía', 'Factura de acueducto'];
-const incomeItems = ['Cuota administración', 'Multa por ruido', 'Alquiler salón social', 'Intereses de mora', 'Alquiler de parqueadero'];
+// In a real app, this list might come from a DB table or a more secure source.
+const SUPER_ADMIN_EMAILS = ['superadmin@paic.com', 'test.superadmin@example.com']; // Example email for testing
 
-const getRandomElement = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const getRandomNumber = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-const getRandomDate = (start: Date, end: Date) => new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-
-// This flag prevents multiple seeding attempts during a single app session.
-let hasSeededForSession = false;
-
-const handleApiError = (error: any, context: string) => {
-    console.error(`Error in ${context}:`, error);
-    if (error && error.code === '23505') { // unique_violation (PostgrestError)
-        if (error.message && error.message.includes('users_email_key')) {
-            throw new Error('Ya existe un usuario con este correo electrónico.');
-        }
-        if (error.message && error.message.includes('user_roles_name_conjunto_id_key')) {
-            throw new Error('Ya existe un rol con este nombre para un usuario de este conjunto.');
-        }
-        throw new Error('Este registro ya existe o viola una restricción de unicidad.');
+const handleError = (error: PostgrestError | null, context: string) => {
+    if (error) {
+        console.error(`Error in ${context}:`, error);
+        throw new Error(`Database error in ${context}: ${error.message}`);
     }
-    // Generic error for any other database issue
-    const message = error?.message || 'Ocurrió un error inesperado en la base de datos.';
-    throw new Error(message);
-}
+};
+
+// A helper to generate random colors for common areas
+const getRandomColor = () => {
+    const colors = [
+      { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+      { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+      { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+      { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+      { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+};
 
 
 export const apiService = {
-    // Seeding function
-    async seedDatabase(conjuntoId: string): Promise<void> {
-        if (hasSeededForSession) return;
-        
-        const { count } = await supabase.from('residents').select('*', { count: 'exact', head: true }).eq('conjunto_id', conjuntoId);
-        
-        if (count !== null && count > 0) {
-            hasSeededForSession = true;
-            return;
-        }
 
-        console.log(`No data found for conjunto ${conjuntoId}. Seeding database...`);
-
-        try {
-            // -- ORDER OF SEEDING MATTERS --
-            
-            // 1. Common Areas & Access Points
-            const commonAreasSeed = [
-                { name: 'Salón Social', color: { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' } },
-                { name: 'Gimnasio', color: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' } },
-                { name: 'Piscina', color: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' } },
-                { name: 'Zona BBQ', color: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' } },
-            ].map(a => ({ ...a, conjunto_id: conjuntoId }));
-            await supabase.from('common_areas').insert(commonAreasSeed);
-            const { data: areasData } = await supabase.from('common_areas').select('name').eq('conjunto_id', conjuntoId);
-            const areaNames = (areasData || []).map(a => a.name);
-
-            const accessPointsSeed = [{ name: 'Portería Principal' }, { name: 'Portería Parqueadero' }].map(p => ({ ...p, conjunto_id: conjuntoId }));
-            await supabase.from('access_points').insert(accessPointsSeed);
-
-            // 2. Residents & Accounts
-            let residentsSeed: any[] = [];
-            let accountsSeed: any[] = [];
-            let apartments: string[] = [];
-            for (let i = 0; i < 50; i++) {
-                const torre = getRandomNumber(1, 5);
-                const aptNum = getRandomNumber(101, 804);
-                const apartment = `${torre}-${aptNum}`;
-                if (apartments.includes(apartment)) { i--; continue; }
-                apartments.push(apartment);
-
-                const fName = getRandomElement(firstNames);
-                const lName = getRandomElement(lastNames);
-                residentsSeed.push({ apartment, name: `${fName} ${lName}`, email: `${fName.toLowerCase()}.${lName.toLowerCase()}${i}@example.com`, phone: `3${getRandomNumber(10, 22)}${getRandomNumber(1000000, 9999999)}` });
-                accountsSeed.push({ apartment, last_payment_date: getRandomDate(new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), new Date()).toISOString().split('T')[0], admin_fee_value: 280000, outstanding_balance: Math.random() < 0.2 ? 280000 * getRandomNumber(1, 3) : 0 });
-            }
-            await supabase.from('residents').insert(residentsSeed.map(r => ({ ...r, conjunto_id: conjuntoId })));
-            await supabase.from('account_status').insert(accountsSeed.map(a => ({ ...a, conjunto_id: conjuntoId })));
-
-            // 3. Providers, Staff, Users, Roles
-            const providersSeed = Array.from({ length: 15 }, (_, i) => {
-                const company = getRandomElement(companies);
-                return { company: `${company} #${i}`, specialty: getRandomElement(specialties), email: `contacto@${company.toLowerCase().replace(/\s/g, '')}${i}.com`, phone: `300${getRandomNumber(1000000, 9999999)}` };
-            });
-            await supabase.from('providers').insert(providersSeed.map(p => ({ ...p, conjunto_id: conjuntoId })));
-            const { data: providersData } = await supabase.from('providers').select('id').eq('conjunto_id', conjuntoId);
-            const providerIds = (providersData || []).map(p => p.id);
-            
-            const staffSeed = Array.from({ length: 5 }, () => {
-                const fName = getRandomElement(firstNames);
-                const lName = getRandomElement(lastNames);
-                return { name: `${fName} ${lName}`, position: getRandomElement(positions), email: `${fName.toLowerCase()}${lName.toLowerCase()}@work.com`, phone: `315${getRandomNumber(1000000, 9999999)}`};
-            });
-            await supabase.from('internal_staff').insert(staffSeed.map(s => ({...s, conjunto_id: conjuntoId})));
-            
-            const usersSeed = [
-                { name: 'Carlos Vigilante', email: 'carlos.v@work.com', phone_number: '3111111111', role: 'Portero', password: 'password123' },
-                { name: 'Lucia Vigilante', email: 'lucia.v@work.com', phone_number: '3222222222', role: 'Portero', password: 'password123' },
-                { name: 'Roberto Contador', email: 'roberto.c@work.com', phone_number: '3333333333', role: 'Contador', password: 'password123' },
-            ];
-            await supabase.from('users').insert(usersSeed.map(u => ({...u, conjunto_id: conjuntoId})));
-
-            const rolesSeed = [{ name: 'Miembro del Consejo', permissions: [Tab.Dashboard, Tab.Finanzas], conjunto_id: conjuntoId }];
-            await supabase.from('user_roles').insert(rolesSeed);
-
-            // 4. Due Dates & Tasks
-            const dueDatesSeed = Array.from({ length: 20 }, () => ({
-                item: getRandomElement(expenseItems),
-                category: getRandomElement(['Servicios', 'Mantenimiento', 'Seguros', 'Nómina', 'Otros']),
-                due_date: getRandomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
-                status: getRandomElement(['Pendiente', 'Vencido', 'Pagado'])
-            }));
-            await supabase.from('due_dates').insert(dueDatesSeed.map(d => ({...d, conjunto_id: conjuntoId})));
-
-            const tasksSeed = Array.from({ length: 25 }, () => ({
-                text: `Revisar ${getRandomElement(['bombillos', 'cámaras', 'extintores', 'ascensor'])} en Torre ${getRandomNumber(1,5)}`,
-                due_date: getRandomDate(new Date(), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
-                completed: Math.random() < 0.4
-            }));
-            await supabase.from('tasks').insert(tasksSeed.map(t => ({...t, conjunto_id: conjuntoId})));
-
-            // 5. Bookings, Finances, Security Logs
-            const bookingsSeed = Array.from({ length: 40 }, () => ({
-                day: getRandomNumber(1, 28),
-                time: `${getRandomNumber(8, 18)}:00`,
-                event: getRandomElement(areaNames),
-                user: `Apto ${getRandomElement(apartments)}`
-            }));
-            await supabase.from('bookings').insert(bookingsSeed.map(b => ({...b, conjunto_id: conjuntoId})));
-
-            // Generate financial data for the last 6 months for realism
-            const today = new Date();
-            const expensesSeed: any[] = [];
-            const incomesSeed: any[] = [];
-            for (let i = 5; i >= 0; i--) {
-                const monthStartDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
-                const monthEndDate = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
-
-                for (let j = 0; j < getRandomNumber(15, 25); j++) {
-                    expensesSeed.push({
-                        description: getRandomElement(expenseItems),
-                        amount: getRandomNumber(50000, 2000000),
-                        category: getRandomElement(['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'] as ExpenseCategory[]),
-                        date: getRandomDate(monthStartDate, monthEndDate).toISOString().split('T')[0],
-                        provider_id: Math.random() < 0.5 ? getRandomElement(providerIds) : null
-                    });
-                }
-                 for (let k = 0; k < getRandomNumber(20, 30); k++) {
-                    incomesSeed.push({
-                        description: getRandomElement(incomeItems),
-                        amount: getRandomNumber(100000, 500000),
-                        category: getRandomElement(['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'] as IncomeCategory[]),
-                        date: getRandomDate(monthStartDate, monthEndDate).toISOString().split('T')[0],
-                    });
-                }
-            }
-            await supabase.from('expenses').insert(expensesSeed.map(e => ({...e, conjunto_id: conjuntoId})));
-            await supabase.from('incomes').insert(incomesSeed.map(i => ({...i, conjunto_id: conjuntoId})));
-
-            const visitorLogsSeed = Array.from({ length: 50 }, () => {
-                const status = getRandomElement(['Autorizado', 'Ingresó', 'Salió']);
-                return {
-                    apartment: getRandomElement(apartments),
-                    visitor_name: `${getRandomElement(firstNames)} ${getRandomElement(lastNames)}`,
-                    date: getRandomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date()).toISOString().split('T')[0],
-                    status,
-                    entry_time: status !== 'Autorizado' ? `${getRandomNumber(7, 19)}:${getRandomNumber(10, 59)}` : null,
-                    exit_time: status === 'Salió' ? `${getRandomNumber(10, 21)}:${getRandomNumber(10, 59)}` : null
-                };
-            });
-            await supabase.from('visitor_logs').insert(visitorLogsSeed.map(v => ({...v, conjunto_id: conjuntoId})));
-            
-            const packageLogsSeed = Array.from({ length: 50 }, () => ({
-                apartment: getRandomElement(apartments),
-                courier: getRandomElement(couriers),
-                tracking_number: `GU${getRandomNumber(100000000, 999999999)}`,
-                received_date: getRandomDate(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), new Date()).toISOString(),
-                status: getRandomElement(['En recepción', 'Entregado'])
-            }));
-            await supabase.from('package_logs').insert(packageLogsSeed.map(p => ({...p, conjunto_id: conjuntoId})));
-
-            hasSeededForSession = true;
-            console.log("Database seeding completed successfully.");
-        } catch (error) {
-            console.error("A critical error occurred during database seeding:", error);
-            // Don't retry seeding in this session if it fails, to avoid loops.
-            hasSeededForSession = true;
-        }
-    },
-    // Conjunto & User
+    // =================================================================
+    // CONJUNTO & PLATFORM
+    // =================================================================
+    
     async fetchConjuntoInfo(conjuntoId: string): Promise<ConjuntoInfo | null> {
         const { data, error } = await supabase.from('conjuntos').select('*').eq('id', conjuntoId).single();
-        if (error) {
-             handleApiError(error, `fetchConjuntoInfo for ${conjuntoId}`);
-             return null;
-        }
+        handleError(error, 'fetchConjuntoInfo');
         return fromSupabase(data) as ConjuntoInfo | null;
     },
+    
     async updateConjuntoInfo(info: ConjuntoInfo): Promise<void> {
-        const { error } = await supabase.from('conjuntos').update(toSupabase(info)).eq('id', info.id);
-        if (error) handleApiError(error, 'updateConjuntoInfo');
+        const { error } = await supabase.from('conjuntos').upsert(toSupabase(info));
+        handleError(error, 'updateConjuntoInfo');
     },
-    async checkIfSuperAdmin(email: string): Promise<boolean> {
-        const { data, error } = await supabase.from('super_admins').select('email').eq('email', email).single();
-        if (error) {
-            // 'PGRST116' is the code for "No rows found", which is not an error here.
-            if (error.code !== 'PGRST116') {
-                 console.error('Error checking for super admin:', error);
-            }
-            return false;
+
+    async fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
+        const { data, error } = await supabase.from('conjuntos').select('*');
+        handleError(error, 'fetchAllConjuntos');
+        return fromSupabase(data) as ConjuntoInfo[];
+    },
+
+    async fetchPlatformStats(): Promise<PlatformStats> {
+        // Mocked data for demonstration
+        return {
+            totalConjuntos: 25,
+            paidSubscriptions: 18,
+            totalResidents: 1250,
+            monthlyRecurringRevenue: 18 * 140000,
+            newThisMonth: 3,
+        };
+    },
+    
+    async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
+        // Mocked data
+        return {
+            chatbotUsage: [
+                { name: 'Ene', value: 400 }, { name: 'Feb', value: 300 }, { name: 'Mar', value: 500 },
+                { name: 'Abr', value: 450 }, { name: 'May', value: 600 }, { name: 'Jun', value: 700 },
+            ],
+            packageVolume: [],
+            visitorTraffic: [],
+        };
+    },
+
+    async seedDatabase(conjuntoId: string): Promise<void> {
+        const { data, error } = await supabase.from('common_areas').select('id').eq('conjunto_id', conjuntoId).limit(1);
+        handleError(error, 'seedDatabase check');
+        if (data && data.length === 0) {
+            console.log(`Seeding default common area for conjunto ${conjuntoId}`);
+            await this.addCommonArea(conjuntoId, 'Salón Social');
         }
-        return !!data;
     },
+
+
+    // =================================================================
+    // AUTH & USERS
+    // =================================================================
+
     async findUserByEmail(email: string): Promise<PlatformUser | null> {
         const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
-        if (error) {
-            if (error.code !== 'PGRST116') {
-                handleApiError(error, `findUserByEmail for ${email}`);
-            }
-            return null;
+        if (error && error.code !== 'PGRST116') { // Ignore 'not found' error
+            handleError(error, 'findUserByEmail');
         }
         return fromSupabase(data) as PlatformUser | null;
     },
+
+    async checkIfSuperAdmin(email: string): Promise<boolean> {
+        return SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+    },
+
     async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
-        try {
-            // 1. Fetch the user by email
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('email', email)
-                .single();
-
-            // If user not found or other DB error
-            if (error) {
-                if (error.code === 'PGRST116') { // PGRST116 is "No rows found"
-                    return null; // User doesn't exist, authentication fails
-                }
-                // For other errors, let the handler manage it
-                throw error;
-            }
-
-            // 2. If user is found, verify the password
-            if (data && data.password === password) {
-                // Password matches, return the user profile
-                return fromSupabase(data) as PlatformUser;
-            }
-
-            // 3. If password doesn't match or no user data
-            return null;
-
-        } catch (error) {
-            // Let the generic error handler process the error
-            handleApiError(error, `authenticateUser for ${email}`);
-            return null;
+        const user = await this.findUserByEmail(email);
+        // This is a simplified password check. In a real app, use Supabase Auth or hashed passwords.
+        if (user && user.password === password) {
+            return user;
         }
+        return null;
     },
-    // FIX: Add missing method to log chatbot interactions for analytics.
-    async logChatbotInteraction(conjuntoId: string): Promise<void> {
-        const { error } = await supabase.from('chatbot_logs').insert({ conjunto_id: conjuntoId });
-        if (error) handleApiError(error, 'logChatbotInteraction');
-    },
-
-    // DatabaseView related
-    async fetchResidents(conjuntoId: string): Promise<Resident[]> {
-        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching residents:', error);
-            return [];
-        }
-        return (fromSupabase(data) as Resident[] | null) || [];
-    },
-    async fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
-        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
-        if (error) { handleApiError(error, `fetchResidentByApartment for apt ${apartment}`); return null; }
-        return fromSupabase(data) as Resident | null;
-    },
-     async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
-        const { error } = await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
-        if (error) handleApiError(error, 'addResident');
-    },
-    async updateResident(conjuntoId: string, resident: Resident): Promise<void> {
-        const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
-        if (error) handleApiError(error, 'updateResident');
-    },
-    async deleteResident(conjuntoId: string, apartment: string): Promise<void> {
-        const { error } = await supabase.from('residents').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
-        if (error) handleApiError(error, 'deleteResident');
-    },
-    async bulkUpsertResidents(conjuntoId: string, residents: any[]): Promise<void> {
-        const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
-        const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'conjunto_id,apartment' });
-        if(error) handleApiError(error, 'bulkUpsertResidents');
+    
+    async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
+        const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));
+        handleError(error, 'addUser');
     },
 
-    async fetchAccountStatus(conjuntoId: string): Promise<AccountStatus[]> {
-        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching account status:', error);
-            return [];
-        }
-        return (fromSupabase(data) as AccountStatus[] | null) || [];
-    },
-     async fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
-        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
-        if (error) { handleApiError(error, 'fetchAccountStatusByApartment'); return null; }
-        return fromSupabase(data) as AccountStatus | null;
-    },
-    async addAccountStatus(conjuntoId: string, account: Omit<AccountStatus, 'id'>): Promise<void> {
-        const { error } = await supabase.from('account_status').insert(toSupabase({ ...account, conjuntoId }));
-        if (error) handleApiError(error, 'addAccountStatus');
-    },
-    async updateAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
-        const { error } = await supabase.from('account_status').update(toSupabase(account)).eq('conjunto_id', conjuntoId).eq('apartment', account.apartment);
-        if (error) handleApiError(error, 'updateAccountStatus');
-    },
-    async deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
-        const { error } = await supabase.from('account_status').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
-        if (error) handleApiError(error, 'deleteAccountStatus');
-    },
-    async bulkUpsertAccountStatus(conjuntoId: string, accounts: any[]): Promise<void> {
-        const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
-        const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id,apartment' });
-        if(error) handleApiError(error, 'bulkUpsertAccountStatus');
-    },
-    async fetchDebtors(conjuntoId: string): Promise<{ apartment: string; name: string; balance: number }[]> {
-        const [accounts, residents] = await Promise.all([
-            this.fetchAccountStatus(conjuntoId),
-            this.fetchResidents(conjuntoId)
-        ]);
-
-        const debtorsAccounts = accounts.filter(a => a.outstandingBalance > 0);
-        const residentsMap = new Map(residents.map(r => [r.apartment, r.name]));
-
-        return debtorsAccounts.map(account => ({
-            apartment: account.apartment,
-            name: residentsMap.get(account.apartment) || 'Nombre no encontrado',
-            balance: account.outstandingBalance
-        })).sort((a, b) => b.balance - a.balance); // Sort by highest balance
+    async updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
+        const { error } = await supabase.from('users').update(toSupabase(user)).eq('id', user.id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateUser');
     },
 
-    async fetchProviders(conjuntoId: string): Promise<Provider[]> {
-        const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching providers:', error);
-            return [];
-        }
-        return (fromSupabase(data) as Provider[] | null) || [];
-    },
-    async fetchProvidersBySpecialty(conjuntoId: string, specialty?: string): Promise<Provider[]> {
-        let query = supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
-
-        if (specialty) {
-            // Use ilike for case-insensitive partial matching
-            query = query.ilike('specialty', `%${specialty}%`);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) {
-            handleApiError(error, `fetchProvidersBySpecialty for specialty ${specialty}`);
-            return [];
-        }
-        return (fromSupabase(data) as Provider[] | null) || [];
-    },
-    async fetchProviderById(conjuntoId: string, id: number): Promise<Provider | null> {
-        const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId).eq('id', id).single();
-        if (error) { handleApiError(error, `fetchProviderById for id ${id}`); return null; }
-        return fromSupabase(data) as Provider | null;
-    },
-     async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
-        const { error } = await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
-        if (error) handleApiError(error, 'addProvider');
-    },
-    async updateProvider(conjuntoId: string, provider: Provider): Promise<void> {
-        const { error } = await supabase.from('providers').update(toSupabase(provider)).eq('id', provider.id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateProvider');
-    },
-    async deleteProvider(conjuntoId: string, providerId: number): Promise<void> {
-        const { error } = await supabase.from('providers').delete().eq('id', providerId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteProvider');
-    },
-    async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
-        // Step 1: Fetch existing providers to know who to update vs. insert
-        const { data: existingData, error: fetchError } = await supabase
-            .from('providers')
-            .select('company')
-            .eq('conjunto_id', conjuntoId);
-
-        if (fetchError) handleApiError(fetchError, 'bulkUpsertProviders (fetch)');
-
-        const existingCompanies = new Set(existingData?.map(p => p.company) || []);
-
-        // Step 2: Partition the incoming data
-        const providersToInsert = [];
-        const providersToUpdate = [];
-
-        for (const provider of providers) {
-            if (existingCompanies.has(provider.company)) {
-                providersToUpdate.push(provider);
-            } else {
-                providersToInsert.push(provider);
-            }
-        }
-
-        // Step 3: Execute the operations
-        if (providersToInsert.length > 0) {
-            const payload = providersToInsert.map(p => toSupabase({ ...p, conjuntoId }));
-            const { error: insertError } = await supabase.from('providers').insert(payload);
-            if (insertError) handleApiError(insertError, 'bulkUpsertProviders (insert)');
-        }
-
-        if (providersToUpdate.length > 0) {
-            const updatePromises = providersToUpdate.map(p =>
-                supabase.from('providers')
-                    .update(toSupabase(p))
-                    .eq('company', p.company)
-                    .eq('conjunto_id', conjuntoId)
-            );
-            const results = await Promise.all(updatePromises);
-            results.forEach(res => {
-                if (res.error) handleApiError(res.error, 'bulkUpsertProviders (update)');
-            });
-        }
-    },
-
-    async fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
-        const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching internal staff:', error);
-            return [];
-        }
-        return (fromSupabase(data) as InternalStaff[] | null) || [];
-    },
-    async fetchInternalStaffByName(conjuntoId: string, name: string): Promise<InternalStaff | null> {
-        const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId).eq('name', name).single();
-        if (error) { handleApiError(error, `fetchInternalStaffByName for name ${name}`); return null; }
-        return fromSupabase(data) as InternalStaff | null;
-    },
-    async addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
-        const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
-        if (error) handleApiError(error, 'addInternalStaff');
-    },
-    async updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
-        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('name', staff.name).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateInternalStaff');
-    },
-    async deleteInternalStaff(conjuntoId: string, staffName: string): Promise<void> {
-        const { error } = await supabase.from('internal_staff').delete().eq('name', staffName).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteInternalStaff');
-    },
-    async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
-        const { data: existingData, error: fetchError } = await supabase
-            .from('internal_staff')
-            .select('name')
-            .eq('conjunto_id', conjuntoId);
-
-        if (fetchError) handleApiError(fetchError, 'bulkUpsertInternalStaff (fetch)');
-
-        const existingNames = new Set(existingData?.map(s => s.name) || []);
-        
-        const staffToInsert = [];
-        const staffToUpdate = [];
-
-        for (const person of staff) {
-            if (existingNames.has(person.name)) {
-                staffToUpdate.push(person);
-            } else {
-                staffToInsert.push(person);
-            }
-        }
-        
-        if (staffToInsert.length > 0) {
-            const payload = staffToInsert.map(s => toSupabase({ ...s, conjuntoId }));
-            const { error: insertError } = await supabase.from('internal_staff').insert(payload);
-            if (insertError) handleApiError(insertError, 'bulkUpsertInternalStaff (insert)');
-        }
-
-        if (staffToUpdate.length > 0) {
-            const updatePromises = staffToUpdate.map(s =>
-                supabase.from('internal_staff')
-                    .update(toSupabase(s))
-                    .eq('name', s.name)
-                    .eq('conjunto_id', conjuntoId)
-            );
-             const results = await Promise.all(updatePromises);
-            results.forEach(res => {
-                if (res.error) handleApiError(res.error, 'bulkUpsertInternalStaff (update)');
-            });
-        }
+    async deleteUser(conjuntoId: string, userId: number): Promise<void> {
+        const { error } = await supabase.from('users').delete().eq('id', userId).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteUser');
     },
 
     async fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
         const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching users:', error);
-            return [];
+        handleError(error, 'fetchUsers');
+        return fromSupabase(data) as PlatformUser[];
+    },
+
+
+    // =================================================================
+    // DATABASE VIEWS
+    // =================================================================
+
+    // Residents
+    async fetchResidents(conjuntoId: string): Promise<Resident[]> {
+        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchResidents');
+        return fromSupabase(data) as Resident[];
+    },
+    async fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
+        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+        if (error && error.code !== 'PGRST116') handleError(error, 'fetchResidentByApartment');
+        return fromSupabase(data) as Resident | null;
+    },
+    async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
+        const { error } = await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
+        handleError(error, 'addResident');
+    },
+    async updateResident(conjuntoId: string, resident: Resident): Promise<void> {
+        const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('apartment', resident.apartment).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateResident');
+    },
+    async deleteResident(conjuntoId: string, apartment: string): Promise<void> {
+        const { error } = await supabase.from('residents').delete().eq('apartment', apartment).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteResident');
+    },
+    async bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<void> {
+        const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
+        const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'apartment, conjunto_id' });
+        handleError(error, 'bulkUpsertResidents');
+    },
+
+    // Account Status
+    async fetchAccountStatus(conjuntoId: string): Promise<AccountStatus[]> {
+        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchAccountStatus');
+        return fromSupabase(data) as AccountStatus[];
+    },
+    async fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
+        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+        if (error && error.code !== 'PGRST116') handleError(error, 'fetchAccountStatusByApartment');
+        return fromSupabase(data) as AccountStatus | null;
+    },
+    async fetchDebtors(conjuntoId: string): Promise<{ apartment: string; name: string; balance: number }[]> {
+        const statuses = await this.fetchAccountStatus(conjuntoId);
+        const residents = await this.fetchResidents(conjuntoId);
+        const residentMap = new Map(residents.map(r => [r.apartment, r.name]));
+        return statuses
+            .filter(s => s.outstandingBalance > 0)
+            .map(s => ({
+                apartment: s.apartment,
+                name: residentMap.get(s.apartment) || 'N/A',
+                balance: s.outstandingBalance,
+            }));
+    },
+    async addAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
+        const { error } = await supabase.from('account_status').insert(toSupabase({ ...account, conjuntoId }));
+        handleError(error, 'addAccountStatus');
+    },
+    async updateAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
+        const { error } = await supabase.from('account_status').update(toSupabase(account)).eq('apartment', account.apartment).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateAccountStatus');
+    },
+    async deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
+        const { error } = await supabase.from('account_status').delete().eq('apartment', apartment).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteAccountStatus');
+    },
+    async bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
+        const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
+        const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'apartment, conjunto_id' });
+        handleError(error, 'bulkUpsertAccountStatus');
+    },
+    
+    // Providers
+    async fetchProviders(conjuntoId: string): Promise<Provider[]> {
+        const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchProviders');
+        return fromSupabase(data) as Provider[];
+    },
+     async fetchProvidersBySpecialty(conjuntoId: string, specialty: string): Promise<Provider[]> {
+        let query = supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+        if (specialty) {
+            query = query.ilike('specialty', `%${specialty}%`);
         }
-        return (fromSupabase(data) as PlatformUser[] | null) || [];
+        const { data, error } = await query;
+        handleError(error, 'fetchProvidersBySpecialty');
+        return fromSupabase(data) as Provider[];
     },
-    async fetchUserById(conjuntoId: string, id: number): Promise<PlatformUser | null> {
-        const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId).eq('id', id).single();
-        if (error) { handleApiError(error, `fetchUserById for id ${id}`); return null; }
-        return fromSupabase(data) as PlatformUser | null;
+    async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
+        const { error } = await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
+        handleError(error, 'addProvider');
     },
+    async updateProvider(conjuntoId: string, provider: Provider): Promise<void> {
+        const { error } = await supabase.from('providers').update(toSupabase(provider)).eq('id', provider.id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateProvider');
+    },
+    async deleteProvider(conjuntoId: string, id: number): Promise<void> {
+        const { error } = await supabase.from('providers').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteProvider');
+    },
+    async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
+        const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
+        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id, conjunto_id', ignoreDuplicates: false });
+        handleError(error, 'bulkUpsertProviders');
+    },
+
+    // Internal Staff
+    async fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
+        const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchInternalStaff');
+        return fromSupabase(data) as InternalStaff[];
+    },
+    async addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
+        const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
+        handleError(error, 'addInternalStaff');
+    },
+    async updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
+        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('name', staff.name).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateInternalStaff');
+    },
+    async deleteInternalStaff(conjuntoId: string, name: string): Promise<void> {
+        const { error } = await supabase.from('internal_staff').delete().eq('name', name).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteInternalStaff');
+    },
+    async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
+        const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
+        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'name, conjunto_id' });
+        handleError(error, 'bulkUpsertInternalStaff');
+    },
+    
+    // Roles
     async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
         const { data, error } = await supabase.from('user_roles').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching roles:', error);
-            return [];
-        }
-        return (fromSupabase(data) as UserRoleDefinition[] | null) || [];
+        handleError(error, 'fetchRoles');
+        return fromSupabase(data) as UserRoleDefinition[];
     },
     async addRole(conjuntoId: string, role: Omit<UserRoleDefinition, 'id'>): Promise<void> {
         const { error } = await supabase.from('user_roles').insert(toSupabase({ ...role, conjuntoId }));
-        if (error) handleApiError(error, 'addRole');
+        handleError(error, 'addRole');
     },
     async updateRole(conjuntoId: string, role: UserRoleDefinition): Promise<void> {
         const { error } = await supabase.from('user_roles').update(toSupabase(role)).eq('id', role.id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateRole');
+        handleError(error, 'updateRole');
     },
-    async deleteRole(conjuntoId: string, roleId: string): Promise<void> {
-        const { error } = await supabase.from('user_roles').delete().eq('id', roleId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteRole');
-    },
-    async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
-        const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));
-        if (error) handleApiError(error, 'addUser');
-    },
-    async updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
-        const updatePayload = { ...user };
-        // Don't send password for update if it's empty
-        if (!updatePayload.password || updatePayload.password.trim() === '') {
-            delete (updatePayload as Partial<PlatformUser>).password;
-        }
-        const { error } = await supabase.from('users').update(toSupabase(updatePayload)).eq('id', user.id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateUser');
-    },
-    async deleteUser(conjuntoId: string, userId: number): Promise<void> {
-        const { error } = await supabase.from('users').delete().eq('id', userId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteUser');
-    },
-
-    // --- DASHBOARD & ANALYTICS ---
-    // FIX: Add missing method to fetch aggregated data for the main dashboard view.
-    async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> {
-        const [accounts, tasks, dueDates, packages] = await Promise.all([
-            this.fetchAccountStatus(conjuntoId),
-            this.fetchTasks(conjuntoId),
-            this.fetchDueDates(conjuntoId),
-            this.fetchPackageLogs(conjuntoId),
-        ]);
-
-        const residentsInDebt = accounts.filter(a => a.outstandingBalance > 0);
-        const pendingTasks = tasks.filter(t => !t.completed);
-        const overduePayments = dueDates.filter(d => d.status === 'Vencido');
-        const packagesToDeliver = packages.filter(p => p.status === 'En recepción');
-
-        const notifications: NotificationItem[] = [];
-        overduePayments.slice(0, 2).forEach(d => notifications.push({
-            id: `due-${d.id}`,
-            type: 'due-date',
-            text: `Pago Vencido: ${d.item}`,
-            details: `Venció el ${d.dueDate}`,
-            urgency: 'high',
-            linkTo: Tab.DueDates,
-        }));
-        pendingTasks.slice(0, 2).forEach(t => notifications.push({
-            id: `task-${t.id}`,
-            type: 'task',
-            text: `Tarea Pendiente: ${t.text}`,
-            details: `Para el ${t.dueDate}`,
-            urgency: 'medium',
-            linkTo: Tab.PendingTasks,
-        }));
-         packagesToDeliver.slice(0, 1).forEach(p => notifications.push({
-            id: `pkg-${p.id}`,
-            type: 'package',
-            text: `Paquete por entregar a Apto ${p.apartment}`,
-            details: `De ${p.courier}`,
-            urgency: 'low',
-            linkTo: Tab.Seguridad,
-        }));
-
-        return {
-            stats: {
-                residentsInDebt: { count: residentsInDebt.length, details: residentsInDebt.map(a => `Apto ${a.apartment}: $${a.outstandingBalance.toLocaleString()}`) },
-                pendingTasks: { count: pendingTasks.length, details: pendingTasks.map(t => t.text) },
-                overduePayments: { count: overduePayments.length, details: overduePayments.map(d => `${d.item} (Venció ${d.dueDate})`) },
-                packagesToDeliver: { count: packagesToDeliver.length, details: packagesToDeliver.map(p => `Apto ${p.apartment} de ${p.courier}`) },
-            },
-            notifications: notifications.sort((a, b) => {
-                const urgencyOrder = { high: 1, medium: 2, low: 3 };
-                // FIX: Corrected the sorting logic to compare numbers with numbers, not a number with a string.
-                return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
-            }),
-        };
-    },
-    // FIX: Add missing method to fetch data specifically for financial charts.
-    async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] }> {
-        const [expenses, incomes, packages, visitors, accessPoints] = await Promise.all([
-            this.fetchExpenses(conjuntoId),
-            this.fetchIncomes(conjuntoId),
-            this.fetchPackageLogs(conjuntoId),
-            this.fetchVisitorLogs(conjuntoId),
-            this.fetchAccessPoints(conjuntoId)
-        ]);
-        
-        const today = new Date();
-        const monthlyData: { [key: string]: { ingresos: number; gastos: number } } = {};
-        const packageMonthlyData: { [key: string]: number } = {};
-
-        for (let i = 11; i >= 0; i--) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const monthKey = d.toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
-            monthlyData[monthKey] = { ingresos: 0, gastos: 0 };
-            packageMonthlyData[monthKey] = 0;
-        }
-
-        incomes.forEach(inc => {
-            if(!inc.date) return;
-            const monthKey = new Date(inc.date).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
-            if (monthlyData[monthKey]) {
-                monthlyData[monthKey].ingresos += inc.amount;
-            }
-        });
-         expenses.forEach(exp => {
-            if(!exp.date) return;
-            const monthKey = new Date(exp.date).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
-            if (monthlyData[monthKey]) {
-                monthlyData[monthKey].gastos += exp.amount;
-            }
-        });
-        packages.forEach(pkg => {
-            if(!pkg.receivedDate) return;
-            const monthKey = new Date(pkg.receivedDate).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
-            if (packageMonthlyData[monthKey] !== undefined) {
-                packageMonthlyData[monthKey]++;
-            }
-        });
-
-        // FIX: Add missing 'value' and 'fill' properties to satisfy the ChartData type.
-        // These are not used by the LineChart, so dummy values are sufficient.
-        const monthlyIncomeVsExpense = Object.keys(monthlyData).map(key => ({
-            name: key.charAt(0).toUpperCase() + key.slice(1),
-            ingresos: monthlyData[key].ingresos,
-            gastos: monthlyData[key].gastos,
-            value: 0,
-            fill: '',
-        }));
-        
-        // FIX: Add missing 'fill' property to satisfy the ChartData type.
-        // The BarChart provides its own fill, so a dummy value is sufficient here.
-        const packageVolume = Object.keys(packageMonthlyData).slice(-6).map(key => ({
-            name: key.charAt(0).toUpperCase() + key.slice(1),
-            value: packageMonthlyData[key],
-            fill: '',
-        }));
-
-        const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const currentMonthExpenses = expenses.filter(e => e.date && new Date(e.date) >= currentMonth);
-        const expensesByCategory = currentMonthExpenses.reduce((acc, expense) => {
-            let category = acc.find(c => c.name === expense.category);
-            if (!category) {
-                category = { name: expense.category, value: 0, fill: '' };
-                acc.push(category);
-            }
-            category.value += expense.amount;
-            return acc;
-        }, [] as ChartData[]).map((cat, i) => {
-            const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
-            cat.fill = colors[i % colors.length];
-            return cat;
-        });
-
-        const visitorTrafficByPoint = visitors.reduce((acc, visitor) => {
-            if (visitor.accessPointId) {
-                acc[visitor.accessPointId] = (acc[visitor.accessPointId] || 0) + 1;
-            }
-            return acc;
-        }, {} as {[key: number]: number});
-
-        const visitorTraffic = Object.keys(visitorTrafficByPoint).map(pointId => {
-            const pointName = accessPoints.find(p => p.id === Number(pointId))?.name || `Punto ${pointId}`;
-            // FIX: Add missing 'fill' property to satisfy the ChartData type.
-            // The PieChart assigns colors via <Cell> components, so a dummy value is sufficient.
-            return { name: pointName, value: visitorTrafficByPoint[Number(pointId)], fill: '' };
-        });
-
-        return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
-    },
-
-    // --- Due Dates ---
-    async fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
-        const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching due dates:', error); return []; }
-        return (fromSupabase(data) as DueDate[] | null) || [];
-    },
-    async addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
-        const { error } = await supabase.from('due_dates').insert(toSupabase({ ...dueDate, conjuntoId }));
-        if (error) handleApiError(error, 'addDueDate');
-    },
-    async updateDueDate(conjuntoId: string, dueDate: DueDate): Promise<void> {
-        const { error } = await supabase.from('due_dates').update(toSupabase(dueDate)).eq('id', dueDate.id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateDueDate');
-    },
-    async deleteDueDate(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('due_dates').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteDueDate');
+    async deleteRole(conjuntoId: string, id: string): Promise<void> {
+        const { error } = await supabase.from('user_roles').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteRole');
     },
     
-    // --- Tasks ---
-    async fetchTasks(conjuntoId: string): Promise<Task[]> {
-        const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching tasks:', error); return []; }
-        return (fromSupabase(data) as Task[] | null) || [];
-    },
-    async addTask(conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> {
-        const { error } = await supabase.from('tasks').insert(toSupabase({ ...task, conjuntoId }));
-        if (error) handleApiError(error, 'addTask');
-    },
-    async updateTask(conjuntoId: string, task: Task): Promise<void> {
-        const { error } = await supabase.from('tasks').update(toSupabase(task)).eq('id', task.id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updateTask');
-    },
-    async deleteTask(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('tasks').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteTask');
-    },
-    
-    // --- Common Areas ---
+
+    // =================================================================
+    // FEATURES
+    // =================================================================
+
+    // Common Areas
     async fetchCommonAreas(conjuntoId: string): Promise<CommonArea[]> {
         const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching common areas:', error); return []; }
-        return (fromSupabase(data) as CommonArea[] | null) || [];
+        handleError(error, 'fetchCommonAreas');
+        return fromSupabase(data) as CommonArea[];
     },
-    async addCommonArea(conjuntoId: string, areaName: string): Promise<void> {
-        const colors = [
-            { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' },
-            { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
-            { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
-            { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
-            { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
-            { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
-        ];
-        const newArea = { name: areaName, color: colors[Math.floor(Math.random() * colors.length)], conjunto_id: conjuntoId };
-        const { error } = await supabase.from('common_areas').insert(newArea);
-        if (error) handleApiError(error, 'addCommonArea');
+    async addCommonArea(conjuntoId: string, name: string): Promise<void> {
+        const newArea = { name, conjuntoId, color: getRandomColor() };
+        const { error } = await supabase.from('common_areas').insert(toSupabase(newArea));
+        handleError(error, 'addCommonArea');
     },
-    async removeCommonArea(conjuntoId: string, areaId: string): Promise<void> {
-        const { error } = await supabase.from('common_areas').delete().eq('id', areaId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'removeCommonArea');
+    async removeCommonArea(conjuntoId: string, id: string): Promise<void> {
+        const { error } = await supabase.from('common_areas').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'removeCommonArea');
     },
+
+    // Bookings
     async fetchBookings(conjuntoId: string): Promise<Booking[]> {
         const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching bookings:', error); return []; }
-        return (fromSupabase(data) as Booking[] | null) || [];
+        handleError(error, 'fetchBookings');
+        return fromSupabase(data) as Booking[];
     },
     async addBooking(conjuntoId: string, booking: Booking): Promise<void> {
         const { error } = await supabase.from('bookings').insert(toSupabase({ ...booking, conjuntoId }));
-        if (error) handleApiError(error, 'addBooking');
+        handleError(error, 'addBooking');
     },
 
-    // --- Finances ---
-    async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
-        const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) { console.error('Error fetching expenses:', error); return []; }
-        return (fromSupabase(data) as Expense[] | null) || [];
+    // Due Dates
+    async fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
+        const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchDueDates');
+        return fromSupabase(data) as DueDate[];
     },
-     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
+    async addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
+        const { error } = await supabase.from('due_dates').insert(toSupabase({ ...dueDate, conjuntoId }));
+        handleError(error, 'addDueDate');
+    },
+    async updateDueDate(conjuntoId: string, dueDate: DueDate): Promise<void> {
+        const { error } = await supabase.from('due_dates').update(toSupabase(dueDate)).eq('id', dueDate.id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateDueDate');
+    },
+    async deleteDueDate(conjuntoId: string, id: number): Promise<void> {
+        const { error } = await supabase.from('due_dates').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteDueDate');
+    },
+
+    // Tasks
+    async fetchTasks(conjuntoId: string): Promise<Task[]> {
+        const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchTasks');
+        return fromSupabase(data) as Task[];
+    },
+    async addTask(conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> {
+        const { error } = await supabase.from('tasks').insert(toSupabase({ ...task, conjuntoId }));
+        handleError(error, 'addTask');
+    },
+    async updateTask(conjuntoId: string, task: Task): Promise<void> {
+        const { error } = await supabase.from('tasks').update(toSupabase(task)).eq('id', task.id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'updateTask');
+    },
+    async deleteTask(conjuntoId: string, id: number): Promise<void> {
+        const { error } = await supabase.from('tasks').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+        handleError(error, 'deleteTask');
+    },
+
+    // Finances
+    async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
+        const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchExpenses');
+        return fromSupabase(data) as Expense[];
+    },
+    async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
         const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
-        if (error) handleApiError(error, 'addExpense');
+        handleError(error, 'addExpense');
     },
     async deleteExpense(conjuntoId: string, id: number): Promise<void> {
         const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteExpense');
+        handleError(error, 'deleteExpense');
     },
-     async bulkUpsertExpenses(conjuntoId: string, expenses: Expense[]): Promise<void> {
+    async bulkUpsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
         const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
-        const { error } = await supabase.from('expenses').upsert(payload, { onConflict: 'conjunto_id,description,date' });
-        if (error) handleApiError(error, 'bulkUpsertExpenses');
+        const { error } = await supabase.from('expenses').upsert(payload, { onConflict: 'id, conjunto_id' });
+        handleError(error, 'bulkUpsertExpenses');
     },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
-        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) { console.error('Error fetching incomes:', error); return []; }
-        return (fromSupabase(data) as Income[] | null) || [];
+        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
+        handleError(error, 'fetchIncomes');
+        return fromSupabase(data) as Income[];
     },
-     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
+    async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
         const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
-        if (error) handleApiError(error, 'addIncome');
+        handleError(error, 'addIncome');
     },
     async deleteIncome(conjuntoId: string, id: number): Promise<void> {
         const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteIncome');
+        handleError(error, 'deleteIncome');
     },
-    async bulkUpsertIncomes(conjuntoId: string, incomes: Income[]): Promise<void> {
+    async bulkUpsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
         const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
-        const { error } = await supabase.from('incomes').upsert(payload, { onConflict: 'conjunto_id,description,date' });
-        if (error) handleApiError(error, 'bulkUpsertIncomes');
+        const { error } = await supabase.from('incomes').upsert(payload, { onConflict: 'id, conjunto_id' });
+        handleError(error, 'bulkUpsertIncomes');
     },
 
-    // --- Seguridad ---
+    // Security
     async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
-        const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching visitor logs:', error); return []; }
-        return (fromSupabase(data) as VisitorLog[] | null) || [];
+        const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
+        handleError(error, 'fetchVisitorLogs');
+        return fromSupabase(data) as VisitorLog[];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
         const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
-        if (error) handleApiError(error, 'addVisitorLog');
+        handleError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
         const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, `updateVisitorLog for id ${logId}`);
+        handleError(error, 'updateVisitorLog');
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
         const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
-        if (error) { console.error('Error fetching package logs:', error); return []; }
-        return (fromSupabase(data) as PackageLog[] | null) || [];
+        handleError(error, 'fetchPackageLogs');
+        return fromSupabase(data) as PackageLog[];
     },
-    async addPackageLog(conjuntoId: string, log: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
-        const newLog = {
+    async addPackageLog(conjuntoId: string, log: Omit<PackageLog, 'id' | 'status' | 'receivedDate'>): Promise<void> {
+        const { error } = await supabase.from('package_logs').insert(toSupabase({
             ...log,
-            receivedDate: new Date().toISOString(),
-            status: 'En recepción' as const,
-            conjuntoId: conjuntoId
-        };
-        const { error } = await supabase.from('package_logs').insert(toSupabase(newLog));
-        if (error) handleApiError(error, 'addPackageLog');
+            conjuntoId,
+            status: 'En recepción',
+            receivedDate: new Date().toISOString()
+        }));
+        handleError(error, 'addPackageLog');
     },
-    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: 'En recepción' | 'Entregado'): Promise<void> {
+    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
         const { error } = await supabase.from('package_logs').update({ status }).eq('id', packageId).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'updatePackageLogStatus');
+        handleError(error, 'updatePackageLogStatus');
     },
+
+    // Access Points
     async fetchAccessPoints(conjuntoId: string): Promise<AccessPoint[]> {
         const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
-        if (error) { console.error('Error fetching access points:', error); return []; }
-        return (fromSupabase(data) as AccessPoint[] | null) || [];
+        handleError(error, 'fetchAccessPoints');
+        return fromSupabase(data) as AccessPoint[];
     },
     async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
         const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
-        if (error) handleApiError(error, 'addAccessPoint');
+        handleError(error, 'addAccessPoint');
     },
     async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
         const { error } = await supabase.from('access_points').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        if (error) handleApiError(error, 'deleteAccessPoint');
+        handleError(error, 'deleteAccessPoint');
     },
-    
-    // --- Comunicaciones ---
-    async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ success: boolean; message: string }> {
-        // This is a placeholder for a backend call.
-        console.log(`Sending email to ${group} for ${conjuntoId} with subject: ${subject}`);
-        await new Promise(res => setTimeout(res, 1000)); // Simulate network delay
-        return { success: true, message: `Correo enviado exitosamente al grupo "${group}".` };
+
+
+    // =================================================================
+    // COMMUNICATIONS
+    // =================================================================
+
+    async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ message: string }> {
+        // This is a mock. The real implementation is sendCommunicationEmail.
+        console.log(`Sending email to ${group} for ${conjuntoId}: ${subject}`);
+        return { message: `Email to ${group} sent.` };
     },
-    
+
     async uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{ name: string; url: string } | null> {
-        const fileName = `${conjuntoId}/communications/${Date.now()}-${file.name}`;
-        const { data, error } = await supabase.storage.from('paic-files').upload(fileName, file);
+        const filePath = `communications/${conjuntoId}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage.from('conjunto-files').upload(filePath, file);
         if (error) {
             console.error('Error uploading attachment:', error);
-            handleApiError(error, 'uploadCommunicationAttachment');
             return null;
         }
-        const { data: { publicUrl } } = supabase.storage.from('paic-files').getPublicUrl(data.path);
-        return { name: file.name, url: publicUrl };
+        const { data } = supabase.storage.from('conjunto-files').getPublicUrl(filePath);
+        return { name: file.name, url: data.publicUrl };
+    },
+
+    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean, error?: string }> {
+        let finalHtml = body.replace(/\n/g, '<br>');
+        if (attachments.length > 0) {
+            finalHtml += '<br/><hr/><h3>Archivos Adjuntos:</h3><ul>';
+            attachments.forEach(att => {
+                finalHtml += `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`;
+            });
+            finalHtml += '</ul>';
+        }
+
+        const { data, error } = await supabase.functions.invoke('send-email', {
+            body: {
+                to: recipients,
+                subject,
+                html: finalHtml,
+                fromName,
+                fromEmail,
+            },
+        });
+
+        if (error) {
+            console.error('Error invoking send-email function:', error);
+            return { success: false, error: error.message };
+        }
+        return data;
     },
     
-    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean; error?: string }> {
-        try {
-            // Construct the HTML body, including links to attachments if they exist.
-            let finalHtml = body.replace(/\n/g, '<br>'); // Basic newline to <br> conversion
-            if (attachments.length > 0) {
-                finalHtml += '<br><br><hr><p><b>Archivos Adjuntos:</b></p><ul>';
-                attachments.forEach(att => {
-                    finalHtml += `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`;
-                });
-                finalHtml += '</ul>';
-            }
+    // =================================================================
+    // LOGGING & DASHBOARDS
+    // =================================================================
 
-            const { data, error } = await supabase.functions.invoke('send-email', {
-                body: { 
-                    to: recipients, 
-                    subject: subject, 
-                    html: finalHtml,
-                    fromName: fromName,
-                    fromEmail: fromEmail,
-                }
-            });
-
-            if (error) {
-                throw new Error(`No se pudo activar la función de correo: ${error.message}`);
-            }
-
-            // The function might return its own structured error response
-            if (data && data.error) {
-                 throw new Error(`Error en la función de correo: ${data.error}`);
-            }
-
-            return { success: true };
-        } catch (err: any) {
-            console.error("Error sending communication email:", err);
-            return { success: false, error: err.message };
-        }
+    async logChatbotInteraction(conjuntoId: string): Promise<void> {
+        const { error } = await supabase.from('chatbot_interactions').insert({ conjunto_id: conjuntoId });
+        if(error) console.error("Error logging chatbot interaction:", error);
     },
 
+    async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> {
+        // Mock data. A real implementation would run DB queries.
+        return {
+            stats: {
+                residentsInDebt: { count: 5, details: ['Apto 101', 'Apto 203'] },
+                pendingTasks: { count: 3, details: ['Revisar bomba de agua'] },
+                overduePayments: { count: 2, details: ['Pago de seguridad', 'Mantenimiento ascensor'] },
+                packagesToDeliver: { count: 8, details: ['Paquete para Apto 505'] },
+            },
+            notifications: [
+                { id: 1, type: 'due-date', text: 'Pago de vigilancia vence pronto', details: 'Vence en 3 días', urgency: 'high', linkTo: Tab.DueDates },
+                { id: 2, type: 'task', text: 'Revisar cámaras de seguridad', details: 'Asignada a: Personal', urgency: 'medium', linkTo: Tab.PendingTasks },
+                { id: 3, type: 'package', text: 'Paquete para Apto 101', details: 'Recibido de Servientrega', urgency: 'low', linkTo: Tab.Seguridad },
+            ]
+        };
+    },
+    
+    async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] }> {
+        // Mock data
+        return {
+            monthlyIncomeVsExpense: [
+                { name: 'Ene', ingresos: 4000, gastos: 2400 },
+                { name: 'Feb', ingresos: 3000, gastos: 1398 },
+                { name: 'Mar', ingresos: 2000, gastos: 9800 },
+                { name: 'Abr', ingresos: 2780, gastos: 3908 },
+                { name: 'May', ingresos: 1890, gastos: 4800 },
+                { name: 'Jun', ingresos: 2390, gastos: 3800 },
+            ],
+            expensesByCategory: [
+                { name: 'Servicios', value: 400, fill: '#0088FE' },
+                { name: 'Mantenimiento', value: 300, fill: '#00C49F' },
+                { name: 'Nómina', value: 300, fill: '#FFBB28' },
+                { name: 'Otros', value: 200, fill: '#FF8042' },
+            ],
+            packageVolume: [
+                { name: 'Ene', value: 50 }, { name: 'Feb', value: 65 }, { name: 'Mar', value: 70 },
+                { name: 'Abr', value: 82 }, { name: 'May', value: 95 }, { name: 'Jun', value: 110 },
+            ],
+            visitorTraffic: [
+                 { name: 'Portería 1', value: 400 },
+                 { name: 'Portería 2', value: 250 },
+            ],
+        };
+    },
 
-    // --- Super Admin ---
-    async fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
-        const { data, error } = await supabase.from('conjuntos').select('*');
-        if (error) { handleApiError(error, 'fetchAllConjuntos'); return []; }
-        return (fromSupabase(data) as ConjuntoInfo[] | null) || [];
-    },
-    async fetchPlatformStats(): Promise<PlatformStats | null> {
-        const { data, error } = await supabase.rpc('get_platform_stats');
-        if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
-        return fromSupabase(data) as PlatformStats;
-    },
-    async fetchSuperAdminChartData(): Promise<SuperAdminChartData | null> {
-        const { data, error } = await supabase.rpc('get_superadmin_charts');
-         if (error) { handleApiError(error, 'fetchSuperAdminChartData'); return null; }
-        return fromSupabase(data) as SuperAdminChartData;
-    },
+    // =================================================================
+    // FILE MANAGEMENT
+    // =================================================================
     async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
-        const { data, error } = await supabase.storage.from('paic-files').list(conjuntoId, {
+        const { data, error } = await supabase.storage.from('conjunto-files').list(conjuntoId, {
             limit: 100,
             offset: 0,
             sortBy: { column: 'created_at', order: 'desc' },
         });
-
-        if (error) { handleApiError(error, 'listFilesForConjunto'); return []; }
+        if(error) handleError({ details: error.message, message: error.message, hint: '', code: ''}, 'listFilesForConjunto');
         if (!data) return [];
 
-        const filesWithUrls = data.map(file => {
-             const { data: { publicUrl } } = supabase.storage.from('paic-files').getPublicUrl(`${conjuntoId}/${file.name}`);
-             return {
-                 id: file.id,
-                 name: file.name,
-                 url: publicUrl,
-                 size: file.metadata.size,
-                 mimeType: file.metadata.mimetype,
-                 createdAt: file.created_at,
-             };
-        });
-        return filesWithUrls;
+        return data.map(file => ({
+            id: file.id ?? file.name,
+            name: file.name,
+            url: supabase.storage.from('conjunto-files').getPublicUrl(`${conjuntoId}/${file.name}`).data.publicUrl,
+            size: file.metadata.size,
+            mimeType: file.metadata.mimetype,
+            createdAt: file.created_at,
+        }));
     },
     async uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
-        const fileName = `${conjuntoId}/${file.name}`;
-        const { error } = await supabase.storage.from('paic-files').upload(fileName, file, {
-            upsert: true, // Overwrite if file with same name exists
-        });
-        if (error) handleApiError(error, 'uploadFileForConjunto');
+        const filePath = `${conjuntoId}/${file.name}`;
+        const { error } = await supabase.storage.from('conjunto-files').upload(filePath, file, { upsert: true });
+        if(error) throw error;
     },
     async deleteFileForConjunto(conjuntoId: string, fileName: string): Promise<void> {
-        const { error } = await supabase.storage.from('paic-files').remove([`${conjuntoId}/${fileName}`]);
-        if (error) handleApiError(error, 'deleteFileForConjunto');
+        const { error } = await supabase.storage.from('conjunto-files').remove([`${conjuntoId}/${fileName}`]);
+        if(error) throw error;
     }
 };
