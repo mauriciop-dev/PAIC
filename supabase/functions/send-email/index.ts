@@ -1,7 +1,9 @@
 // supabase/functions/send-email/index.ts
-// FIX: Add a triple-slash directive to provide TypeScript with Deno's type definitions.
-// This resolves the "Cannot find name 'Deno'" error.
-/// <reference types="https://deno.land/x/deno/cli/types.d.ts" />
+// FIX: The Deno global object is not available in standard TypeScript environments,
+// causing "Cannot find name 'Deno'" errors. A manual declaration is added
+// to provide types for the Deno APIs used in this function.
+// The invalid triple-slash directive that was causing a file-not-found error was also removed.
+declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { Resend } from 'npm:resend@3.2.0';
 
@@ -12,7 +14,8 @@ const corsHeaders = {
 };
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL') || 'onboarding@resend.dev';
+const FALLBACK_SENDER_EMAIL = Deno.env.get('SENDER_EMAIL') || 'onboarding@resend.dev';
+const FALLBACK_SENDER_NAME = 'Administración PAIC';
 
 serve(async (req) => {
   // Manejo de la solicitud pre-vuelo (preflight) de CORS
@@ -26,22 +29,27 @@ serve(async (req) => {
     }
     
     const resend = new Resend(RESEND_API_KEY);
-    const { bcc, subject, html } = await req.json();
+    // FIX: Destructure fromName and fromEmail from the request body for dynamic sender info.
+    const { to, subject, html, fromName, fromEmail } = await req.json();
 
     // Valida que los campos necesarios estén presentes
-    if (!bcc || !Array.isArray(bcc) || bcc.length === 0 || !subject || !html) {
+    if (!to || !Array.isArray(to) || to.length === 0 || !subject || !html) {
       return new Response(JSON.stringify({
-        error: 'Faltan destinatarios (bcc), asunto (subject) o cuerpo del correo (html) en la solicitud, o el formato es incorrecto.'
+        error: 'Faltan destinatarios (to), asunto (subject) o cuerpo del correo (html) en la solicitud, o el formato es incorrecto.'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    // FIX: Use the dynamic sender details from the payload, with fallbacks to environment variables.
+    const senderName = fromName || FALLBACK_SENDER_NAME;
+    const senderEmail = fromEmail || FALLBACK_SENDER_EMAIL;
 
     // Lógica de envío de correo
     const { data, error } = await resend.emails.send({
-      from: `Administración PAIC <${SENDER_EMAIL}>`,
-      to: bcc, // FIX: Los destinatarios ahora se envían en el campo 'to' para una entrega correcta.
+      from: `${senderName} <${senderEmail}>`,
+      to: to,
       subject: subject,
       html: html,
     });

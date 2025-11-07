@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { UserProfile } from '../../types';
+import { ConjuntoInfo, UserProfile } from '../../types';
 import { Icon } from '../ui/Icon';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
 
 interface ComunicacionesViewProps {
     userProfile: UserProfile;
+    conjuntoInfo: ConjuntoInfo;
 }
 
-const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) => {
+const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, conjuntoInfo }) => {
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
@@ -126,7 +127,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile }) 
             }
             setIsUploading(false);
 
-            const result = await apiService.sendCommunicationEmail(recipients, subject, body, uploadedAttachments);
+            const result = await apiService.sendCommunicationEmail(recipients, subject, body, uploadedAttachments, conjuntoInfo.adminName, conjuntoInfo.adminEmail);
             
             if (result.success) {
                 setFeedback({type: 'success', text: `¡Correo enviado exitosamente a ${recipients.length} destinatario(s)!`});

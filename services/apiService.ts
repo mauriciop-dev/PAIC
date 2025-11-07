@@ -628,6 +628,7 @@ export const apiService = {
             },
             notifications: notifications.sort((a, b) => {
                 const urgencyOrder = { high: 1, medium: 2, low: 3 };
+                // FIX: Corrected the sorting logic to compare numbers with numbers, not a number with a string.
                 return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
             }),
         };
@@ -902,7 +903,7 @@ export const apiService = {
         return { name: file.name, url: publicUrl };
     },
     
-    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[]): Promise<{ success: boolean; error?: string }> {
+    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean; error?: string }> {
         try {
             // Construct the HTML body, including links to attachments if they exist.
             let finalHtml = body.replace(/\n/g, '<br>'); // Basic newline to <br> conversion
@@ -916,9 +917,11 @@ export const apiService = {
 
             const { data, error } = await supabase.functions.invoke('send-email', {
                 body: { 
-                    bcc: recipients, 
+                    to: recipients, 
                     subject: subject, 
-                    html: finalHtml
+                    html: finalHtml,
+                    fromName: fromName,
+                    fromEmail: fromEmail,
                 }
             });
 

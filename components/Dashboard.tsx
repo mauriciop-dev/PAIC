@@ -38,7 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
       case Tab.PendingTasks:
           return <PendingTasksView userProfile={userProfile} />;
       case Tab.Comunicaciones:
-          return <ComunicacionesView userProfile={userProfile} />;
+          return <ComunicacionesView userProfile={userProfile} conjuntoInfo={conjuntoInfo} />;
       case Tab.Finanzas:
           return <FinanzasView userProfile={userProfile} />;
       case Tab.Seguridad:
