@@ -829,18 +829,23 @@ export const apiService = {
     },
 
     // --- COMMUNICATIONS ---
-    // FIX: Add missing method to handle sending emails. This is a simulation.
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string; url: string }[]): Promise<{ success: boolean; message?: string; error?: string; }> {
-        console.log('Simulating sending email:');
-        console.log('Recipients:', recipients);
-        console.log('Subject:', subject);
-        console.log('Body:', body);
-        console.log('Attachments:', attachments);
-        // In a real app, this would invoke a Supabase Edge Function
-        if (recipients.length > 0) {
-            return { success: true, message: 'Email sent successfully (simulated).' };
-        } else {
-            return { success: false, error: 'No recipients provided.' };
+        try {
+            // This invokes the 'send-email' Supabase Edge Function
+            const { error } = await supabase.functions.invoke('send-email', {
+                body: { recipients, subject, body, attachments },
+            });
+
+            if (error) {
+                throw error; // Let the catch block handle it
+            }
+
+            return { success: true, message: 'Se ha iniciado el proceso de envío de correo.' };
+
+        } catch (error: any) {
+            console.error('Error invoking Supabase Edge Function "send-email":', error);
+            const errorMessage = error.message || 'Ocurrió un error en la función de envío.';
+            return { success: false, error: `No se pudo activar la función de correo: ${errorMessage}` };
         }
     },
     // FIX: Add missing method to upload attachments for communications.
