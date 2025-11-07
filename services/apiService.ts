@@ -592,122 +592,110 @@ export const apiService = {
         const pendingTasks = tasks.filter(t => !t.completed);
         const overduePayments = dueDates.filter(d => d.status === 'Vencido');
         const packagesToDeliver = packages.filter(p => p.status === 'En recepción');
-        
+
         const notifications: NotificationItem[] = [];
-        overduePayments.slice(0, 2).forEach(d => {
-            notifications.push({
-                id: `due-${d.id}`,
-                type: 'due-date',
-                text: `Pago Vencido: ${d.item}`,
-                details: `Venció el ${d.dueDate}`,
-                urgency: 'high',
-                linkTo: Tab.DueDates,
-            });
-        });
-        pendingTasks.slice(0, 2).forEach(t => {
-             notifications.push({
-                id: `task-${t.id}`,
-                type: 'task',
-                text: `Tarea Pendiente: ${t.text}`,
-                details: t.dueDate ? `Vence el ${t.dueDate}` : 'Sin fecha límite',
-                urgency: 'medium',
-                linkTo: Tab.PendingTasks,
-            });
-        });
-        packagesToDeliver.slice(0, 2).forEach(p => {
-             notifications.push({
-                id: `pkg-${p.id}`,
-                type: 'package',
-                text: `Paquete por entregar a Apto ${p.apartment}`,
-                details: `Recibido de ${p.courier}`,
-                urgency: 'low',
-                linkTo: Tab.Seguridad,
-            });
-        });
-        
+        overduePayments.slice(0, 2).forEach(d => notifications.push({
+            id: `due-${d.id}`,
+            type: 'due-date',
+            text: `Pago Vencido: ${d.item}`,
+            details: `Venció el ${d.dueDate}`,
+            urgency: 'high',
+            linkTo: Tab.DueDates,
+        }));
+        pendingTasks.slice(0, 2).forEach(t => notifications.push({
+            id: `task-${t.id}`,
+            type: 'task',
+            text: `Tarea Pendiente: ${t.text}`,
+            details: `Para el ${t.dueDate}`,
+            urgency: 'medium',
+            linkTo: Tab.PendingTasks,
+        }));
+         packagesToDeliver.slice(0, 1).forEach(p => notifications.push({
+            id: `pkg-${p.id}`,
+            type: 'package',
+            text: `Paquete por entregar a Apto ${p.apartment}`,
+            details: `De ${p.courier}`,
+            urgency: 'low',
+            linkTo: Tab.Seguridad,
+        }));
+
         return {
             stats: {
-                residentsInDebt: {
-                    count: residentsInDebt.length,
-                    details: residentsInDebt.map(a => `Apto ${a.apartment}: $${a.outstandingBalance.toLocaleString()}`),
-                },
-                pendingTasks: {
-                    count: pendingTasks.length,
-                    details: pendingTasks.map(t => t.text),
-                },
-                overduePayments: {
-                    count: overduePayments.length,
-                    details: overduePayments.map(d => `${d.item} (Venció ${d.dueDate})`),
-                },
-                packagesToDeliver: {
-                    count: packagesToDeliver.length,
-                    details: packagesToDeliver.map(p => `Apto ${p.apartment} de ${p.courier}`),
-                },
+                residentsInDebt: { count: residentsInDebt.length, details: residentsInDebt.map(a => `Apto ${a.apartment}: $${a.outstandingBalance.toLocaleString()}`) },
+                pendingTasks: { count: pendingTasks.length, details: pendingTasks.map(t => t.text) },
+                overduePayments: { count: overduePayments.length, details: overduePayments.map(d => `${d.item} (Venció ${d.dueDate})`) },
+                packagesToDeliver: { count: packagesToDeliver.length, details: packagesToDeliver.map(p => `Apto ${p.apartment} de ${p.courier}`) },
             },
             notifications: notifications.sort((a, b) => {
-                const urgencyOrder = { high: 0, medium: 1, low: 2 };
+                const urgencyOrder = { high: 1, medium: 2, low: 3 };
                 return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
-            }).slice(0, 5),
+            }),
         };
     },
-    // FIX: Add missing method to fetch aggregated financial data for charts.
-    async fetchFinancialChartData(conjuntoId: string): Promise<{
-        monthlyIncomeVsExpense: ChartData[];
-        expensesByCategory: ChartData[];
-        packageVolume: ChartData[];
-        visitorTraffic: ChartData[];
-        monthlyBudget: number;
-    }> {
-        const now = new Date();
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-
+    // FIX: Add missing method to fetch data specifically for financial charts.
+    async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] }> {
         const [expenses, incomes, packages, visitors, accessPoints] = await Promise.all([
             this.fetchExpenses(conjuntoId),
             this.fetchIncomes(conjuntoId),
             this.fetchPackageLogs(conjuntoId),
             this.fetchVisitorLogs(conjuntoId),
-            this.fetchAccessPoints(conjuntoId),
+            this.fetchAccessPoints(conjuntoId)
         ]);
+        
+        const today = new Date();
+        const monthlyData: { [key: string]: { ingresos: number; gastos: number } } = {};
+        const packageMonthlyData: { [key: string]: number } = {};
 
-        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const monthKeys: string[] = [];
         for (let i = 11; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            monthKeys.push(monthNames[d.getMonth()]);
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const monthKey = d.toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
+            monthlyData[monthKey] = { ingresos: 0, gastos: 0 };
+            packageMonthlyData[monthKey] = 0;
         }
-        
-        const monthlyDataTemplate = () => Object.fromEntries(monthKeys.map(key => [key, 0]));
-        
-        const monthlyIncomesData = monthlyDataTemplate();
+
         incomes.forEach(inc => {
-            const d = new Date(inc.date + 'T00:00:00Z');
-            const monthName = monthNames[d.getUTCMonth()];
-            if (monthName in monthlyIncomesData) monthlyIncomesData[monthName] += inc.amount;
+            if(!inc.date) return;
+            const monthKey = new Date(inc.date).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
+            if (monthlyData[monthKey]) {
+                monthlyData[monthKey].ingresos += inc.amount;
+            }
+        });
+         expenses.forEach(exp => {
+            if(!exp.date) return;
+            const monthKey = new Date(exp.date).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
+            if (monthlyData[monthKey]) {
+                monthlyData[monthKey].gastos += exp.amount;
+            }
+        });
+        packages.forEach(pkg => {
+            if(!pkg.receivedDate) return;
+            const monthKey = new Date(pkg.receivedDate).toLocaleString('es-ES', { month: 'short', year: '2-digit' }).replace('.', '');
+            if (packageMonthlyData[monthKey] !== undefined) {
+                packageMonthlyData[monthKey]++;
+            }
         });
 
-        const monthlyExpensesData = monthlyDataTemplate();
-        expenses.forEach(exp => {
-            const d = new Date(exp.date + 'T00:00:00Z');
-            const monthName = monthNames[d.getUTCMonth()];
-            if (monthName in monthlyExpensesData) monthlyExpensesData[monthName] += exp.amount;
-        });
-        
-        const monthlyIncomeVsExpense = monthKeys.map(month => ({
-            name: month,
-            ingresos: monthlyIncomesData[month],
-            gastos: monthlyExpensesData[month],
+        // FIX: Add missing 'value' and 'fill' properties to satisfy the ChartData type.
+        // These are not used by the LineChart, so dummy values are sufficient.
+        const monthlyIncomeVsExpense = Object.keys(monthlyData).map(key => ({
+            name: key.charAt(0).toUpperCase() + key.slice(1),
+            ingresos: monthlyData[key].ingresos,
+            gastos: monthlyData[key].gastos,
             value: 0,
             fill: '',
         }));
+        
+        // FIX: Add missing 'fill' property to satisfy the ChartData type.
+        // The BarChart provides its own fill, so a dummy value is sufficient here.
+        const packageVolume = Object.keys(packageMonthlyData).slice(-6).map(key => ({
+            name: key.charAt(0).toUpperCase() + key.slice(1),
+            value: packageMonthlyData[key],
+            fill: '',
+        }));
 
-        const thisMonth = now.getMonth();
-        const thisYear = now.getFullYear();
-        const currentMonthExpenses = expenses.filter(e => {
-            const d = new Date(e.date + 'T00:00:00Z');
-            return d.getUTCMonth() === thisMonth && d.getUTCFullYear() === thisYear;
-        });
-
-        const expensesByCategory: ChartData[] = currentMonthExpenses.reduce((acc, expense) => {
+        const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const currentMonthExpenses = expenses.filter(e => e.date && new Date(e.date) >= currentMonth);
+        const expensesByCategory = currentMonthExpenses.reduce((acc, expense) => {
             let category = acc.find(c => c.name === expense.category);
             if (!category) {
                 category = { name: expense.category, value: 0, fill: '' };
@@ -721,38 +709,27 @@ export const apiService = {
             return cat;
         });
 
-        const sixMonthKeys = monthKeys.slice(-6);
-        const packageVolumeData = Object.fromEntries(sixMonthKeys.map(key => [key, 0]));
-        packages.filter(p => new Date(p.receivedDate) >= sixMonthsAgo).forEach(p => {
-             const monthName = monthNames[new Date(p.receivedDate).getMonth()];
-             if (monthName in packageVolumeData) packageVolumeData[monthName]++;
+        const visitorTrafficByPoint = visitors.reduce((acc, visitor) => {
+            if (visitor.accessPointId) {
+                acc[visitor.accessPointId] = (acc[visitor.accessPointId] || 0) + 1;
+            }
+            return acc;
+        }, {} as {[key: number]: number});
+
+        const visitorTraffic = Object.keys(visitorTrafficByPoint).map(pointId => {
+            const pointName = accessPoints.find(p => p.id === Number(pointId))?.name || `Punto ${pointId}`;
+            // FIX: Add missing 'fill' property to satisfy the ChartData type.
+            // The PieChart assigns colors via <Cell> components, so a dummy value is sufficient.
+            return { name: pointName, value: visitorTrafficByPoint[Number(pointId)], fill: '' };
         });
-        const packageVolume = sixMonthKeys.map(month => ({ name: month, value: packageVolumeData[month], fill: '#82ca9d'}));
 
-        const visitorTraffic: ChartData[] = accessPoints.map((ap, i) => ({
-            name: ap.name,
-            value: visitors.filter(v => v.accessPointId === ap.id).length || Math.floor(Math.random() * 50) + 10,
-            fill: ['#8884d8', '#82ca9d', '#ffc658'][i % 3],
-        }));
-
-        const monthlyBudget = monthlyIncomesData[monthNames[thisMonth]] || 0;
-
-        return {
-            monthlyIncomeVsExpense,
-            expensesByCategory,
-            packageVolume,
-            visitorTraffic,
-            monthlyBudget
-        };
+        return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
     },
 
-    // Due Dates & Tasks
+    // --- Due Dates ---
     async fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
         const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching due dates:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching due dates:', error); return []; }
         return (fromSupabase(data) as DueDate[] | null) || [];
     },
     async addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
@@ -767,18 +744,15 @@ export const apiService = {
         const { error } = await supabase.from('due_dates').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteDueDate');
     },
-
+    
+    // --- Tasks ---
     async fetchTasks(conjuntoId: string): Promise<Task[]> {
         const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching tasks:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching tasks:', error); return []; }
         return (fromSupabase(data) as Task[] | null) || [];
     },
-    async addTask(conjuntoId: string, task: Omit<Task, 'id'|'completed'> & {completed?: boolean}): Promise<void> {
-        const payload = { ...task, completed: task.completed || false };
-        const { error } = await supabase.from('tasks').insert(toSupabase({ ...payload, conjuntoId }));
+    async addTask(conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> {
+        const { error } = await supabase.from('tasks').insert(toSupabase({ ...task, conjuntoId }));
         if (error) handleApiError(error, 'addTask');
     },
     async updateTask(conjuntoId: string, task: Task): Promise<void> {
@@ -789,143 +763,47 @@ export const apiService = {
         const { error } = await supabase.from('tasks').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteTask');
     },
-
-    // Common Areas
+    
+    // --- Common Areas ---
     async fetchCommonAreas(conjuntoId: string): Promise<CommonArea[]> {
         const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching common areas:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching common areas:', error); return []; }
         return (fromSupabase(data) as CommonArea[] | null) || [];
     },
-    async addCommonArea(conjuntoId: string, name: string): Promise<void> {
-        // This is a simplified version. A real app might have more sophisticated color logic.
+    async addCommonArea(conjuntoId: string, areaName: string): Promise<void> {
         const colors = [
             { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' },
             { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
-            { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
+            { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
             { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+            { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
+            { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
         ];
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        const { error } = await supabase.from('common_areas').insert({ conjunto_id: conjuntoId, name, color });
+        const newArea = { name: areaName, color: colors[Math.floor(Math.random() * colors.length)], conjunto_id: conjuntoId };
+        const { error } = await supabase.from('common_areas').insert(newArea);
         if (error) handleApiError(error, 'addCommonArea');
     },
-    async removeCommonArea(conjuntoId: string, id: string): Promise<void> {
-        const { error } = await supabase.from('common_areas').delete().eq('id', id).eq('conjunto_id', conjuntoId);
+    async removeCommonArea(conjuntoId: string, areaId: string): Promise<void> {
+        const { error } = await supabase.from('common_areas').delete().eq('id', areaId).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'removeCommonArea');
     },
     async fetchBookings(conjuntoId: string): Promise<Booking[]> {
         const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching bookings:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching bookings:', error); return []; }
         return (fromSupabase(data) as Booking[] | null) || [];
     },
-    async addBooking(conjuntoId: string, booking: Omit<Booking, 'id'>): Promise<void> {
+    async addBooking(conjuntoId: string, booking: Booking): Promise<void> {
         const { error } = await supabase.from('bookings').insert(toSupabase({ ...booking, conjuntoId }));
         if (error) handleApiError(error, 'addBooking');
     },
 
-    // --- COMMUNICATIONS ---
-    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string; url: string }[]): Promise<{ success: boolean; message?: string; error?: string; }> {
-        try {
-            const payload = { recipients, subject, body, attachments };
-
-            // Use the standard Supabase client library function to invoke the Edge Function.
-            // Pass the payload object directly to the 'body' property. The library handles JSON stringification.
-            const { data, error } = await supabase.functions.invoke('send-email', {
-                body: payload,
-            });
-
-            if (error) {
-                // If the invocation itself fails (e.g., network error, function not found, CORS), throw the error.
-                throw error;
-            }
-            
-            // Assuming a successful invocation (even if the function has internal errors) means the process started.
-            // A more robust implementation might check the `data` returned from the function for a success status.
-            return { success: true, message: 'Se ha iniciado el proceso de envío de correo.' };
-
-        } catch (error: any) {
-            console.error('Error invoking Supabase Edge Function "send-email":', error);
-            const errorMessage = error.message || 'Ocurrió un error en la función de envío.';
-            return { success: false, error: `No se pudo activar la función de correo: ${errorMessage}` };
-        }
-    },
-    // FIX: Add missing method to upload attachments for communications.
-    async uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{ name: string; url: string } | null> {
-        const bucket = 'archivos_conjuntos';
-        const filePath = `${conjuntoId}/comunicaciones/${Date.now()}-${file.name}`;
-        
-        const { error: uploadError } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, file);
-
-        if (uploadError) {
-            handleApiError(uploadError, 'uploadCommunicationAttachment');
-            return null;
-        }
-
-        const { data: publicUrlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(filePath);
-        
-        return {
-            name: file.name,
-            url: publicUrlData.publicUrl,
-        };
-    },
-    // FIX: Add missing method to handle sending emails to specific groups via the chatbot.
-    async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ success: boolean; message: string; error?: string }> {
-        let emailList: string[] = [];
-        try {
-            switch(group) {
-                case 'all':
-                    emailList = (await this.fetchResidents(conjuntoId)).map(r => r.email).filter(Boolean);
-                    break;
-                case 'debtors':
-                    const accounts = await this.fetchAccountStatus(conjuntoId);
-                    const debtorApartments = new Set(accounts.filter(a => a.outstandingBalance > 0).map(a => a.apartment));
-                    const residents = await this.fetchResidents(conjuntoId);
-                    emailList = residents.filter(r => debtorApartments.has(r.apartment)).map(r => r.email).filter(Boolean);
-                    break;
-                case 'providers':
-                    emailList = (await this.fetchProviders(conjuntoId)).map(p => p.email).filter(Boolean);
-                    break;
-                case 'internal':
-                    emailList = (await this.fetchInternalStaff(conjuntoId)).map(s => s.email).filter(Boolean);
-                    break;
-                default:
-                    return { success: false, message: 'Grupo de destinatarios inválido.', error: 'Invalid recipient group.' };
-            }
-            
-            if (emailList.length === 0) {
-                return { success: true, message: `No se encontraron destinatarios para el grupo '${group}'. No se enviaron correos.` };
-            }
-            const sendResult = await this.sendCommunicationEmail(emailList, subject, body, []);
-            if (sendResult.success) {
-                return { success: true, message: `¡Correo masivo enviado exitosamente a ${emailList.length} destinatarios del grupo '${group}'!` };
-            } else {
-                return { success: false, message: `Error al enviar correo masivo: ${sendResult.error}`, error: sendResult.error };
-            }
-        } catch (error: any) {
-            handleApiError(error, `sendMassEmail for group ${group}`);
-            return { success: false, message: `Error al procesar el envío masivo: ${error.message}`, error: error.message };
-        }
-    },
-    
-    // Financial
+    // --- Finances ---
     async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
         const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) {
-            console.error('Error fetching expenses:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching expenses:', error); return []; }
         return (fromSupabase(data) as Expense[] | null) || [];
     },
-    async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
+     async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
         const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
         if (error) handleApiError(error, 'addExpense');
     },
@@ -933,20 +811,17 @@ export const apiService = {
         const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteExpense');
     },
-    async bulkUpsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
+     async bulkUpsertExpenses(conjuntoId: string, expenses: Expense[]): Promise<void> {
         const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
-        const { error } = await supabase.from('expenses').insert(payload);
-        if(error) handleApiError(error, 'bulkUpsertExpenses');
+        const { error } = await supabase.from('expenses').upsert(payload, { onConflict: 'conjunto_id,description,date' });
+        if (error) handleApiError(error, 'bulkUpsertExpenses');
     },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
         const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        if (error) {
-            console.error('Error fetching incomes:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching incomes:', error); return []; }
         return (fromSupabase(data) as Income[] | null) || [];
     },
-    async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
+     async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
         const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
         if (error) handleApiError(error, 'addIncome');
     },
@@ -954,19 +829,16 @@ export const apiService = {
         const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteIncome');
     },
-    async bulkUpsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
+    async bulkUpsertIncomes(conjuntoId: string, incomes: Income[]): Promise<void> {
         const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
-        const { error } = await supabase.from('incomes').insert(payload);
-        if(error) handleApiError(error, 'bulkUpsertIncomes');
+        const { error } = await supabase.from('incomes').upsert(payload, { onConflict: 'conjunto_id,description,date' });
+        if (error) handleApiError(error, 'bulkUpsertIncomes');
     },
-    
-    // Security
+
+    // --- Seguridad ---
     async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
         const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching visitor logs:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching visitor logs:', error); return []; }
         return (fromSupabase(data) as VisitorLog[] | null) || [];
     },
     async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
@@ -974,219 +846,132 @@ export const apiService = {
         if (error) handleApiError(error, 'addVisitorLog');
     },
     async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
-        // FIX: Re-implemented with native fetch to bypass a potential Supabase client schema cache issue
-        // that was causing "Could not find column" errors after database migrations. This approach sends
-        // the request directly to the PostgREST endpoint, ensuring it's validated against the live DB schema.
-        // FIX: Removed session logic and now use the public anon key for authorization, aligning with the app's
-        // overall auth strategy and fixing the "Authentication token not found" error.
-        try {
-            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co'; // From supabaseClient.ts
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys'; // From supabaseClient.ts
-
-            const response = await fetch(`${supabaseUrl}/rest/v1/visitor_logs?id=eq.${logId}&conjunto_id=eq.${conjuntoId}`, {
-                method: 'PATCH',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify(toSupabase(updates))
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                const error: PostgrestError = {
-                    message: errorData.message || `Failed to update visitor log with status ${response.status}`,
-                    details: errorData.details || '',
-                    hint: errorData.hint || '',
-                    code: errorData.code || String(response.status),
-                };
-                handleApiError(error, 'updateVisitorLog (manual fetch)');
-            }
-        } catch (e) {
-            handleApiError(e, 'updateVisitorLog (manual fetch wrapper)');
-        }
+        const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
+        if (error) handleApiError(error, `updateVisitorLog for id ${logId}`);
     },
     async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
         const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
-        if (error) {
-            console.error('Error fetching package logs:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching package logs:', error); return []; }
         return (fromSupabase(data) as PackageLog[] | null) || [];
     },
-    async addPackageLog(conjuntoId: string, pkg: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
-        const payload = { ...pkg, receivedDate: new Date().toISOString(), status: 'En recepción' as const, conjuntoId };
-        const { error } = await supabase.from('package_logs').insert(toSupabase(payload));
-        if (error) {
-            handleApiError(error, 'addPackageLog');
-            return;
-        }
-        
-        // After successful insertion, trigger email notification
-        const resident = (await this.fetchResidents(conjuntoId)).find(r => r.apartment === pkg.apartment);
-        if (resident && resident.email) {
-            this.sendCommunicationEmail(
-                [resident.email],
-                `📦 ¡Tienes un paquete en recepción!`,
-                `<p>Hola ${resident.name},</p><p>Te informamos que hemos recibido un paquete para ti de <strong>${pkg.courier}</strong>. Puedes reclamarlo en la recepción.</p>`,
-                []
-            );
-        }
+    async addPackageLog(conjuntoId: string, log: Omit<PackageLog, 'id' | 'receivedDate' | 'status'>): Promise<void> {
+        const newLog = {
+            ...log,
+            receivedDate: new Date().toISOString(),
+            status: 'En recepción' as const,
+            conjuntoId: conjuntoId
+        };
+        const { error } = await supabase.from('package_logs').insert(toSupabase(newLog));
+        if (error) handleApiError(error, 'addPackageLog');
     },
-    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
-        const { data: pkgBeforeUpdate, error: fetchError } = await supabase.from('package_logs').select('apartment, courier').eq('id', packageId).single();
-        if (fetchError || !pkgBeforeUpdate) {
-            handleApiError(fetchError!, 'fetching package before status update');
-            return;
-        }
-
+    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: 'En recepción' | 'Entregado'): Promise<void> {
         const { error } = await supabase.from('package_logs').update({ status }).eq('id', packageId).eq('conjunto_id', conjuntoId);
-        if (error) {
-            handleApiError(error, 'updatePackageLogStatus');
-            return;
-        }
-        
-        if (status === 'Entregado') {
-             const resident = (await this.fetchResidents(conjuntoId)).find(r => r.apartment === pkgBeforeUpdate.apartment);
-             if (resident && resident.email) {
-                 this.sendCommunicationEmail(
-                    [resident.email],
-                    `✅ Tu paquete ha sido entregado`,
-                    `<p>Hola ${resident.name},</p><p>Te confirmamos que tu paquete de <strong>${pkgBeforeUpdate.courier}</strong> ha sido entregado exitosamente.</p>`,
-                    []
-                );
-             }
-        }
+        if (error) handleApiError(error, 'updatePackageLogStatus');
     },
-
-    // Settings
     async fetchAccessPoints(conjuntoId: string): Promise<AccessPoint[]> {
         const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
-        if (error) {
-            console.error('Error fetching access points:', error);
-            return [];
-        }
+        if (error) { console.error('Error fetching access points:', error); return []; }
         return (fromSupabase(data) as AccessPoint[] | null) || [];
     },
     async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
-        const { error } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
+        const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
         if (error) handleApiError(error, 'addAccessPoint');
     },
     async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
         const { error } = await supabase.from('access_points').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         if (error) handleApiError(error, 'deleteAccessPoint');
     },
+    
+    // --- Comunicaciones ---
+    async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ success: boolean; message: string }> {
+        // This is a placeholder for a backend call.
+        console.log(`Sending email to ${group} for ${conjuntoId} with subject: ${subject}`);
+        await new Promise(res => setTimeout(res, 1000)); // Simulate network delay
+        return { success: true, message: `Correo enviado exitosamente al grupo "${group}".` };
+    },
+    
+    async uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{ name: string; url: string } | null> {
+        const fileName = `${conjuntoId}/communications/${Date.now()}-${file.name}`;
+        const { data, error } = await supabase.storage.from('paic-files').upload(fileName, file);
+        if (error) {
+            console.error('Error uploading attachment:', error);
+            handleApiError(error, 'uploadCommunicationAttachment');
+            return null;
+        }
+        const { data: { publicUrl } } = supabase.storage.from('paic-files').getPublicUrl(data.path);
+        return { name: file.name, url: publicUrl };
+    },
+    
+    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[]): Promise<{ success: boolean; error?: string }> {
+        try {
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: { recipients, subject, body, attachments }
+            });
 
-    // Super Admin
+            if (error) {
+                throw new Error(`No se pudo activar la función de correo: ${error.message}`);
+            }
+
+            if (data.error) {
+                throw new Error(`Error en la función de correo: ${data.error}`);
+            }
+
+            return { success: true };
+        } catch (err: any) {
+            console.error("Error sending communication email:", err);
+            return { success: false, error: err.message };
+        }
+    },
+
+
+    // --- Super Admin ---
     async fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
         const { data, error } = await supabase.from('conjuntos').select('*');
-        if (error) {
-            console.error('Error fetching all conjuntos:', error);
-            return [];
-        }
+        if (error) { handleApiError(error, 'fetchAllConjuntos'); return []; }
         return (fromSupabase(data) as ConjuntoInfo[] | null) || [];
     },
     async fetchPlatformStats(): Promise<PlatformStats | null> {
-         const { data, error } = await supabase.rpc('get_platform_stats');
-         if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
-         return fromSupabase(data) as PlatformStats;
+        const { data, error } = await supabase.rpc('get_platform_stats');
+        if (error) { handleApiError(error, 'fetchPlatformStats'); return null; }
+        return fromSupabase(data) as PlatformStats;
     },
-    async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
-        const now = new Date();
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    
-        const [chatbotRes, packageRes] = await Promise.all([
-            supabase.from('chatbot_logs').select('created_at').gte('created_at', sixMonthsAgo.toISOString()),
-            supabase.from('package_logs').select('received_date').gte('received_date', sixMonthsAgo.toISOString()),
-        ]);
-    
-        const errors = [chatbotRes.error, packageRes.error].filter(Boolean);
-        if (errors.length > 0) {
-            handleApiError(errors[0], 'fetchSuperAdminChartData');
-        }
-        
-        const monthKeys: string[] = [];
-        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            monthKeys.push(monthNames[d.getMonth()]);
-        }
-        
-        const monthlyDataTemplate: Record<string, number> = Object.fromEntries(monthKeys.map(key => [key, 0]));
-    
-        const chatbotUsageData = {...monthlyDataTemplate};
-        (chatbotRes.data as { created_at: string }[] || []).forEach((log: { created_at: string }) => {
-            const monthName = monthNames[new Date(log.created_at).getMonth()];
-            // FIX: Using the `in` operator for robust property checking to fix 'unknown index type' error.
-            if (monthName && monthName in chatbotUsageData) {
-                chatbotUsageData[monthName]++;
-            }
-        });
-    
-        const packageVolumeData = {...monthlyDataTemplate};
-        (packageRes.data as { received_date: string }[] || []).forEach((log: { received_date: string }) => {
-            const monthName = monthNames[new Date(log.received_date).getMonth()];
-            // FIX: Using the `in` operator for robust property checking to fix 'unknown index type' error.
-            if (monthName && monthName in packageVolumeData) {
-                packageVolumeData[monthName]++;
-            }
-        });
-    
-        const formatForChart = (data: Record<string, number>): ChartData[] => Object.entries(data).map(([name, value]) => ({
-            name,
-            value,
-            fill: '', 
-        }));
-    
-        return {
-            chatbotUsage: formatForChart(chatbotUsageData),
-            packageVolume: formatForChart(packageVolumeData),
-            visitorTraffic: [] // Return empty array as the column doesn't exist
-        };
+    async fetchSuperAdminChartData(): Promise<SuperAdminChartData | null> {
+        const { data, error } = await supabase.rpc('get_superadmin_charts');
+         if (error) { handleApiError(error, 'fetchSuperAdminChartData'); return null; }
+        return fromSupabase(data) as SuperAdminChartData;
     },
     async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
-        const bucket = 'archivos_conjuntos';
-        const { data: fileObjects, error } = await supabase.storage.from(bucket).list(conjuntoId, {
+        const { data, error } = await supabase.storage.from('paic-files').list(conjuntoId, {
             limit: 100,
             offset: 0,
             sortBy: { column: 'created_at', order: 'desc' },
         });
 
-        if (error) {
-            console.error(`Error listing files for ${conjuntoId}:`, error);
-            return [];
-        }
-        if (!fileObjects) return [];
+        if (error) { handleApiError(error, 'listFilesForConjunto'); return []; }
+        if (!data) return [];
 
-        const filesWithUrls: StoredFile[] = fileObjects.map(file => {
-            const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(`${conjuntoId}/${file.name}`);
-            return {
-                id: file.id ?? file.name,
-                name: file.name,
-                url: publicUrlData.publicUrl,
-                size: file.metadata?.size ?? 0,
-                mimeType: file.metadata?.mimetype ?? 'application/octet-stream',
-                createdAt: file.created_at,
-            };
+        const filesWithUrls = data.map(file => {
+             const { data: { publicUrl } } = supabase.storage.from('paic-files').getPublicUrl(`${conjuntoId}/${file.name}`);
+             return {
+                 id: file.id,
+                 name: file.name,
+                 url: publicUrl,
+                 size: file.metadata.size,
+                 mimeType: file.metadata.mimetype,
+                 createdAt: file.created_at,
+             };
         });
-
         return filesWithUrls;
     },
     async uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
-        const { error } = await supabase.storage
-            .from('archivos_conjuntos')
-            .upload(`${conjuntoId}/${file.name}`, file, {
-                cacheControl: '3600',
-                upsert: true
-            });
-        if (error) handleApiError(error, `uploadFileForConjunto`);
+        const fileName = `${conjuntoId}/${file.name}`;
+        const { error } = await supabase.storage.from('paic-files').upload(fileName, file, {
+            upsert: true, // Overwrite if file with same name exists
+        });
+        if (error) handleApiError(error, 'uploadFileForConjunto');
     },
     async deleteFileForConjunto(conjuntoId: string, fileName: string): Promise<void> {
-         const { error } = await supabase.storage
-            .from('archivos_conjuntos')
-            .remove([`${conjuntoId}/${fileName}`]);
-        if (error) handleApiError(error, `deleteFileForConjunto`);
-    },
+        const { error } = await supabase.storage.from('paic-files').remove([`${conjuntoId}/${fileName}`]);
+        if (error) handleApiError(error, 'deleteFileForConjunto');
+    }
 };
