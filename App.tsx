@@ -214,53 +214,60 @@ const App: React.FC = () => {
   }, []);
 
   const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
-    // FIX: Authenticate with Supabase using the Google ID token to establish a valid session.
-    // This is required for subsequent authenticated API calls, like sending emails via Edge Functions.
-    const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: credentialResponse.credential,
-    });
+    try {
+      // FIX: Authenticate with Supabase using the Google ID token to establish a valid session.
+      // This is required for subsequent authenticated API calls, like sending emails via Edge Functions.
+      const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: credentialResponse.credential,
+      });
 
-    if (error) {
-        console.error("Supabase sign-in error:", error);
-        setNotification(`Error de autenticación: ${error.message}`);
+      if (error) {
+          console.error("Supabase sign-in error:", error);
+          setNotification(`Error de autenticación: ${error.message}`);
+          return;
+      }
+
+      if (!data.user) {
+          console.error("Supabase sign-in did not return a user.");
+          setNotification("Error de autenticación: No se pudo verificar el usuario.");
+          return;
+      }
+
+      const profileObject: any = jwtDecode(credentialResponse.credential);
+      if (!profileObject) {
+        console.error("Failed to decode profile from credential response.");
+        // FIX: Provide user feedback when token decoding fails.
+        setNotification("No se pudo procesar la información de inicio de sesión de Google.");
         return;
-    }
+      }
+      
+      const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
+      if (isSuperAdmin) {
+          const superAdmin: SuperAdminProfile = {
+              name: profileObject.name,
+              email: profileObject.email,
+              role: UserRole.SuperAdmin,
+          };
+          setSuperAdminProfile(superAdmin);
+          localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
+          return; // End flow here for super admin
+      }
 
-    if (!data.user) {
-        console.error("Supabase sign-in did not return a user.");
-        setNotification("Error de autenticación: No se pudo verificar el usuario.");
-        return;
-    }
+      const existingUser = await apiService.findUserByEmail(profileObject.email);
 
-    const profileObject: any = jwtDecode(credentialResponse.credential);
-    if (!profileObject) {
-      console.error("Failed to decode profile from credential response.");
-      return;
+      const newUserProfile: UserProfile = {
+        name: profileObject.name,
+        email: profileObject.email,
+        picture: profileObject.picture,
+        role: UserRole.Admin,
+        conjuntoId: existingUser?.conjuntoId || 'conj-123'
+      };
+      handleAuthSuccess(newUserProfile);
+    } catch (err: any) {
+        console.error("Error during Google login process:", err);
+        setNotification(`Error al iniciar sesión: ${err.message || 'Ocurrió un error inesperado.'}`);
     }
-    
-    const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
-    if (isSuperAdmin) {
-        const superAdmin: SuperAdminProfile = {
-            name: profileObject.name,
-            email: profileObject.email,
-            role: UserRole.SuperAdmin,
-        };
-        setSuperAdminProfile(superAdmin);
-        localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
-        return; // End flow here for super admin
-    }
-
-    const existingUser = await apiService.findUserByEmail(profileObject.email);
-
-    const newUserProfile: UserProfile = {
-      name: profileObject.name,
-      email: profileObject.email,
-      picture: profileObject.picture,
-      role: UserRole.Admin,
-      conjuntoId: existingUser?.conjuntoId || 'conj-123'
-    };
-    handleAuthSuccess(newUserProfile);
   }, [handleAuthSuccess]);
 
   const handleSaveSetup = async (info: ConjuntoInfo) => {
