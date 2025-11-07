@@ -597,7 +597,6 @@ export const apiService = {
                 subject,
                 html: finalHtml,
                 fromName,
-                fromEmail,
             },
         });
 
