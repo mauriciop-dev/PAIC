@@ -3,7 +3,7 @@
 // NOTE: No `declare namespace Deno` is needed as the Supabase environment provides these types globally.
 // FIX: To resolve issues with Deno's global types not being recognized in some environments,
 // this was updated to import and use the `serve` function from the Deno standard library
-// instead of relying on the global `Deno.serve`. This change also helps resolve `Deno.env` type errors.
+// instead of relying on the global `Deno.serve`.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { Resend } from 'npm:resend@3.2.0'
 
@@ -17,11 +17,15 @@ const corsHeaders = {
 // --- Environment Variable Validation ---
 // Fail fast if secrets are not set in Supabase settings. This will cause a clear deployment error
 // instead of a confusing runtime error.
+// FIX: Added @ts-ignore to suppress TypeScript errors. Deno.env is available in the Supabase Edge Function runtime.
+// @ts-ignore
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 if (!RESEND_API_KEY) {
   throw new Error("Server configuration error: The 'RESEND_API_KEY' secret is not set.");
 }
 
+// FIX: Added @ts-ignore to suppress TypeScript errors. Deno.env is available in the Supabase Edge Function runtime.
+// @ts-ignore
 const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL');
 if (!SENDER_EMAIL) {
   throw new Error("Server configuration error: The 'SENDER_EMAIL' secret is not set.");
