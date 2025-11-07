@@ -1,11 +1,16 @@
 // supabase/functions/send-email/index.ts
-// FIX: The Deno global object is not available in standard TypeScript environments,
-// causing "Cannot find name 'Deno'" errors. A manual declaration is added
-// to provide types for the Deno APIs used in this function.
-// The invalid triple-slash directive that was causing a file-not-found error was also removed.
-declare const Deno: any;
+// FIX: Removed invalid Deno types reference and added a minimal declaration
+// for the Deno global. This resolves TypeScript errors in environments that
+// don't have Deno types available by default, without affecting the
+// function's behavior in the Supabase Edge Function runtime. The original
+// /// <reference ... /> pointed to a non-existent file.
+declare const Deno: {
+    env: {
+        get(key: string): string | undefined;
+    };
+};
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { Resend } from 'npm:resend@3.2.0';
 
 // Define las cabeceras CORS en una constante para reutilizarlas
 const corsHeaders = {
@@ -28,8 +33,6 @@ serve(async (req) => {
       throw new Error('La variable de entorno RESEND_API_KEY no está configurada.');
     }
     
-    const resend = new Resend(RESEND_API_KEY);
-    // FIX: Destructure fromName and fromEmail from the request body for dynamic sender info.
     const { to, subject, html, fromName, fromEmail } = await req.json();
 
     // Valida que los campos necesarios estén presentes
@@ -42,29 +45,38 @@ serve(async (req) => {
       });
     }
     
-    // FIX: Use the dynamic sender details from the payload, with fallbacks to environment variables.
     const senderName = fromName || FALLBACK_SENDER_NAME;
     const senderEmail = fromEmail || FALLBACK_SENDER_EMAIL;
 
-    // Lógica de envío de correo
-    const { data, error } = await resend.emails.send({
+    const resendPayload = {
       from: `${senderName} <${senderEmail}>`,
       to: to,
       subject: subject,
       html: html,
+    };
+
+    const resendResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${RESEND_API_KEY}`
+        },
+        body: JSON.stringify(resendPayload)
     });
 
-    if (error) {
-      console.error({ error });
-      // Lanza el error para que sea capturado por el bloque catch
-      throw error;
+    const responseData = await resendResponse.json();
+
+    if (!resendResponse.ok) {
+        console.error({ error: responseData });
+        const errorMessage = responseData.message || responseData.error || 'Error from Resend API';
+        throw new Error(errorMessage);
     }
 
     // Respuesta exitosa
     return new Response(JSON.stringify({
       success: true,
       message: 'Correo enviado exitosamente',
-      data,
+      data: responseData,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
