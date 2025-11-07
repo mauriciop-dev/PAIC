@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -57,7 +56,7 @@ const App: React.FC = () => {
     if (window.google && window.google.accounts && window.google.accounts.id) {
         window.google.accounts.id.disableAutoSelect();
     }
-  }, []);
+  }, [setUserProfile, setSuperAdminProfile, setConjuntoInfo, setSelectedAccessPointId]);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -216,7 +215,7 @@ const App: React.FC = () => {
     if (profile.role === UserRole.Guard) {
       setIsAccessPointModalOpen(true);
     }
-  }, []);
+  }, [setUserProfile, setConjuntoInfo, setIsInitialSetupModalOpen, setIsAccessPointModalOpen]);
 
   const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
     // FIX: Authenticate with Supabase using the Google ID token to establish a valid session.
@@ -266,7 +265,7 @@ const App: React.FC = () => {
       conjuntoId: existingUser?.conjuntoId || 'conj-123'
     };
     handleAuthSuccess(newUserProfile);
-  }, [handleAuthSuccess]);
+  }, [handleAuthSuccess, setNotification, setSuperAdminProfile]);
 
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     // 1. Persist the new info to our simulated backend
