@@ -274,6 +274,23 @@ const App: React.FC = () => {
           // This covers admins who haven't logged in before or don't have a 'users' table entry.
           const existingConjunto = await apiService.findConjuntoByAdminEmail(profileObject.email);
           if (existingConjunto) {
+              // FIX: If an admin is found via the 'conjuntos' table, ensure a corresponding
+              // record exists in the 'users' table. This is critical for Row Level Security (RLS)
+              // policies to function correctly for all subsequent API calls. Without this,
+              // data fetching might fail silently after login.
+              const dbUser = await apiService.findUserByEmail(profileObject.email);
+              if (!dbUser) {
+                  console.log(`Admin user ${profileObject.email} not in DB, creating entry for RLS.`);
+                  const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
+                      name: existingConjunto.adminName,
+                      email: existingConjunto.adminEmail,
+                      phoneNumber: existingConjunto.adminPhone,
+                      role: UserRole.Admin,
+                      conjuntoId: existingConjunto.id,
+                  };
+                  await apiService.addUser(existingConjunto.id, adminForDb);
+              }
+
               finalProfile = {
                   name: existingConjunto.adminName,
                   email: existingConjunto.adminEmail,
