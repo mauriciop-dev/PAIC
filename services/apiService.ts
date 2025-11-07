@@ -904,16 +904,31 @@ export const apiService = {
     
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[]): Promise<{ success: boolean; error?: string }> {
         try {
+            // Construct the HTML body, including links to attachments if they exist.
+            let finalHtml = body.replace(/\n/g, '<br>'); // Basic newline to <br> conversion
+            if (attachments.length > 0) {
+                finalHtml += '<br><br><hr><p><b>Archivos Adjuntos:</b></p><ul>';
+                attachments.forEach(att => {
+                    finalHtml += `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`;
+                });
+                finalHtml += '</ul>';
+            }
+
             const { data, error } = await supabase.functions.invoke('send-email', {
-                body: { recipients, subject, body, attachments }
+                body: { 
+                    bcc: recipients, 
+                    subject: subject, 
+                    html: finalHtml
+                }
             });
 
             if (error) {
                 throw new Error(`No se pudo activar la función de correo: ${error.message}`);
             }
 
-            if (data.error) {
-                throw new Error(`Error en la función de correo: ${data.error}`);
+            // The function might return its own structured error response
+            if (data && data.error) {
+                 throw new Error(`Error en la función de correo: ${data.error}`);
             }
 
             return { success: true };
