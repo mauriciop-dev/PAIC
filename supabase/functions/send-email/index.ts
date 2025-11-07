@@ -1,97 +1,93 @@
 // supabase/functions/send-email/index.ts
-// FIX: Removed invalid Deno types reference and added a minimal declaration
-// for the Deno global. This resolves TypeScript errors in environments that
-// don't have Deno types available by default, without affecting the
-// function's behavior in the Supabase Edge Function runtime. The original
-// /// <reference ... /> pointed to a non-existent file.
-declare const Deno: {
-    env: {
-        get(key: string): string | undefined;
-    };
-};
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { Resend } from 'npm:resend@3.2.0';
+// FIX: Add type definitions for `Deno.env` to resolve TypeScript errors.
+// The Deno runtime provides the 'Deno' global, but in some environments (like a standard TS project without Deno config),
+// the types for its properties like 'env' are missing.
+declare namespace Deno {
+  export const env: {
+    get(key: string): string | undefined;
+  };
+}
 
-// Define las cabeceras CORS en una constante para reutilizarlas
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { Resend } from 'npm:resend@3.2.0'
+
+// This is a critical security best practice.
+// The API key should never be exposed client-side.
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+// The sender email must be a verified domain in your Resend account.
+const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL')
+const FALLBACK_SENDER_NAME = 'Administración PAIC'
+
+// Initialize the Resend client once when the function starts.
+// This is more efficient than creating it on every request.
+const resend = new Resend(RESEND_API_KEY)
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // En producción, deberías restringir esto a tu dominio
+  'Access-Control-Allow-Origin': '*', // For development. In production, lock this down to your app's URL.
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL');
-const FALLBACK_SENDER_NAME = 'Administración PAIC';
+  'Access-Control-Allow-Methods': 'POST, OPTIONS', // Explicitly allow POST and OPTIONS
+}
 
 serve(async (req) => {
-  // Manejo de la solicitud pre-vuelo (preflight) de CORS
+  // This is a preflight request. It's a security check browsers do before
+  // making a real request to a different origin. We must handle it correctly.
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // Validate that essential environment variables are set on the server.
     if (!RESEND_API_KEY) {
-      throw new Error('La variable de entorno RESEND_API_KEY no está configurada.');
+      throw new Error('Server configuration error: RESEND_API_KEY is not set.')
     }
     if (!SENDER_EMAIL) {
-        throw new Error('La variable de entorno SENDER_EMAIL (email de envío verificado) no está configurada.');
+      throw new Error('Server configuration error: SENDER_EMAIL is not set.')
     }
-    
-    const resend = new Resend(RESEND_API_KEY);
-    const body = await req.json();
 
-    if (!body || typeof body !== 'object') {
-        throw new Error("El cuerpo de la solicitud es inválido o no es un objeto JSON.");
-    }
-    
-    const { to, subject, html, fromName } = body;
+    const body = await req.json()
+    // This log is crucial for debugging. Check your Supabase function logs to see if the request is arriving.
+    console.log('Function received payload:', JSON.stringify(body, null, 2))
 
-    // Valida que los campos necesarios estén presentes
+    // Validate the incoming payload from the client.
+    const { to, subject, html, fromName } = body
     if (!to || !Array.isArray(to) || to.length === 0 || !subject || !html) {
-      return new Response(JSON.stringify({
-        error: 'Faltan destinatarios (to), asunto (subject) o cuerpo del correo (html) en la solicitud, o el formato es incorrecto.'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('Invalid payload: Missing required fields "to", "subject", or "html".')
     }
-    
-    const senderName = fromName || FALLBACK_SENDER_NAME;
-    const senderEmail = SENDER_EMAIL;
 
-    // Lógica de envío de correo
+    // Send the email using the validated and server-configured details.
     const { data, error } = await resend.emails.send({
-      from: `${senderName} <${senderEmail}>`,
+      from: `${fromName || FALLBACK_SENDER_NAME} <${SENDER_EMAIL}>`,
       to: to,
       subject: subject,
       html: html,
-    });
+    })
 
+    // Handle potential errors from the Resend API.
     if (error) {
-      console.error({ error });
-      // Lanza el error para que sea capturado por el bloque catch
-      throw error;
+      console.error('Resend API Error:', JSON.stringify(error, null, 2))
+      // Forward the Resend error for better client-side debugging.
+      throw new Error(`Resend API failed: ${error.message}`)
     }
 
-    // Respuesta exitosa
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Correo enviado exitosamente',
-      data,
-    }), {
+    // Return a success response to the client.
+    return new Response(JSON.stringify({ success: true, data }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    })
   } catch (error) {
-    // Manejo centralizado de errores
-    console.error('Error en la función de envío de correo:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || 'Ocurrió un error inesperado en el servidor.',
-    }), {
-      status: 500, // Usar 500 para errores del servidor
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Catch any error from the try block, log it, and return a formatted error response.
+    console.error('Edge Function Error:', error)
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        // Use 400 for client-side/payload errors, but could be 500 for server issues.
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    )
   }
-});
+})
