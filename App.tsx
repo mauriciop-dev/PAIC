@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -254,16 +255,46 @@ const App: React.FC = () => {
           return; // End flow here for super admin
       }
 
-      const existingUser = await apiService.findUserByEmail(profileObject.email);
+      let finalProfile: UserProfile;
 
-      const newUserProfile: UserProfile = {
-        name: profileObject.name,
-        email: profileObject.email,
-        picture: profileObject.picture,
-        role: UserRole.Admin,
-        conjuntoId: existingUser?.conjuntoId || 'conj-123'
-      };
-      handleAuthSuccess(newUserProfile);
+      // 1. Check if they exist as a platform user (guard, accountant, existing admin, etc.)
+      const existingUser = await apiService.findUserByEmail(profileObject.email);
+      
+      if (existingUser) {
+          // User already exists in the users table. Use their data.
+          finalProfile = {
+              name: existingUser.name,
+              email: existingUser.email,
+              picture: profileObject.picture,
+              role: existingUser.role, // Use role from DB
+              conjuntoId: existingUser.conjuntoId,
+          };
+      } else {
+          // 2. If not a regular user, check if they are an admin of an existing conjunto
+          // This covers admins who haven't logged in before or don't have a 'users' table entry.
+          const existingConjunto = await apiService.findConjuntoByAdminEmail(profileObject.email);
+          if (existingConjunto) {
+              finalProfile = {
+                  name: existingConjunto.adminName,
+                  email: existingConjunto.adminEmail,
+                  picture: profileObject.picture,
+                  role: UserRole.Admin, // Role is Admin because they own a conjunto
+                  conjuntoId: existingConjunto.id,
+              };
+          } else {
+              // 3. If not found anywhere, this is a completely new user. Default them to the Admin setup flow.
+              finalProfile = {
+                  name: profileObject.name,
+                  email: profileObject.email,
+                  picture: profileObject.picture,
+                  role: UserRole.Admin,
+                  conjuntoId: undefined, // This will trigger the InitialSetupModal
+              };
+          }
+      }
+
+      handleAuthSuccess(finalProfile);
+
     } catch (err: any) {
         console.error("Error during Google login process:", err);
         setNotification(`Error al iniciar sesión: ${err.message || 'Ocurrió un error inesperado.'}`);
@@ -297,7 +328,7 @@ const App: React.FC = () => {
 
     // 3. Also, sync the admin name with the user profile for UI consistency
     if (userProfile && userProfile.name !== info.adminName) {
-      const updatedProfile = { ...userProfile, name: info.adminName };
+      const updatedProfile = { ...userProfile, name: info.adminName, conjuntoId: info.id };
       setUserProfile(updatedProfile);
       localStorage.setItem('paic_userProfile', JSON.stringify(updatedProfile));
     }
@@ -365,7 +396,7 @@ const App: React.FC = () => {
         <InitialSetupModal 
             onClose={() => setIsInitialSetupModalOpen(false)} 
             onSaveSetup={handleSaveSetup} 
-            conjuntoId={userProfile.conjuntoId || 'conj-123'} 
+            conjuntoId={userProfile.conjuntoId || 'conj-' + Date.now()} 
         />
       )}
       {isSettingsModalOpen && userProfile.role === UserRole.Admin && conjuntoInfo && (

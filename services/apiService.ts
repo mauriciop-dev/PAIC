@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import { 
@@ -258,6 +259,16 @@ export const apiService = {
             return null;
         }
         return fromSupabase(data) as PlatformUser | null;
+    },
+    async findConjuntoByAdminEmail(adminEmail: string): Promise<ConjuntoInfo | null> {
+        const { data, error } = await supabase.from('conjuntos').select('*').eq('admin_email', adminEmail).single();
+        if (error) {
+            if (error.code !== 'PGRST116') { // 'No rows found' is not an error here
+                handleApiError(error, `findConjuntoByAdminEmail for ${adminEmail}`);
+            }
+            return null;
+        }
+        return fromSupabase(data) as ConjuntoInfo | null;
     },
     async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
         try {
