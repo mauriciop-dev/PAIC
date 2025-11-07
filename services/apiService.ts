@@ -831,9 +831,11 @@ export const apiService = {
     // --- COMMUNICATIONS ---
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string; url: string }[]): Promise<{ success: boolean; message?: string; error?: string; }> {
         try {
+            const payload = { recipients, subject, body, attachments };
             // This invokes the 'send-email' Supabase Edge Function
             const { error } = await supabase.functions.invoke('send-email', {
-                body: { recipients, subject, body, attachments },
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' },
             });
 
             if (error) {
