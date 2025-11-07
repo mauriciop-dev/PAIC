@@ -22,27 +22,51 @@ const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSucce
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check if the script has loaded.
-    if (typeof window.google === 'undefined' || !window.google.accounts || !window.google.accounts.id) {
-      console.error("Google Identity Services script not loaded.");
-      // You could add a state here to show an error message to the user
+    // FIX: Replaced the original Google button rendering logic with a robust polling mechanism.
+    // This resolves a race condition where the component might try to render the button
+    // before the external Google GSI script has fully loaded, which would cause the button
+    // to not appear. The new code repeatedly attempts to render the button until the
+    // script is available, ensuring it displays reliably.
+    const attemptRenderButton = () => {
+      if (window.google?.accounts?.id && googleButtonRef.current) {
+        // Prevent re-rendering if the button is already there
+        if (googleButtonRef.current.childElementCount > 0) {
+          return true;
+        }
+
+        try {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: onGoogleLoginSuccess,
+          });
+
+          window.google.accounts.id.renderButton(
+            googleButtonRef.current,
+            { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
+          );
+          return true; // Success
+        } catch (error) {
+          console.error("Error rendering Google button:", error);
+          return false; // Failure
+        }
+      }
+      return false; // Not ready
+    };
+    
+    // Attempt to render immediately. If it works, we're done.
+    if (attemptRenderButton()) {
       return;
     }
-    
-    // Initialize the Google client.
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: onGoogleLoginSuccess,
-    });
 
-    // Render the button, but only if the ref is available.
-    // This effect runs only once, so we ensure the button is rendered into its persistent container.
-    if (googleButtonRef.current && googleButtonRef.current.childElementCount === 0) {
-        window.google.accounts.id.renderButton(
-          googleButtonRef.current,
-          { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
-        );
-    }
+    // If not, set up an interval to poll until the GSI script is ready.
+    const intervalId = setInterval(() => {
+      if (attemptRenderButton()) {
+        clearInterval(intervalId);
+      }
+    }, 200);
+
+    // Clean up the interval when the component unmounts.
+    return () => clearInterval(intervalId);
     
   }, [onGoogleLoginSuccess]);
 
