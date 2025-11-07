@@ -831,30 +831,21 @@ export const apiService = {
     // --- COMMUNICATIONS ---
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string; url: string }[]): Promise<{ success: boolean; message?: string; error?: string; }> {
         try {
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError) throw sessionError;
-            if (!session) throw new Error('No active session found. Please log in again.');
-
-            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co';
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys';
-            
             const payload = { recipients, subject, body, attachments };
 
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-                method: 'POST',
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload)
+            // Use the standard Supabase client library function to invoke the Edge Function.
+            // Pass the payload object directly to the 'body' property. The library handles JSON stringification.
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: payload,
             });
 
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(errorBody || `Request failed with status ${response.status}`);
+            if (error) {
+                // If the invocation itself fails (e.g., network error, function not found, CORS), throw the error.
+                throw error;
             }
-    
+            
+            // Assuming a successful invocation (even if the function has internal errors) means the process started.
+            // A more robust implementation might check the `data` returned from the function for a success status.
             return { success: true, message: 'Se ha iniciado el proceso de envío de correo.' };
 
         } catch (error: any) {
