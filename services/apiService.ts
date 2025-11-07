@@ -905,8 +905,12 @@ export const apiService = {
     
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean; error?: string }> {
         try {
-            // Construct the HTML body, including links to attachments if they exist.
-            let finalHtml = body.replace(/\n/g, '<br>'); // Basic newline to <br> conversion
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+                throw new Error("No se pudo obtener la sesión de usuario. Inicia sesión de nuevo.");
+            }
+
+            let finalHtml = body.replace(/\n/g, '<br>');
             if (attachments.length > 0) {
                 finalHtml += '<br><br><hr><p><b>Archivos Adjuntos:</b></p><ul>';
                 attachments.forEach(att => {
@@ -915,26 +919,45 @@ export const apiService = {
                 finalHtml += '</ul>';
             }
 
-            const { data, error } = await supabase.functions.invoke('send-email', {
-                body: { 
-                    to: recipients, 
-                    subject: subject, 
+            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys';
+            const functionUrl = `${supabaseUrl}/functions/v1/send-email`;
+
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': supabaseKey,
+                },
+                body: JSON.stringify({
+                    to: recipients,
+                    subject: subject,
                     html: finalHtml,
                     fromName: fromName,
                     fromEmail: fromEmail,
-                }
+                }),
             });
 
-            if (error) {
-                throw new Error(`No se pudo activar la función de correo: ${error.message}`);
+            if (!response.ok) {
+                const errorBody = await response.text();
+                let errorMessage = errorBody;
+                try {
+                    const errorJson = JSON.parse(errorBody);
+                    errorMessage = errorJson.error || errorJson.message || `Respuesta del servidor: ${errorBody}`;
+                } catch (e) {
+                    // Not JSON, use raw text
+                }
+                throw new Error(`Error del servidor (${response.status}): ${errorMessage}`);
             }
 
-            // The function might return its own structured error response
-            if (data && data.error) {
-                 throw new Error(`Error en la función de correo: ${data.error}`);
+            const responseData = await response.json();
+            if (responseData.error) {
+                throw new Error(`Error en la función de correo: ${responseData.error}`);
             }
 
             return { success: true };
+
         } catch (err: any) {
             console.error("Error sending communication email:", err);
             return { success: false, error: err.message };
