@@ -25,7 +25,14 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null>(null);
+    // FIX: Updated the state type to match the data structure returned by `apiService.fetchFinancialChartData`,
+    // which includes `packageVolume` and `visitorTraffic`, and removed the unused `monthlyBudget` property.
+    const [chartData, setChartData] = useState<{ 
+        monthlyIncomeVsExpense: ChartData[],
+        expensesByCategory: ChartData[],
+        packageVolume: ChartData[],
+        visitorTraffic: ChartData[]
+    } | null>(null);
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
 

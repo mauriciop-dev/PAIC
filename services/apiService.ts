@@ -89,10 +89,11 @@ export const apiService = {
     
     async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
         // Mocked data
+        // FIX: Added 'fill' property to chart data objects to satisfy the ChartData type.
         return {
             chatbotUsage: [
-                { name: 'Ene', value: 400 }, { name: 'Feb', value: 300 }, { name: 'Mar', value: 500 },
-                { name: 'Abr', value: 450 }, { name: 'May', value: 600 }, { name: 'Jun', value: 700 },
+                { name: 'Ene', value: 400, fill: '#8884d8' }, { name: 'Feb', value: 300, fill: '#8884d8' }, { name: 'Mar', value: 500, fill: '#8884d8' },
+                { name: 'Abr', value: 450, fill: '#8884d8' }, { name: 'May', value: 600, fill: '#8884d8' }, { name: 'Jun', value: 700, fill: '#8884d8' },
             ],
             packageVolume: [],
             visitorTraffic: [],
@@ -100,11 +101,107 @@ export const apiService = {
     },
 
     async seedDatabase(conjuntoId: string): Promise<void> {
-        const { data, error } = await supabase.from('common_areas').select('id').eq('conjunto_id', conjuntoId).limit(1);
+        // Check if residents table is empty for this conjunto, which implies it's a new setup.
+        const { data, error } = await supabase.from('residents').select('apartment').eq('conjunto_id', conjuntoId).limit(1);
         handleError(error, 'seedDatabase check');
+
+        // If data is empty, it means no residents, so we seed the database with sample data.
         if (data && data.length === 0) {
-            console.log(`Seeding default common area for conjunto ${conjuntoId}`);
-            await this.addCommonArea(conjuntoId, 'Salón Social');
+            console.log(`Seeding database for new conjunto: ${conjuntoId}`);
+
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            const nextWeek = new Date(today);
+            nextWeek.setDate(today.getDate() + 7);
+            const lastWeek = new Date(today);
+            lastWeek.setDate(today.getDate() - 7);
+
+
+            const sampleResidents = [
+                { conjuntoId, apartment: '101', name: 'Juan Perez', email: 'juan.perez.sample@email.com', phone: '3001234567' },
+                { conjuntoId, apartment: '102', name: 'Maria Rodriguez', email: 'maria.r.sample@email.com', phone: '3011234568' },
+                { conjuntoId, apartment: '201', name: 'Carlos Lopez (En Mora)', email: 'carlos.l.sample@email.com', phone: '3021234569' },
+                { conjuntoId, apartment: '202', name: 'Ana Martinez', email: 'ana.m.sample@email.com', phone: '3031234570' },
+            ];
+
+            const sampleAccountStatus = [
+                { conjuntoId, apartment: '101', lastPaymentDate: today.toISOString().split('T')[0], adminFeeValue: 200000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
+                { conjuntoId, apartment: '102', lastPaymentDate: yesterday.toISOString().split('T')[0], adminFeeValue: 220000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
+                { conjuntoId, apartment: '201', lastPaymentDate: lastWeek.toISOString().split('T')[0], adminFeeValue: 200000, pendingInstallments: 1, otherCharges: 50000, outstandingBalance: 250000 },
+                { conjuntoId, apartment: '202', lastPaymentDate: today.toISOString().split('T')[0], adminFeeValue: 220000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
+            ];
+            
+            const sampleProviders = [
+                { conjuntoId, company: 'Plomería J.J.', specialty: 'Plomería', email: 'plomeriajj.sample@email.com', phone: '3101234567' },
+                { conjuntoId, company: 'Seguridad Águila', specialty: 'Vigilancia', email: 'contacto.aguila.sample@email.com', phone: '3111234568' },
+            ];
+
+            const sampleInternalStaff = [
+                { conjuntoId, name: 'Pedro Gomez', position: 'Todero', email: 'pedro.g.sample@email.com', phone: '3131234567' },
+            ];
+
+            const sampleAccessPoints = [
+                { conjunto_id: conjuntoId, name: 'Portería Principal' },
+                { conjunto_id: conjuntoId, name: 'Portería Vehicular' },
+            ];
+            
+            const sampleDueDates = [
+                { conjuntoId, item: 'Pago de Vigilancia', category: 'Servicios' as const, dueDate: nextWeek.toISOString().split('T')[0], status: 'Pendiente' as const },
+                { conjuntoId, item: 'Mantenimiento Ascensor', category: 'Mantenimiento' as const, dueDate: lastWeek.toISOString().split('T')[0], status: 'Pagado' as const },
+                { conjuntoId, item: 'Seguro de áreas comunes', category: 'Seguros' as const, dueDate: yesterday.toISOString().split('T')[0], status: 'Vencido' as const },
+            ];
+
+            const sampleTasks = [
+                { conjuntoId, text: 'Revisar bomba de agua', dueDate: tomorrow.toISOString().split('T')[0], completed: false },
+                { conjuntoId, text: 'Comprar bombillos pasillo 3', dueDate: yesterday.toISOString().split('T')[0], completed: true },
+            ];
+            
+            const sampleIncomes = [
+                { conjuntoId, description: 'Cuota de Admin Apto 101', amount: 200000, category: 'Cuota de Administración' as const, date: today.toISOString().split('T')[0] },
+                { conjuntoId, description: 'Alquiler Salón Social Apto 102', amount: 150000, category: 'Alquiler de Áreas' as const, date: yesterday.toISOString().split('T')[0] },
+            ];
+
+            const sampleExpenses = [
+                { conjuntoId, description: 'Pago Vigilancia', amount: 80000, category: 'Servicios' as const, date: today.toISOString().split('T')[0], providerId: null },
+                { conjuntoId, description: 'Reparación Plomería', amount: 120000, category: 'Mantenimiento' as const, date: lastWeek.toISOString().split('T')[0], providerId: null },
+            ];
+
+            const sampleVisitorLogs = [
+                { conjuntoId, apartment: '102', visitorName: 'Laura Prima', date: today.toISOString().split('T')[0], status: 'Autorizado' as const },
+                { conjuntoId, apartment: '202', visitorName: 'Técnico Internet', date: yesterday.toISOString().split('T')[0], status: 'Salió' as const, entryTime: '09:00', exitTime: '10:30' },
+            ];
+
+            const samplePackageLogs = [
+                { conjuntoId, apartment: '101', courier: 'Servientrega', receivedDate: today.toISOString(), status: 'En recepción' as const },
+                { conjuntoId, apartment: '201', courier: 'MercadoLibre', receivedDate: yesterday.toISOString(), status: 'Entregado' as const },
+            ];
+            
+            const sampleCommonAreas = [
+                 { conjuntoId, name: 'Salón Social', color: getRandomColor() },
+                 { conjuntoId, name: 'Gimnasio', color: getRandomColor() },
+                 { conjuntoId, name: 'Zona BBQ', color: getRandomColor() },
+            ];
+
+            // Using Promise.all to run insertions in parallel for efficiency
+            await Promise.all([
+                supabase.from('residents').insert(sampleResidents.map(toSupabase)),
+                supabase.from('account_status').insert(sampleAccountStatus.map(toSupabase)),
+                supabase.from('providers').insert(sampleProviders.map(toSupabase)),
+                supabase.from('internal_staff').insert(sampleInternalStaff.map(toSupabase)),
+                supabase.from('access_points').insert(sampleAccessPoints),
+                supabase.from('due_dates').insert(sampleDueDates.map(toSupabase)),
+                supabase.from('tasks').insert(sampleTasks.map(toSupabase)),
+                supabase.from('incomes').insert(sampleIncomes.map(toSupabase)),
+                supabase.from('expenses').insert(sampleExpenses.map(toSupabase)),
+                supabase.from('visitor_logs').insert(sampleVisitorLogs.map(toSupabase)),
+                supabase.from('package_logs').insert(samplePackageLogs.map(toSupabase)),
+                supabase.from('common_areas').insert(sampleCommonAreas.map(toSupabase)),
+            ]);
+
+            console.log(`Database seeded successfully for conjunto: ${conjuntoId}`);
         }
     },
 
@@ -541,12 +638,13 @@ export const apiService = {
         // Mock data
         return {
             monthlyIncomeVsExpense: [
-                { name: 'Ene', ingresos: 4000, gastos: 2400 },
-                { name: 'Feb', ingresos: 3000, gastos: 1398 },
-                { name: 'Mar', ingresos: 2000, gastos: 9800 },
-                { name: 'Abr', ingresos: 2780, gastos: 3908 },
-                { name: 'May', ingresos: 1890, gastos: 4800 },
-                { name: 'Jun', ingresos: 2390, gastos: 3800 },
+                // FIX: Added 'value' and 'fill' properties to conform to ChartData type.
+                { name: 'Ene', ingresos: 4000, gastos: 2400, value: 0, fill: '' },
+                { name: 'Feb', ingresos: 3000, gastos: 1398, value: 0, fill: '' },
+                { name: 'Mar', ingresos: 2000, gastos: 9800, value: 0, fill: '' },
+                { name: 'Abr', ingresos: 2780, gastos: 3908, value: 0, fill: '' },
+                { name: 'May', ingresos: 1890, gastos: 4800, value: 0, fill: '' },
+                { name: 'Jun', ingresos: 2390, gastos: 3800, value: 0, fill: '' },
             ],
             expensesByCategory: [
                 { name: 'Servicios', value: 400, fill: '#0088FE' },
@@ -555,12 +653,14 @@ export const apiService = {
                 { name: 'Otros', value: 200, fill: '#FF8042' },
             ],
             packageVolume: [
-                { name: 'Ene', value: 50 }, { name: 'Feb', value: 65 }, { name: 'Mar', value: 70 },
-                { name: 'Abr', value: 82 }, { name: 'May', value: 95 }, { name: 'Jun', value: 110 },
+                // FIX: Added 'fill' property to conform to ChartData type.
+                { name: 'Ene', value: 50, fill: '#82ca9d' }, { name: 'Feb', value: 65, fill: '#82ca9d' }, { name: 'Mar', value: 70, fill: '#82ca9d' },
+                { name: 'Abr', value: 82, fill: '#82ca9d' }, { name: 'May', value: 95, fill: '#82ca9d' }, { name: 'Jun', value: 110, fill: '#82ca9d' },
             ],
             visitorTraffic: [
-                 { name: 'Portería 1', value: 400 },
-                 { name: 'Portería 2', value: 250 },
+                 // FIX: Added 'fill' property to conform to ChartData type.
+                 { name: 'Portería 1', value: 400, fill: '#0088FE' },
+                 { name: 'Portería 2', value: 250, fill: '#00C49F' },
             ],
         };
     },
@@ -574,7 +674,13 @@ export const apiService = {
             offset: 0,
             sortBy: { column: 'created_at', order: 'desc' },
         });
-        if(error) handleError({ details: error.message, message: error.message, hint: '', code: ''}, 'listFilesForConjunto');
+        // FIX: The error from supabase.storage.list() is a `StorageError`, not a `PostgrestError`,
+        // which caused a type mismatch with the `handleError` utility function.
+        // Replaced with direct error handling that preserves the original logic.
+        if (error) {
+            console.error(`Error in listFilesForConjunto:`, error);
+            throw new Error(`Database error in listFilesForConjunto: ${error.message}`);
+        }
         if (!data) return [];
 
         return data.map(file => ({
