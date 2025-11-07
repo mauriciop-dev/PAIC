@@ -20,55 +20,42 @@ type LoginType = 'Administrador' | 'Personal';
 const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSuccess }) => {
   const [loginType, setLoginType] = useState<LoginType>('Administrador');
   const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [isGoogleScriptLoaded, setIsGoogleScriptLoaded] = useState(false);
 
   useEffect(() => {
-    // FIX: Replaced the original Google button rendering logic with a robust polling mechanism.
-    // This resolves a race condition where the component might try to render the button
-    // before the external Google GSI script has fully loaded, which would cause the button
-    // to not appear. The new code repeatedly attempts to render the button until the
-    // script is available, ensuring it displays reliably.
-    const attemptRenderButton = () => {
-      if (window.google?.accounts?.id && googleButtonRef.current) {
-        // Prevent re-rendering if the button is already there
-        if (googleButtonRef.current.childElementCount > 0) {
-          return true;
-        }
-
-        try {
-          window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: onGoogleLoginSuccess,
-          });
-
-          window.google.accounts.id.renderButton(
-            googleButtonRef.current,
-            { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
-          );
-          return true; // Success
-        } catch (error) {
-          console.error("Error rendering Google button:", error);
-          return false; // Failure
-        }
-      }
-      return false; // Not ready
-    };
-    
-    // Attempt to render immediately. If it works, we're done.
-    if (attemptRenderButton()) {
-      return;
+    if (window.google?.accounts?.id) {
+        setIsGoogleScriptLoaded(true);
+    } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            setIsGoogleScriptLoaded(true);
+        };
+        document.body.appendChild(script);
+        return () => {
+            document.body.removeChild(script);
+        };
     }
+  }, []);
 
-    // If not, set up an interval to poll until the GSI script is ready.
-    const intervalId = setInterval(() => {
-      if (attemptRenderButton()) {
-        clearInterval(intervalId);
-      }
-    }, 200);
-
-    // Clean up the interval when the component unmounts.
-    return () => clearInterval(intervalId);
-    
-  }, [onGoogleLoginSuccess]);
+  useEffect(() => {
+    if (isGoogleScriptLoaded && googleButtonRef.current) {
+        try {
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: onGoogleLoginSuccess,
+            });
+            window.google.accounts.id.renderButton(
+                googleButtonRef.current,
+                { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
+            );
+        } catch (error) {
+            console.error("Error initializing or rendering Google button:", error);
+        }
+    }
+  }, [isGoogleScriptLoaded, onGoogleLoginSuccess]);
 
 
   return (
