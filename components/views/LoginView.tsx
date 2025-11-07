@@ -20,42 +20,31 @@ type LoginType = 'Administrador' | 'Personal';
 const LoginView: React.FC<LoginViewProps> = ({ onAuthSuccess, onGoogleLoginSuccess }) => {
   const [loginType, setLoginType] = useState<LoginType>('Administrador');
   const googleButtonRef = useRef<HTMLDivElement>(null);
-  const [isGoogleScriptLoaded, setIsGoogleScriptLoaded] = useState(false);
 
   useEffect(() => {
-    if (window.google?.accounts?.id) {
-        setIsGoogleScriptLoaded(true);
-    } else {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-            setIsGoogleScriptLoaded(true);
-        };
-        document.body.appendChild(script);
-        return () => {
-            document.body.removeChild(script);
-        };
+    // Check if the script has loaded.
+    if (typeof window.google === 'undefined' || !window.google.accounts || !window.google.accounts.id) {
+      console.error("Google Identity Services script not loaded.");
+      // You could add a state here to show an error message to the user
+      return;
     }
-  }, []);
+    
+    // Initialize the Google client.
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: onGoogleLoginSuccess,
+    });
 
-  useEffect(() => {
-    if (isGoogleScriptLoaded && googleButtonRef.current) {
-        try {
-            window.google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: onGoogleLoginSuccess,
-            });
-            window.google.accounts.id.renderButton(
-                googleButtonRef.current,
-                { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
-            );
-        } catch (error) {
-            console.error("Error initializing or rendering Google button:", error);
-        }
+    // Render the button, but only if the ref is available.
+    // This effect runs only once, so we ensure the button is rendered into its persistent container.
+    if (googleButtonRef.current && googleButtonRef.current.childElementCount === 0) {
+        window.google.accounts.id.renderButton(
+          googleButtonRef.current,
+          { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with', shape: 'pill', locale: 'es' }
+        );
     }
-  }, [isGoogleScriptLoaded, onGoogleLoginSuccess]);
+    
+  }, [onGoogleLoginSuccess]);
 
 
   return (

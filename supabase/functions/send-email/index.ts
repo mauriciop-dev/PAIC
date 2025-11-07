@@ -11,6 +11,7 @@ declare const Deno: {
 };
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { Resend } from 'npm:resend@3.2.0';
 
 // Define las cabeceras CORS en una constante para reutilizarlas
 const corsHeaders = {
@@ -33,6 +34,7 @@ serve(async (req) => {
       throw new Error('La variable de entorno RESEND_API_KEY no está configurada.');
     }
     
+    const resend = new Resend(RESEND_API_KEY);
     const { to, subject, html, fromName, fromEmail } = await req.json();
 
     // Valida que los campos necesarios estén presentes
@@ -48,35 +50,25 @@ serve(async (req) => {
     const senderName = fromName || FALLBACK_SENDER_NAME;
     const senderEmail = fromEmail || FALLBACK_SENDER_EMAIL;
 
-    const resendPayload = {
+    // Lógica de envío de correo
+    const { data, error } = await resend.emails.send({
       from: `${senderName} <${senderEmail}>`,
       to: to,
       subject: subject,
       html: html,
-    };
-
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${RESEND_API_KEY}`
-        },
-        body: JSON.stringify(resendPayload)
     });
 
-    const responseData = await resendResponse.json();
-
-    if (!resendResponse.ok) {
-        console.error({ error: responseData });
-        const errorMessage = responseData.message || responseData.error || 'Error from Resend API';
-        throw new Error(errorMessage);
+    if (error) {
+      console.error({ error });
+      // Lanza el error para que sea capturado por el bloque catch
+      throw error;
     }
 
     // Respuesta exitosa
     return new Response(JSON.stringify({
       success: true,
       message: 'Correo enviado exitosamente',
-      data: responseData,
+      data,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

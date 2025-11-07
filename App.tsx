@@ -8,7 +8,7 @@ import InitialSetupModal from './components/InitialSetupModal';
 import SettingsModal from './components/SettingsModal';
 import LoginView from './components/views/LoginView';
 import SuperAdminDashboard from './components/views/SuperAdminDashboard';
-import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog } from './types';
+import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog, PlatformUser } from './types';
 import { jwtDecode } from './utils/jwtDecode';
 import { Icon } from './components/ui/Icon';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
@@ -74,6 +74,23 @@ const App: React.FC = () => {
             setUserProfile(parsedUser); // Set user profile immediately
 
             if (parsedUser.conjuntoId) {
+                // FIX: Ensures the admin user exists in the `users` table to satisfy RLS policies.
+                // This handles existing admins who logged in before this logic was added.
+                if (parsedUser.role === UserRole.Admin) {
+                    const dbUser = await apiService.findUserByEmail(parsedUser.email);
+                    if (!dbUser) {
+                        console.log(`Admin user ${parsedUser.email} not in DB, creating entry for RLS.`);
+                        const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
+                            name: parsedUser.name,
+                            email: parsedUser.email,
+                            phoneNumber: parsedUser.phoneNumber,
+                            role: UserRole.Admin,
+                            conjuntoId: parsedUser.conjuntoId,
+                        };
+                        await apiService.addUser(parsedUser.conjuntoId, adminForDb);
+                    }
+                }
+
                 await apiService.seedDatabase(parsedUser.conjuntoId); // Seed database if empty
                 let infoToSet: ConjuntoInfo | null = null;
                 const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
@@ -174,7 +191,7 @@ const App: React.FC = () => {
       }
   }, [userProfile]);
   
-  const handleAuthSuccess = useCallback(async (profile: UserProfile) => {
+  const handleAuthSuccess = async (profile: UserProfile) => {
     setUserProfile(profile);
     localStorage.setItem('paic_userProfile', JSON.stringify(profile));
     
@@ -194,98 +211,58 @@ const App: React.FC = () => {
     if (profile.role === UserRole.Guard) {
       setIsAccessPointModalOpen(true);
     }
-  }, []);
+  };
 
   const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
-    try {
-      // FIX: Authenticate with Supabase using the Google ID token to establish a valid session.
-      // This is required for subsequent authenticated API calls, like sending emails via Edge Functions.
-      const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: credentialResponse.credential,
-      });
-
-      if (error) {
-          console.error("Supabase sign-in error:", error);
-          setNotification(`Error de autenticación: ${error.message}`);
-          return;
-      }
-
-      if (!data.user) {
-          console.error("Supabase sign-in did not return a user.");
-          setNotification("Error de autenticación: No se pudo verificar el usuario.");
-          return;
-      }
-
-      const profileObject: any = jwtDecode(credentialResponse.credential);
-      if (!profileObject) {
-        console.error("Failed to decode profile from credential response.");
-        // FIX: Provide user feedback when token decoding fails.
-        setNotification("No se pudo procesar la información de inicio de sesión de Google.");
-        return;
-      }
-      
-      const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
-      if (isSuperAdmin) {
-          const superAdmin: SuperAdminProfile = {
-              name: profileObject.name,
-              email: profileObject.email,
-              role: UserRole.SuperAdmin,
-          };
-          setSuperAdminProfile(superAdmin);
-          localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
-          return; // End flow here for super admin
-      }
-
-      let finalProfile: UserProfile;
-
-      // 1. Check if they exist as a platform user (guard, accountant, existing admin, etc.)
-      const existingUser = await apiService.findUserByEmail(profileObject.email);
-      
-      if (existingUser) {
-          // User already exists in the users table. Use their data.
-          finalProfile = {
-              name: existingUser.name,
-              email: existingUser.email,
-              picture: profileObject.picture,
-              role: existingUser.role, // Use role from DB
-              conjuntoId: existingUser.conjuntoId,
-          };
-      } else {
-          // 2. If not a regular user, check if they are an admin of an existing conjunto
-          // This covers admins who haven't logged in before.
-          const existingConjunto = await apiService.findConjuntoByAdminEmail(profileObject.email);
-          if (existingConjunto) {
-              finalProfile = {
-                  name: existingConjunto.adminName,
-                  email: existingConjunto.adminEmail,
-                  picture: profileObject.picture,
-                  role: UserRole.Admin, // Role is Admin because they own a conjunto
-                  conjuntoId: existingConjunto.id,
-              };
-          } else {
-              // 3. If not found anywhere, this is a completely new user. Default them to the Admin setup flow.
-              finalProfile = {
-                  name: profileObject.name,
-                  email: profileObject.email,
-                  picture: profileObject.picture,
-                  role: UserRole.Admin,
-                  conjuntoId: undefined, // This will trigger the InitialSetupModal
-              };
-          }
-      }
-
-      handleAuthSuccess(finalProfile);
-
-    } catch (err: any) {
-        console.error("Error during Google login process:", err);
-        setNotification(`Error al iniciar sesión: ${err.message || 'Ocurrió un error inesperado.'}`);
+    const profileObject: any = jwtDecode(credentialResponse.credential);
+    if (!profileObject) {
+      console.error("Failed to decode profile from credential response.");
+      return;
     }
-  }, [handleAuthSuccess]);
+    
+    const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
+    if (isSuperAdmin) {
+        const superAdmin: SuperAdminProfile = {
+            name: profileObject.name,
+            email: profileObject.email,
+            role: UserRole.SuperAdmin,
+        };
+        setSuperAdminProfile(superAdmin);
+        localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
+        return; // End flow here for super admin
+    }
+
+    const existingUser = await apiService.findUserByEmail(profileObject.email);
+
+    const newUserProfile: UserProfile = {
+      name: profileObject.name,
+      email: profileObject.email,
+      picture: profileObject.picture,
+      role: UserRole.Admin,
+      conjuntoId: existingUser?.conjuntoId || 'conj-123'
+    };
+    handleAuthSuccess(newUserProfile);
+  }, []);
 
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     // 1. Persist the new info to our simulated backend
     await apiService.updateConjuntoInfo(info);
+
+    // FIX: After creating the conjunto, create the admin user record.
+    // This is crucial for RLS policies on other tables to work correctly.
+    if (userProfile && userProfile.role === UserRole.Admin) {
+        const dbUser = await apiService.findUserByEmail(userProfile.email);
+        if (!dbUser) {
+            const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
+                name: info.adminName,
+                email: info.adminEmail,
+                phoneNumber: info.adminPhone,
+                role: UserRole.Admin,
+                conjuntoId: info.id,
+            };
+            await apiService.addUser(info.id, adminForDb);
+        }
+    }
 
     // 2. Update the local state to trigger re-render
     setConjuntoInfo(info);
@@ -294,7 +271,7 @@ const App: React.FC = () => {
 
     // 3. Also, sync the admin name with the user profile for UI consistency
     if (userProfile && userProfile.name !== info.adminName) {
-      const updatedProfile = { ...userProfile, name: info.adminName, conjuntoId: info.id };
+      const updatedProfile = { ...userProfile, name: info.adminName };
       setUserProfile(updatedProfile);
       localStorage.setItem('paic_userProfile', JSON.stringify(updatedProfile));
     }
@@ -362,7 +339,7 @@ const App: React.FC = () => {
         <InitialSetupModal 
             onClose={() => setIsInitialSetupModalOpen(false)} 
             onSaveSetup={handleSaveSetup} 
-            conjuntoId={userProfile.conjuntoId || 'conj-' + Date.now()} 
+            conjuntoId={userProfile.conjuntoId || 'conj-123'} 
         />
       )}
       {isSettingsModalOpen && userProfile.role === UserRole.Admin && conjuntoInfo && (

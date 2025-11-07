@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import { 
@@ -259,16 +258,6 @@ export const apiService = {
             return null;
         }
         return fromSupabase(data) as PlatformUser | null;
-    },
-    async findConjuntoByAdminEmail(adminEmail: string): Promise<ConjuntoInfo | null> {
-        const { data, error } = await supabase.from('conjuntos').select('*').eq('admin_email', adminEmail).single();
-        if (error) {
-            if (error.code !== 'PGRST116') { // 'No rows found' is not an error here
-                handleApiError(error, `findConjuntoByAdminEmail for ${adminEmail}`);
-            }
-            return null;
-        }
-        return fromSupabase(data) as ConjuntoInfo | null;
     },
     async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
         try {
@@ -916,12 +905,8 @@ export const apiService = {
     
     async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean; error?: string }> {
         try {
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) {
-                throw new Error("No se pudo obtener la sesión de usuario. Inicia sesión de nuevo.");
-            }
-
-            let finalHtml = body.replace(/\n/g, '<br>');
+            // Construct the HTML body, including links to attachments if they exist.
+            let finalHtml = body.replace(/\n/g, '<br>'); // Basic newline to <br> conversion
             if (attachments.length > 0) {
                 finalHtml += '<br><br><hr><p><b>Archivos Adjuntos:</b></p><ul>';
                 attachments.forEach(att => {
@@ -930,45 +915,26 @@ export const apiService = {
                 finalHtml += '</ul>';
             }
 
-            const supabaseUrl = 'https://wdqogvvuhcxciwoonomk.supabase.co';
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcW9ndnZ1aGN4Y2l3b29ub21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NDUzMzEsImV4cCI6MjA3NzUyMTMzMX0.u3AO7YxEtysPmowjukvgGENL3hVgNDJ43ygoKPCP1Ys';
-            const functionUrl = `${supabaseUrl}/functions/v1/send-email`;
-
-            const response = await fetch(functionUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'apikey': supabaseKey,
-                },
-                body: JSON.stringify({
-                    to: recipients,
-                    subject: subject,
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: { 
+                    to: recipients, 
+                    subject: subject, 
                     html: finalHtml,
                     fromName: fromName,
                     fromEmail: fromEmail,
-                }),
+                }
             });
 
-            if (!response.ok) {
-                const errorBody = await response.text();
-                let errorMessage = errorBody;
-                try {
-                    const errorJson = JSON.parse(errorBody);
-                    errorMessage = errorJson.error || errorJson.message || `Respuesta del servidor: ${errorBody}`;
-                } catch (e) {
-                    // Not JSON, use raw text
-                }
-                throw new Error(`Error del servidor (${response.status}): ${errorMessage}`);
+            if (error) {
+                throw new Error(`No se pudo activar la función de correo: ${error.message}`);
             }
 
-            const responseData = await response.json();
-            if (responseData.error) {
-                throw new Error(`Error en la función de correo: ${responseData.error}`);
+            // The function might return its own structured error response
+            if (data && data.error) {
+                 throw new Error(`Error en la función de correo: ${data.error}`);
             }
 
             return { success: true };
-
         } catch (err: any) {
             console.error("Error sending communication email:", err);
             return { success: false, error: err.message };

@@ -25,10 +25,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    // FIX: Corrected the type definition for the 'chartData' state to align with the data structure
-    // returned by the API service. The previous type expected a 'monthlyBudget' property which was
-    // not provided, causing a TypeScript error.
-    const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] } | null>(null);
+    const [chartData, setChartData] = useState<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], monthlyBudget: number } | null>(null);
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
 
