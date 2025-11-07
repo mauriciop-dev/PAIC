@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -40,8 +41,12 @@ const App: React.FC = () => {
 
   const [notification, setNotification] = useState<string | null>(null);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error("Error logging out from Supabase:", error);
+    }
     setUserProfile(null);
     setSuperAdminProfile(null);
     setConjuntoInfo(null);
