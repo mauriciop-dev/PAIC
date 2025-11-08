@@ -16,8 +16,10 @@ const allPermissions = Object.values(Tab);
 
 const getBasePermissions = (roleName: UserRole | string): Tab[] => {
     switch (roleName) {
-        case UserRole.Guard: return [Tab.Seguridad];
-        case UserRole.Contador: return [Tab.Finanzas];
+        // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
+        case 'Guard': return [Tab.Seguridad];
+        // FIX: Property 'Contador' does not exist on type 'typeof UserRole'. Use string literal instead.
+        case 'Contador': return [Tab.Finanzas];
         default: return [];
     }
 };

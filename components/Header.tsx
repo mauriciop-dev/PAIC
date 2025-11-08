@@ -27,61 +27,71 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
   }, []);
   
   if (!userProfile) return null;
+  const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
+  const isTrialActive = userProfile.role === UserRole.Trial && userProfile.trialExpiresAt;
+
 
   return (
-    <header className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200 bg-white sticky top-0 z-20">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold text-gray-800">
-            PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
-          </h1>
-          <p className="text-md font-semibold text-blue-600 mt-1">{activeTabName}</p>
+    <header className="bg-white sticky top-0 z-20 shadow-sm">
+      {isTrialActive && (
+        <div className="bg-yellow-100 text-yellow-800 text-xs font-bold text-center p-1">
+          Tu período de prueba termina el {new Date(userProfile.trialExpiresAt!).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}.
         </div>
-        <div className="flex items-center gap-4 flex-shrink-0 pt-1">
-          <button
-            onClick={onHelpClick}
-            className="hidden sm:block px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
-          >
-            Ayuda
-          </button>
-          
-          <div className="relative" ref={menuRef}>
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-2 rounded-full p-1 hover:bg-gray-100">
-              {userProfile.picture ? (
-                 <img src={userProfile.picture} alt="User Avatar" className="w-8 h-8 rounded-full" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                    <Icon name="user" className="w-5 h-5 text-gray-600" />
+      )}
+      <div className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-lg md:text-xl font-bold text-gray-800">
+              PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
+            </h1>
+            <p className="text-md font-semibold text-blue-600 mt-1">{activeTabName}</p>
+          </div>
+          <div className="flex items-center gap-4 flex-shrink-0 pt-1">
+            <button
+              onClick={onHelpClick}
+              className="hidden sm:block px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
+            >
+              Ayuda
+            </button>
+            
+            <div className="relative" ref={menuRef}>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-2 rounded-full p-1 hover:bg-gray-100">
+                {userProfile.avatarUrl ? (
+                   <img src={userProfile.avatarUrl} alt="User Avatar" className="w-8 h-8 rounded-full" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      <Icon name="user" className="w-5 h-5 text-gray-600" />
+                  </div>
+                )}
+                <span className="hidden md:inline font-semibold text-sm">{userProfile.fullName}</span>
+              </button>
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20 border border-gray-100">
+                  <div className="p-3 border-b">
+                     <p className="font-semibold text-sm text-gray-800">{userProfile.fullName}</p>
+                     <p className="text-xs text-gray-500">{userProfile.email}</p>
+                     <p className="text-xs font-bold text-blue-600 mt-1 capitalize">{userProfile.role}</p>
+                  </div>
+                  <div className="p-1">
+                    {isConjuntoAdmin && (
+                      <button
+                        onClick={() => { onSettingsClick(); setIsMenuOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
+                      >
+                        <Icon name="settings" className="w-4 h-4 text-gray-500" />
+                        Configuración
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { onLogout(); setIsMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
+                    >
+                      Cerrar Sesión
+                    </button>
+                  </div>
                 </div>
               )}
-              <span className="hidden md:inline font-semibold text-sm">{userProfile.name}</span>
-            </button>
-            {isMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20 border border-gray-100">
-                <div className="p-3 border-b">
-                   <p className="font-semibold text-sm text-gray-800">{userProfile.name}</p>
-                   <p className="text-xs text-gray-500">{userProfile.email}</p>
-                   <p className="text-xs font-bold text-blue-600 mt-1">{userProfile.role}</p>
-                </div>
-                <div className="p-1">
-                  {userProfile.role === UserRole.Admin && (
-                    <button
-                      onClick={() => { onSettingsClick(); setIsMenuOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
-                    >
-                      <Icon name="settings" className="w-4 h-4 text-gray-500" />
-                      Configuración
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { onLogout(); setIsMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
-                  >
-                    Cerrar Sesión
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

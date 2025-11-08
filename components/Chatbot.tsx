@@ -20,7 +20,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
   useEffect(() => {
     if (userProfile && conjuntoInfo && messages.length === 0 && isOpen) {
         setMessages([
-            { sender: 'ai', text: `Hola ${userProfile.name}, soy PAIC y te ayudaré a administrar ${conjuntoInfo.name}.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
+            // FIX: Property 'name' does not exist on type 'UserProfile'. Use 'fullName' instead.
+            { sender: 'ai', text: `Hola ${userProfile.fullName}, soy PAIC y te ayudaré a administrar ${conjuntoInfo.name}.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
         ]);
     } else if (!isOpen) {
         // Clear messages when chatbot is closed to ensure it re-initializes with the welcome message
@@ -103,7 +104,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
             >
               <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
             </div>
-            {msg.sender === 'user' && userProfile && userProfile.picture && <img src={userProfile.picture} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
+            {/* FIX: Property 'picture' does not exist on type 'UserProfile'. Use 'avatarUrl' instead. */}
+            {msg.sender === 'user' && userProfile && userProfile.avatarUrl && <img src={userProfile.avatarUrl} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
           </div>
         ))}
         {isLoading && (

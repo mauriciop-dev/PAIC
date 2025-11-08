@@ -9,21 +9,14 @@ import SettingsModal from './components/SettingsModal';
 import LoginView from './components/views/LoginView';
 import SuperAdminDashboard from './components/views/SuperAdminDashboard';
 import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog, PlatformUser } from './types';
-import { jwtDecode } from './utils/jwtDecode';
 import { Icon } from './components/ui/Icon';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
 import { apiService } from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
+import { Session } from '@supabase/supabase-js';
 
-// FIX: Removed deprecated `aistudio` property from the global Window type to resolve a conflict.
-// The API key is now handled via environment variables as per updated guidelines.
-declare global {
-  interface Window {
-    google: any;
-  }
-}
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Dashboard);
@@ -33,105 +26,60 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
   
+  const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [superAdminProfile, setSuperAdminProfile] = useState<SuperAdminProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   const [notification, setNotification] = useState<string | null>(null);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
+    await supabase.auth.signOut();
+    // The onAuthStateChange listener will handle the state cleanup
     setUserProfile(null);
-    setSuperAdminProfile(null);
     setConjuntoInfo(null);
     setSelectedAccessPointId(null);
-    localStorage.removeItem('paic_userProfile');
-    localStorage.removeItem('paic_superAdminProfile');
-    localStorage.removeItem('paic_conjuntoInfo');
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-        window.google.accounts.id.disableAutoSelect();
-    }
   }, []);
 
   useEffect(() => {
-    const loadSession = async () => {
-        const storedUser = localStorage.getItem('paic_userProfile');
-        const storedSuperAdmin = localStorage.getItem('paic_superAdminProfile');
-
-        if (storedSuperAdmin) {
-            setSuperAdminProfile(JSON.parse(storedSuperAdmin));
-            return;
+    setIsLoadingSession(true);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        if (!session) {
+           setIsLoadingSession(false);
         }
+    });
 
-        if (storedUser) {
-            const parsedUser: UserProfile = JSON.parse(storedUser);
-            // FIX: This check prevents a crash if a user from an older version of the app
-            // is stored in localStorage without a 'role' property.
-            if (!parsedUser.role) { 
-                parsedUser.role = UserRole.Admin; // Default to Admin for backward compatibility
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        if (session?.user) {
+            const profile = await apiService.fetchUserProfile(session.user.id);
+            if (profile) {
+                setUserProfile(profile);
+                if (profile.conjuntoId) {
+                    const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+                    if (info) {
+                        setConjuntoInfo(info);
+                    } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                        setIsInitialSetupModalOpen(true);
+                    }
+                } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                    setIsInitialSetupModalOpen(true);
+                }
+            } else {
+                console.error("User is logged in but profile data is missing. Logging out.");
+                await handleLogout();
             }
-            setUserProfile(parsedUser); // Set user profile immediately
-
-            if (parsedUser.conjuntoId) {
-                // FIX: Ensures the admin user exists in the `users` table to satisfy RLS policies.
-                // This handles existing admins who logged in before this logic was added.
-                if (parsedUser.role === UserRole.Admin) {
-                    const dbUser = await apiService.findUserByEmail(parsedUser.email);
-                    if (!dbUser) {
-                        console.log(`Admin user ${parsedUser.email} not in DB, creating entry for RLS.`);
-                        const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
-                            name: parsedUser.name,
-                            email: parsedUser.email,
-                            phoneNumber: parsedUser.phoneNumber,
-                            role: UserRole.Admin,
-                            conjuntoId: parsedUser.conjuntoId,
-                        };
-                        await apiService.addUser(parsedUser.conjuntoId, adminForDb);
-                    }
-                }
-
-                await apiService.seedDatabase(parsedUser.conjuntoId); // Seed database if empty
-                let infoToSet: ConjuntoInfo | null = null;
-                const storedConjuntoRaw = localStorage.getItem('paic_conjuntoInfo');
-
-                if (storedConjuntoRaw) {
-                    try {
-                        const parsed = JSON.parse(storedConjuntoRaw);
-                        if (parsed && typeof parsed === 'object') {
-                            infoToSet = parsed;
-                        }
-                    } catch (error) {
-                        console.error('Could not parse conjuntoInfo from localStorage, fetching from API.', error);
-                        localStorage.removeItem('paic_conjuntoInfo');
-                    }
-                }
-
-                if (infoToSet) {
-                    setConjuntoInfo(infoToSet);
-                } else {
-                    const infoFromApi = await apiService.fetchConjuntoInfo(parsedUser.conjuntoId);
-                    if (infoFromApi) {
-                        setConjuntoInfo(infoFromApi);
-                        localStorage.setItem('paic_conjuntoInfo', JSON.stringify(infoFromApi));
-                    } else {
-                        // If info couldn't be fetched from API...
-                        if (parsedUser.role === UserRole.Admin) {
-                            setIsInitialSetupModalOpen(true);
-                        } else {
-                            // For non-admins, this is a critical error. They can't proceed.
-                            console.error(`Could not fetch conjuntoInfo for non-admin user ${parsedUser.email}. Logging out.`);
-                            handleLogout();
-                        }
-                    }
-                }
-            } else if (parsedUser.role === UserRole.Admin) {
-                setIsInitialSetupModalOpen(true);
-            }
+        } else {
+            setUserProfile(null);
+            setConjuntoInfo(null);
         }
-    };
-
-    loadSession();
+        setIsLoadingSession(false);
+    });
+    
+    return () => subscription.unsubscribe();
   }, [handleLogout]);
   
   // Effect to handle post-payment redirection
@@ -142,16 +90,16 @@ const App: React.FC = () => {
 
       if (paymentStatus === 'approved' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
         try {
-          // Clean the URL to prevent re-triggering on refresh
           window.history.replaceState({}, document.title, window.location.pathname);
 
           const updatedConjunto = { ...conjuntoInfo, subscriptionPlan: 'Paid' as const, planPrice: 140000 };
-          
           await apiService.updateConjuntoInfo(updatedConjunto);
           
-          setConjuntoInfo(updatedConjunto);
-          localStorage.setItem('paic_conjuntoInfo', JSON.stringify(updatedConjunto));
+          const updatedProfile = { ...userProfile, role: UserRole.Subscriber };
+          await apiService.updateUserProfile(updatedProfile);
           
+          setConjuntoInfo(updatedConjunto);
+          setUserProfile(updatedProfile);
           setNotification('¡Suscripción exitosa! Has mejorado al Plan Pro.');
 
         } catch (error) {
@@ -167,7 +115,7 @@ const App: React.FC = () => {
   }, [userProfile, conjuntoInfo]);
 
   useEffect(() => {
-      if (userProfile?.role === UserRole.Admin && userProfile.conjuntoId) {
+      if (userProfile && (userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber) && userProfile.conjuntoId) {
           const channel = supabase
               .channel('package-notifications')
               .on(
@@ -191,117 +139,65 @@ const App: React.FC = () => {
       }
   }, [userProfile]);
   
-  const handleAuthSuccess = async (profile: UserProfile) => {
-    setUserProfile(profile);
-    localStorage.setItem('paic_userProfile', JSON.stringify(profile));
-    
-    if (profile.conjuntoId) {
-        await apiService.seedDatabase(profile.conjuntoId); // Seed database if empty
-        const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
-        if (info) {
-            setConjuntoInfo(info);
-            localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
-        } else if (profile.role === UserRole.Admin) {
-            setIsInitialSetupModalOpen(true);
-        }
-    } else if (profile.role === UserRole.Admin) {
-        setIsInitialSetupModalOpen(true);
-    }
-
-    if (profile.role === UserRole.Guard) {
-      setIsAccessPointModalOpen(true);
-    }
-  };
-
-  const handleGoogleLoginSuccess = useCallback(async (credentialResponse: any) => {
-    const profileObject: any = jwtDecode(credentialResponse.credential);
-    if (!profileObject) {
-      console.error("Failed to decode profile from credential response.");
-      return;
-    }
-    
-    const isSuperAdmin = await apiService.checkIfSuperAdmin(profileObject.email);
-    if (isSuperAdmin) {
-        const superAdmin: SuperAdminProfile = {
-            name: profileObject.name,
-            email: profileObject.email,
-            role: UserRole.SuperAdmin,
-        };
-        setSuperAdminProfile(superAdmin);
-        localStorage.setItem('paic_superAdminProfile', JSON.stringify(superAdmin));
-        return; // End flow here for super admin
-    }
-
-    const existingUser = await apiService.findUserByEmail(profileObject.email);
-
-    const newUserProfile: UserProfile = {
-      name: profileObject.name,
-      email: profileObject.email,
-      picture: profileObject.picture,
-      role: UserRole.Admin,
-      conjuntoId: existingUser?.conjuntoId || 'conj-123'
-    };
-    handleAuthSuccess(newUserProfile);
-  }, []);
 
   const handleSaveSetup = async (info: ConjuntoInfo) => {
-    // 1. Persist the new info to our simulated backend
+    if (!userProfile) return;
+    
+    // 1. Create/update conjunto info
     await apiService.updateConjuntoInfo(info);
+    
+    // 2. Update the user's profile with the new conjuntoId
+    const updatedProfile: UserProfile = { ...userProfile, conjuntoId: info.id, fullName: info.adminName };
+    await apiService.updateUserProfile(updatedProfile);
 
-    // FIX: After creating the conjunto, create the admin user record.
-    // This is crucial for RLS policies on other tables to work correctly.
-    if (userProfile && userProfile.role === UserRole.Admin) {
-        const dbUser = await apiService.findUserByEmail(userProfile.email);
-        if (!dbUser) {
-            const adminForDb: Omit<PlatformUser, 'id' | 'password'> = {
-                name: info.adminName,
-                email: info.adminEmail,
-                phoneNumber: info.adminPhone,
-                role: UserRole.Admin,
-                conjuntoId: info.id,
-            };
-            await apiService.addUser(info.id, adminForDb);
-        }
-    }
-
-    // 2. Update the local state to trigger re-render
+    // 3. Update local state
+    setUserProfile(updatedProfile);
     setConjuntoInfo(info);
-    localStorage.setItem('paic_conjuntoInfo', JSON.stringify(info));
     setIsInitialSetupModalOpen(false);
-
-    // 3. Also, sync the admin name with the user profile for UI consistency
-    if (userProfile && userProfile.name !== info.adminName) {
-      const updatedProfile = { ...userProfile, name: info.adminName };
-      setUserProfile(updatedProfile);
-      localStorage.setItem('paic_userProfile', JSON.stringify(updatedProfile));
-    }
   };
 
-  const handleSaveSettings = (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => {
+
+  const handleSaveSettings = async (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => {
+    await apiService.updateUserProfile(updatedProfile);
+    await apiService.updateConjuntoInfo(updatedConjunto);
     setUserProfile(updatedProfile);
     setConjuntoInfo(updatedConjunto);
-    localStorage.setItem('paic_userProfile', JSON.stringify(updatedProfile));
-    localStorage.setItem('paic_conjuntoInfo', JSON.stringify(updatedConjunto));
     setIsSettingsModalOpen(false);
   };
   
-  if (superAdminProfile) {
+  if (isLoadingSession) {
+      return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="text-center">
+                <Icon name="bot" className="w-12 h-12 text-blue-600 animate-pulse mx-auto"/>
+                <p className="text-gray-600 mt-2">Cargando PAIC...</p>
+            </div>
+        </div>
+      );
+  }
+
+  if (userProfile && userProfile.role === UserRole.Admin) {
+      const superAdminProfile: SuperAdminProfile = { name: userProfile.fullName, email: userProfile.email, role: UserRole.Admin };
       return <SuperAdminDashboard profile={superAdminProfile} onLogout={handleLogout} />;
   }
 
   if (!userProfile) {
-    return <LoginView onAuthSuccess={handleAuthSuccess} onGoogleLoginSuccess={handleGoogleLoginSuccess} />;
+    return <LoginView />;
   }
   
   const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";
-  const needsAdminSetup = userProfile.role === UserRole.Admin && !conjuntoInfo;
+  const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
+  const needsAdminSetup = isConjuntoAdmin && !conjuntoInfo;
 
   return (
     <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
       <NotificationToast message={notification} onClose={() => setNotification(null)} />
-      <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       
-      {userProfile.role === UserRole.Admin && (
+      {isConjuntoAdmin && (
+          <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+      )}
+      
+      {isConjuntoAdmin && (
         <div className={`fixed top-0 left-0 h-full z-20 transition-opacity duration-300 ease-in-out ${isChatbotOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <button onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
             <Icon name="bot" className="w-6 h-6" />
@@ -310,7 +206,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (userProfile.role === UserRole.Admin ? 'ml-8' : 'ml-0')}`}>
+      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
             userProfile={userProfile} 
@@ -339,13 +235,13 @@ const App: React.FC = () => {
         <InitialSetupModal 
             onClose={() => setIsInitialSetupModalOpen(false)} 
             onSaveSetup={handleSaveSetup} 
-            conjuntoId={userProfile.conjuntoId || 'conj-123'} 
+            userProfile={userProfile}
         />
       )}
-      {isSettingsModalOpen && userProfile.role === UserRole.Admin && conjuntoInfo && (
+      {isSettingsModalOpen && isConjuntoAdmin && conjuntoInfo && (
           <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} onSave={handleSaveSettings} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       )}
-      {isAccessPointModalOpen && userProfile.conjuntoId && (
+       {isAccessPointModalOpen && userProfile.conjuntoId && (
         <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
       )}
     </div>

@@ -12,11 +12,12 @@ export enum Tab {
 }
 
 export enum UserRole {
-  Admin = 'Administrador',
-  Guard = 'Portero',
-  SuperAdmin = 'SuperAdmin',
-  Contador = 'Contador',
+  Trial = 'trial',
+  Subscriber = 'subscriber',
+  Internal = 'internal',
+  Admin = 'admin',
 }
+
 
 export interface UserRoleDefinition {
   id: string;
@@ -102,18 +103,20 @@ export interface CommonArea {
 }
 
 export interface UserProfile {
-    name: string;
-    email: string;
-    picture?: string;
-    phoneNumber?: string;
-    role: UserRole | string;
-    conjuntoId?: string;
+  id: string; // This is the auth.users.id (UUID)
+  email: string;
+  fullName: string;
+  avatarUrl?: string; // Corresponds to `picture` from Google/auth
+  role: UserRole;
+  trialExpiresAt?: string; // nullable timestamptz
+  conjuntoId?: string; // This will be set after initial setup
 }
+
 
 export interface SuperAdminProfile {
     name: string;
     email: string;
-    role: UserRole.SuperAdmin;
+    role: UserRole.Admin;
 }
 
 

@@ -16,7 +16,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
     name: '',
     email: '',
     phoneNumber: '',
-    role: UserRole.Guard,
+    // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
+    role: 'Guard',
     password: '',
   });
 
@@ -38,7 +39,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         name: '',
         email: '',
         phoneNumber: '',
-        role: UserRole.Guard,
+        // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
+        role: 'Guard',
         password: '',
       });
     }
@@ -66,7 +68,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
 
   const allRoles = [
       { id: UserRole.Admin, name: UserRole.Admin },
-      { id: UserRole.Guard, name: UserRole.Guard },
+      // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
+      { id: 'Guard', name: 'Guard' },
       ...availableRoles,
   ];
 

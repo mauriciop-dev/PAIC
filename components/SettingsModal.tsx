@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { UserProfile, ConjuntoInfo, AccessPoint } from '../types';
+import { UserProfile, ConjuntoInfo, AccessPoint, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 import { mercadoPagoService } from '../services/mercadoPagoService';
@@ -36,7 +37,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     const fetchAccessPoints = async () => {
         if (activeTab === 'Puntos de Acceso' && userProfile.conjuntoId) {
-            // FIX: Pass conjuntoId to fetchAccessPoints.
             const data = await apiService.fetchAccessPoints(userProfile.conjuntoId);
             setAccessPoints(data);
         }
@@ -45,10 +45,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [activeTab, userProfile.conjuntoId]);
 
   useEffect(() => {
-      // When the modal re-opens or conjuntoInfo from parent updates (e.g., after payment),
-      // sync the local state.
       setConjuntoData(conjuntoInfo);
-  }, [conjuntoInfo, isOpen])
+      setProfileData(userProfile);
+  }, [conjuntoInfo, userProfile, isOpen])
 
 
   if (!isOpen) return null;
@@ -67,10 +66,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   
   const handleAddAccessPoint = async () => {
       if (newAccessPointName.trim() && userProfile.conjuntoId) {
-          // FIX: Pass conjuntoId to addAccessPoint.
           await apiService.addAccessPoint(userProfile.conjuntoId, newAccessPointName.trim());
           setNewAccessPointName('');
-          // FIX: Pass conjuntoId to fetchAccessPoints.
           const data = await apiService.fetchAccessPoints(userProfile.conjuntoId); // Refresh
           setAccessPoints(data);
       }
@@ -78,9 +75,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleDeleteAccessPoint = async (id: number) => {
       if(window.confirm('¿Estás seguro de que quieres eliminar este punto de acceso?') && userProfile.conjuntoId) {
-          // FIX: Pass conjuntoId to deleteAccessPoint.
           await apiService.deleteAccessPoint(userProfile.conjuntoId, id);
-          // FIX: Pass conjuntoId to fetchAccessPoints.
           const data = await apiService.fetchAccessPoints(userProfile.conjuntoId); // Refresh
           setAccessPoints(data);
       }
@@ -112,25 +107,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const renderProfileTab = () => (
     <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-            <img src={profileData.picture} alt="Avatar" className="w-16 h-16 rounded-full" />
+            {profileData.avatarUrl ? (
+                <img src={profileData.avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full" />
+            ) : (
+                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                    <Icon name="user" className="w-8 h-8 text-gray-600" />
+                </div>
+            )}
             <div>
-                <p className="font-bold text-lg text-gray-800">{profileData.name}</p>
+                <p className="font-bold text-lg text-gray-800">{profileData.fullName}</p>
                 <p className="text-sm text-gray-600">{profileData.email}</p>
             </div>
         </div>
-        <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Teléfono de Contacto</label>
-            <input
-                type="tel"
-                id="phone"
-                name="phoneNumber"
-                value={profileData.phoneNumber || ''}
-                onChange={handleProfileChange}
-                placeholder="Agrega tu número de teléfono"
-                className="mt-1 w-full p-2 border border-gray-300 rounded-md"
-            />
-        </div>
-        <p className="text-xs text-gray-500">Tu nombre, correo y foto son gestionados por tu cuenta de Google.</p>
+        <p className="text-xs text-gray-500">Tu nombre, correo y foto son gestionados por tu proveedor de autenticación (ej. Google).</p>
     </div>
   );
 

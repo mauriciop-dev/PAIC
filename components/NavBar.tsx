@@ -10,14 +10,14 @@ interface NavBarProps {
 }
 
 const allTabs = [
-  { id: Tab.Dashboard, label: 'Centro de Control', icon: 'dashboard', roles: [UserRole.Admin] },
-  { id: Tab.Database, label: 'Base de datos', icon: 'database', roles: [UserRole.Admin] },
-  { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar', roles: [UserRole.Admin] },
-  { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail', roles: [UserRole.Admin] },
-  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Admin, UserRole.Contador] },
-  { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield', roles: [UserRole.Admin, UserRole.Guard] },
-  { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock', roles: [UserRole.Admin] },
-  { id: Tab.PendingTasks, label: 'Tareas', icon: 'checkSquare', roles: [UserRole.Admin] },
+  { id: Tab.Dashboard, label: 'Centro de Control', icon: 'dashboard', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.Database, label: 'Base de datos', icon: 'database', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Trial, UserRole.Subscriber, UserRole.Internal] }, // Example: Internal could be an accountant
+  { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield', roles: [UserRole.Trial, UserRole.Subscriber, UserRole.Internal] },
+  { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.PendingTasks, label: 'Tareas', icon: 'checkSquare', roles: [UserRole.Trial, UserRole.Subscriber] },
 ];
 
 const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile }) => {
@@ -25,12 +25,16 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
   const [currentItem, setCurrentItem] = useState(0);
 
   const visibleTabs = useMemo(() => {
-    // This needs to be adapted when custom roles are fully implemented
-    return allTabs.filter(tab => (userProfile.role && tab.roles.includes(userProfile.role as UserRole)));
+    if (!userProfile) return [];
+    // TODO: When custom roles are fully implemented via the UI, this logic will need to read
+    // the permissions from the user's specific role definition.
+    return allTabs.filter(tab => tab.roles.includes(userProfile.role));
   }, [userProfile.role]);
 
+  const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
+
   useEffect(() => {
-    if (userProfile.role !== UserRole.Admin || !userProfile.conjuntoId) return;
+    if (!isConjuntoAdmin || !userProfile.conjuntoId) return;
 
     const updateSliderItems = async () => {
       const [dueDates, tasks] = await Promise.all([
@@ -101,7 +105,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
     const intervalId = setInterval(updateSliderItems, 60000); // Refresh every minute
     return () => clearInterval(intervalId);
 
-  }, [userProfile.role, userProfile.conjuntoId]);
+  }, [isConjuntoAdmin, userProfile.conjuntoId]);
 
   useEffect(() => {
     if (sliderItems.length <= 1) return;
@@ -120,7 +124,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
     : 'bg-gray-500';
 
   return (
-    <nav className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-0 z-10 flex justify-between items-center gap-4 flex-wrap">
+    <nav className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4 flex-wrap">
       <div className="flex items-center gap-1 md:gap-2 flex-wrap">
         {visibleTabs.map((tab) => (
           <button
@@ -136,7 +140,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
           </button>
         ))}
       </div>
-      {userProfile.role === UserRole.Admin && sliderItems.length > 0 && (
+      {isConjuntoAdmin && sliderItems.length > 0 && (
           <div className="hidden sm:flex items-center gap-2 overflow-hidden flex-shrink min-w-0">
              <div className={`w-3 h-3 rounded-full ${trafficLightColor} flex-shrink-0`}></div>
              <p className="text-sm text-gray-700 truncate">{sliderItems[currentItem].text}</p>

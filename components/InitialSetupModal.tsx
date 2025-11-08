@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './ui/Icon';
-import { ConjuntoInfo } from '../types';
+import { ConjuntoInfo, UserProfile } from '../types';
 
 interface InitialSetupModalProps {
   onClose: () => void;
   onSaveSetup: (info: ConjuntoInfo) => void;
-  conjuntoId: string;
+  userProfile: UserProfile;
 }
 
-const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSetup, conjuntoId }) => {
+const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSetup, userProfile }) => {
   const [formData, setFormData] = useState<Omit<ConjuntoInfo, 'id' | 'subscriptionPlan'>>({
     name: '',
     nit: '',
@@ -18,6 +18,16 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
     adminPhone: '',
   });
 
+  useEffect(() => {
+    if (userProfile) {
+        setFormData(prev => ({
+            ...prev,
+            adminName: userProfile.fullName,
+            adminEmail: userProfile.email,
+        }));
+    }
+  }, [userProfile]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -25,9 +35,10 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newConjuntoId = `conj-${Date.now()}`;
     const completeInfo: ConjuntoInfo = {
         ...formData,
-        id: conjuntoId,
+        id: userProfile.conjuntoId || newConjuntoId,
         subscriptionPlan: 'Free', // Default plan
     };
     onSaveSetup(completeInfo);
@@ -49,7 +60,7 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
                 <input type="text" name="nit" value={formData.nit} onChange={handleChange} placeholder="NIT" className="w-full p-2 border border-gray-300 rounded-md" required />
                 <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Dirección del conjunto" className="w-full p-2 border border-gray-300 rounded-md" required />
                 <input type="text" name="adminName" value={formData.adminName} onChange={handleChange} placeholder="Nombre del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
-                <input type="email" name="adminEmail" value={formData.adminEmail} onChange={handleChange} placeholder="Correo del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
+                <input type="email" name="adminEmail" value={formData.adminEmail} onChange={handleChange} placeholder="Correo del administrador" className="w-full p-2 border border-gray-300 rounded-md disabled:bg-gray-100" required disabled />
                 <input type="tel" name="adminPhone" value={formData.adminPhone} onChange={handleChange} placeholder="Teléfono del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
             </div>
             <div className="mt-8 flex justify-end gap-4">

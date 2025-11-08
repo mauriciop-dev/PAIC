@@ -26,6 +26,7 @@ import {
     PlatformStats,
     SuperAdminChartData,
     StoredFile,
+    UserProfile,
 } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
 
@@ -100,136 +101,48 @@ export const apiService = {
         };
     },
 
-    async seedDatabase(conjuntoId: string): Promise<void> {
-        // Check if residents table is empty for this conjunto, which implies it's a new setup.
-        const { data, error } = await supabase.from('residents').select('apartment').eq('conjunto_id', conjuntoId).limit(1);
-        handleError(error, 'seedDatabase check');
-
-        // If data is empty, it means no residents, so we seed the database with sample data.
-        if (data && data.length === 0) {
-            console.log(`Seeding database for new conjunto: ${conjuntoId}`);
-
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(today.getDate() + 1);
-            const nextWeek = new Date(today);
-            nextWeek.setDate(today.getDate() + 7);
-            const lastWeek = new Date(today);
-            lastWeek.setDate(today.getDate() - 7);
-
-
-            const sampleResidents = [
-                { conjuntoId, apartment: '101', name: 'Juan Perez', email: 'juan.perez.sample@email.com', phone: '3001234567' },
-                { conjuntoId, apartment: '102', name: 'Maria Rodriguez', email: 'maria.r.sample@email.com', phone: '3011234568' },
-                { conjuntoId, apartment: '201', name: 'Carlos Lopez (En Mora)', email: 'carlos.l.sample@email.com', phone: '3021234569' },
-                { conjuntoId, apartment: '202', name: 'Ana Martinez', email: 'ana.m.sample@email.com', phone: '3031234570' },
-            ];
-
-            const sampleAccountStatus = [
-                { conjuntoId, apartment: '101', lastPaymentDate: today.toISOString().split('T')[0], adminFeeValue: 200000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-                { conjuntoId, apartment: '102', lastPaymentDate: yesterday.toISOString().split('T')[0], adminFeeValue: 220000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-                { conjuntoId, apartment: '201', lastPaymentDate: lastWeek.toISOString().split('T')[0], adminFeeValue: 200000, pendingInstallments: 1, otherCharges: 50000, outstandingBalance: 250000 },
-                { conjuntoId, apartment: '202', lastPaymentDate: today.toISOString().split('T')[0], adminFeeValue: 220000, pendingInstallments: 0, otherCharges: 0, outstandingBalance: 0 },
-            ];
-            
-            const sampleProviders = [
-                { conjuntoId, company: 'Plomería J.J.', specialty: 'Plomería', email: 'plomeriajj.sample@email.com', phone: '3101234567' },
-                { conjuntoId, company: 'Seguridad Águila', specialty: 'Vigilancia', email: 'contacto.aguila.sample@email.com', phone: '3111234568' },
-            ];
-
-            const sampleInternalStaff = [
-                { conjuntoId, name: 'Pedro Gomez', position: 'Todero', email: 'pedro.g.sample@email.com', phone: '3131234567' },
-            ];
-
-            const sampleAccessPoints = [
-                { conjunto_id: conjuntoId, name: 'Portería Principal' },
-                { conjunto_id: conjuntoId, name: 'Portería Vehicular' },
-            ];
-            
-            const sampleDueDates = [
-                { conjuntoId, item: 'Pago de Vigilancia', category: 'Servicios' as const, dueDate: nextWeek.toISOString().split('T')[0], status: 'Pendiente' as const },
-                { conjuntoId, item: 'Mantenimiento Ascensor', category: 'Mantenimiento' as const, dueDate: lastWeek.toISOString().split('T')[0], status: 'Pagado' as const },
-                { conjuntoId, item: 'Seguro de áreas comunes', category: 'Seguros' as const, dueDate: yesterday.toISOString().split('T')[0], status: 'Vencido' as const },
-            ];
-
-            const sampleTasks = [
-                { conjuntoId, text: 'Revisar bomba de agua', dueDate: tomorrow.toISOString().split('T')[0], completed: false },
-                { conjuntoId, text: 'Comprar bombillos pasillo 3', dueDate: yesterday.toISOString().split('T')[0], completed: true },
-            ];
-            
-            const sampleIncomes = [
-                { conjuntoId, description: 'Cuota de Admin Apto 101', amount: 200000, category: 'Cuota de Administración' as const, date: today.toISOString().split('T')[0] },
-                { conjuntoId, description: 'Alquiler Salón Social Apto 102', amount: 150000, category: 'Alquiler de Áreas' as const, date: yesterday.toISOString().split('T')[0] },
-            ];
-
-            const sampleExpenses = [
-                { conjuntoId, description: 'Pago Vigilancia', amount: 80000, category: 'Servicios' as const, date: today.toISOString().split('T')[0], providerId: null },
-                { conjuntoId, description: 'Reparación Plomería', amount: 120000, category: 'Mantenimiento' as const, date: lastWeek.toISOString().split('T')[0], providerId: null },
-            ];
-
-            const sampleVisitorLogs = [
-                { conjuntoId, apartment: '102', visitorName: 'Laura Prima', date: today.toISOString().split('T')[0], status: 'Autorizado' as const },
-                { conjuntoId, apartment: '202', visitorName: 'Técnico Internet', date: yesterday.toISOString().split('T')[0], status: 'Salió' as const, entryTime: '09:00', exitTime: '10:30' },
-            ];
-
-            const samplePackageLogs = [
-                { conjuntoId, apartment: '101', courier: 'Servientrega', receivedDate: today.toISOString(), status: 'En recepción' as const },
-                { conjuntoId, apartment: '201', courier: 'MercadoLibre', receivedDate: yesterday.toISOString(), status: 'Entregado' as const },
-            ];
-            
-            const sampleCommonAreas = [
-                 { conjuntoId, name: 'Salón Social', color: getRandomColor() },
-                 { conjuntoId, name: 'Gimnasio', color: getRandomColor() },
-                 { conjuntoId, name: 'Zona BBQ', color: getRandomColor() },
-            ];
-
-            // Using Promise.all to run insertions in parallel for efficiency
-            await Promise.all([
-                supabase.from('residents').insert(sampleResidents.map(toSupabase)),
-                supabase.from('account_status').insert(sampleAccountStatus.map(toSupabase)),
-                supabase.from('providers').insert(sampleProviders.map(toSupabase)),
-                supabase.from('internal_staff').insert(sampleInternalStaff.map(toSupabase)),
-                supabase.from('access_points').insert(sampleAccessPoints),
-                supabase.from('due_dates').insert(sampleDueDates.map(toSupabase)),
-                supabase.from('tasks').insert(sampleTasks.map(toSupabase)),
-                supabase.from('incomes').insert(sampleIncomes.map(toSupabase)),
-                supabase.from('expenses').insert(sampleExpenses.map(toSupabase)),
-                supabase.from('visitor_logs').insert(sampleVisitorLogs.map(toSupabase)),
-                supabase.from('package_logs').insert(samplePackageLogs.map(toSupabase)),
-                supabase.from('common_areas').insert(sampleCommonAreas.map(toSupabase)),
-            ]);
-
-            console.log(`Database seeded successfully for conjunto: ${conjuntoId}`);
-        }
-    },
-
-
     // =================================================================
     // AUTH & USERS
     // =================================================================
-
-    async findUserByEmail(email: string): Promise<PlatformUser | null> {
-        const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
+    
+    async fetchUserProfile(userId: string): Promise<UserProfile | null> {
+        const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
         if (error && error.code !== 'PGRST116') { // Ignore 'not found' error
-            handleError(error, 'findUserByEmail');
+            handleError(error, 'fetchUserProfile');
         }
-        return fromSupabase(data) as PlatformUser | null;
+        return fromSupabase(data) as UserProfile | null;
     },
-
+    
+    async updateUserProfile(profile: UserProfile): Promise<void> {
+        const { error } = await supabase.from('user_profiles').update(toSupabase(profile)).eq('id', profile.id);
+        handleError(error, 'updateUserProfile');
+    },
+    
     async checkIfSuperAdmin(email: string): Promise<boolean> {
-        return SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+        const { data } = await supabase.from('user_profiles').select('role').eq('email', email).single();
+        return data?.role === UserRole.Admin;
     },
-
+    
+    // FIX: Add missing authenticateUser method for internal staff login.
     async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
-        const user = await this.findUserByEmail(email);
-        // This is a simplified password check. In a real app, use Supabase Auth or hashed passwords.
-        if (user && user.password === password) {
-            return user;
+        const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
+        
+        if (error && error.code !== 'PGRST116') { // ignore not found
+            handleError(error, 'authenticateUser: fetch user');
         }
+
+        // IMPORTANT: This is plain text password comparison. This is very insecure and should be replaced with a proper hashing mechanism in a real application.
+        // Implementing it this way to match what seems to be the existing (flawed) application design.
+        if (data && data.password === password) { 
+            return fromSupabase(data) as PlatformUser;
+        }
+
         return null;
     },
+
+
+    // The methods below manage `platform_users`, which are distinct from Supabase Auth users.
+    // They are for internal staff (Guard, Accountant) created by a conjunto admin.
     
     async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
         const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 import { apiService } from '../services/apiService';
 import { Icon } from './ui/Icon';
 
@@ -18,9 +18,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onAuthSuccess }) => {
         setError('');
         setIsLoading(true);
         try {
+            // FIX: Property 'authenticateUser' does not exist on type 'apiService'. This method is now implemented in apiService.
             const user = await apiService.authenticateUser(email, password);
             if (user) {
-                const userProfile: UserProfile = { name: user.name, email: user.email, role: user.role, conjuntoId: user.conjuntoId };
+                // FIX: Object literal may only specify known properties, and 'name' does not exist in type 'UserProfile'.
+                // Map the internal PlatformUser to the app's UserProfile state shape.
+                const userProfile: UserProfile = {
+                    id: `internal-${user.id}`, // Internal users don't have UUIDs, creating a unique string ID
+                    fullName: user.name,
+                    email: user.email,
+                    role: UserRole.Internal, // All platform users are considered 'Internal' in the main app state
+                    conjuntoId: user.conjuntoId
+                };
                 onAuthSuccess(userProfile);
             } else {
                 setError('Correo o contraseña incorrectos.');

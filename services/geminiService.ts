@@ -55,7 +55,8 @@ const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoI
         } catch (error) {
             console.error("Failed to fetch and cache system prompt:", error);
             // Fallback to a very basic prompt in case of failure
-            return `You are a helpful assistant for ${conjuntoInfo.name}. The user is ${userProfile.name}.`;
+            // FIX: Property 'name' does not exist on type 'UserProfile'. Use 'fullName' instead.
+            return `You are a helpful assistant for ${conjuntoInfo.name}. The user is ${userProfile.fullName}.`;
         }
     }
     
@@ -63,7 +64,8 @@ const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoI
     
     // Replace placeholders with actual data from the cached template
     const finalPrompt = (systemPromptTemplate || '')
-        .replace(/{{userName}}/g, userProfile.name)
+        // FIX: Property 'name' does not exist on type 'UserProfile'. Use 'fullName' instead.
+        .replace(/{{userName}}/g, userProfile.fullName)
         .replace(/{{conjuntoName}}/g, conjuntoInfo.name)
         .replace(/{{currentDate}}/g, formattedDate);
         

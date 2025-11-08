@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition, Tab } from '../../types';
@@ -456,9 +457,11 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         switch (roleName) {
             case UserRole.Admin:
                 return Object.values(Tab);
-            case UserRole.Guard:
+            // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
+            case 'Guard':
                 return [Tab.Seguridad];
-            case UserRole.Contador:
+            // FIX: Property 'Contador' does not exist on type 'typeof UserRole'. Use string literal instead.
+            case 'Contador':
                 return [Tab.Finanzas];
             default:
                 const customRole = allCustomRoles.find(r => r.name === roleName);

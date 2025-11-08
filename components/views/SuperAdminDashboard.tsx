@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SuperAdminProfile, ConjuntoInfo, PlatformStats, SuperAdminChartData } from '../../types';
+import { SuperAdminProfile, ConjuntoInfo, PlatformStats, SuperAdminChartData, UserRole } from '../../types';
 import { apiService } from '../../services/apiService';
 import { Icon } from '../ui/Icon';
 import FileManagerModal from '../FileManagerModal'; // Import the new modal
