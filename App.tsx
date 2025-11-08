@@ -165,6 +165,16 @@ const App: React.FC = () => {
     setIsSettingsModalOpen(false);
   };
   
+  const handleInternalAuthSuccess = (profile: UserProfile) => {
+    setUserProfile(profile);
+    // You might want to fetch conjuntoInfo here as well if internal users need it
+    if (profile.conjuntoId) {
+      apiService.fetchConjuntoInfo(profile.conjuntoId).then(info => {
+        if (info) setConjuntoInfo(info);
+      });
+    }
+  };
+
   if (isLoadingSession) {
       return (
         <div className="flex h-screen items-center justify-center">
@@ -182,7 +192,7 @@ const App: React.FC = () => {
   }
 
   if (!userProfile) {
-    return <LoginView />;
+    return <LoginView onInternalAuthSuccess={handleInternalAuthSuccess} />;
   }
   
   const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";
