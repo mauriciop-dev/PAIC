@@ -55,7 +55,15 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setSession(session);
         if (session?.user) {
-            const profile = await apiService.fetchUserProfile(session.user.id);
+            let profile = null;
+            // Retry fetching the profile to account for potential replication delay or trigger latency.
+            for (let i = 0; i < 3; i++) {
+                profile = await apiService.fetchUserProfile(session.user.id);
+                if (profile) break;
+                console.warn(`Profile not found for new user, retrying... Attempt ${i + 1}`);
+                await new Promise(res => setTimeout(res, 1000)); // Wait 1 second
+            }
+
             if (profile) {
                 setUserProfile(profile);
                 if (profile.conjuntoId) {
@@ -69,7 +77,7 @@ const App: React.FC = () => {
                     setIsInitialSetupModalOpen(true);
                 }
             } else {
-                console.error("User is logged in but profile data is missing. Logging out.");
+                console.error("User is logged in but profile data is missing after retries. Logging out.");
                 await handleLogout();
             }
         } else {
