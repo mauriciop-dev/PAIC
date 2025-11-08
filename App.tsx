@@ -31,16 +31,17 @@ const App: React.FC = () => {
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
 
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
     await supabase.auth.signOut();
-    // The onAuthStateChange listener will handle the state cleanup
     setUserProfile(null);
     setConjuntoInfo(null);
     setSelectedAccessPointId(null);
+    setLoginError(null);
   }, []);
 
   useEffect(() => {
@@ -53,6 +54,7 @@ const App: React.FC = () => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setLoginError(null); // Clear any previous error on a new auth event
         setSession(session);
         if (session?.user) {
             let profile = null;
@@ -77,8 +79,10 @@ const App: React.FC = () => {
                     setIsInitialSetupModalOpen(true);
                 }
             } else {
-                console.error("User is logged in but profile data is missing after retries. Logging out.");
-                await handleLogout();
+                console.error("User is logged in but profile data is missing after retries.");
+                setLoginError("No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.");
+                setUserProfile(null);
+                setConjuntoInfo(null);
             }
         } else {
             setUserProfile(null);
@@ -185,10 +189,30 @@ const App: React.FC = () => {
 
   if (isLoadingSession) {
       return (
-        <div className="flex h-screen items-center justify-center">
+        <div className="flex h-screen items-center justify-center bg-gray-50">
             <div className="text-center">
                 <Icon name="bot" className="w-12 h-12 text-blue-600 animate-pulse mx-auto"/>
                 <p className="text-gray-600 mt-2">Cargando PAIC...</p>
+            </div>
+        </div>
+      );
+  }
+  
+  if (loginError) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="text-center p-8 bg-white shadow-lg rounded-lg max-w-md mx-4">
+                <Icon name="alert-triangle" className="w-12 h-12 text-red-500 mx-auto"/>
+                <h2 className="text-xl font-bold text-gray-800 mt-4">Error de Sincronización</h2>
+                <p className="text-gray-600 mt-2">{loginError}</p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                        Refrescar Página
+                    </button>
+                    <button onClick={handleLogout} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300">
+                        Cerrar Sesión
+                    </button>
+                </div>
             </div>
         </div>
       );
