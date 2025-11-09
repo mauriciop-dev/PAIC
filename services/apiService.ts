@@ -66,8 +66,13 @@ export const apiService = {
         return fromSupabase(data) as ConjuntoInfo | null;
     },
     
+    async addConjuntoInfo(info: ConjuntoInfo): Promise<void> {
+        const { error } = await supabase.from('conjuntos').insert(toSupabase(info));
+        handleError(error, 'addConjuntoInfo');
+    },
+
     async updateConjuntoInfo(info: ConjuntoInfo): Promise<void> {
-        const { error } = await supabase.from('conjuntos').upsert(toSupabase(info));
+        const { error } = await supabase.from('conjuntos').update(toSupabase(info)).eq('id', info.id);
         handleError(error, 'updateConjuntoInfo');
     },
 

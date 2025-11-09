@@ -181,8 +181,8 @@ const App: React.FC = () => {
     if (!userProfile) return;
     
     try {
-        // 1. Create/update conjunto info
-        await apiService.updateConjuntoInfo(info);
+        // 1. Create conjunto info using the new, explicit 'add' function.
+        await apiService.addConjuntoInfo(info);
         
         // 2. Update the user's profile with the new conjuntoId
         const updatedProfile: UserProfile = { ...userProfile, conjuntoId: info.id, fullName: info.adminName };
