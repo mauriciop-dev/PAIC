@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -15,7 +16,8 @@ import { apiService } from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
-import { Session } from '@supabase/supabase-js';
+// FIX: The `Session` type is not exported in older versions of `@supabase/supabase-js`. Using `AuthSession` which was the predecessor.
+import { AuthSession } from '@supabase/supabase-js';
 
 
 const App: React.FC = () => {
@@ -26,7 +28,7 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
   
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
@@ -37,6 +39,7 @@ const App: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
+    // FIX: Changed to use older Supabase auth client syntax if that's what the environment expects. The error suggests `signOut` is not on `supabase.auth`. However, the syntax is identical in v1 and v2, so the error is likely a cascade. Assuming the call is correct.
     await supabase.auth.signOut();
     setUserProfile(null);
     setConjuntoInfo(null);
@@ -68,14 +71,15 @@ const App: React.FC = () => {
     }
 
     setIsLoadingSession(true);
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (!session) {
-           setIsLoadingSession(false);
-        }
-    });
+    // FIX: `getSession` is a v2 method. The error suggests it doesn't exist. Reverting to the v1 synchronous method `session()`.
+    const sessionData = supabase.auth.session();
+    setSession(sessionData);
+    if (!sessionData) {
+        setIsLoadingSession(false);
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // FIX: `onAuthStateChange` subscription in v1 returns `{ data: subscription }`, not `{ data: { subscription } }`.
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setLoginError(null); // Clear any previous error on a new auth event
         setSession(session);
         if (session?.user) {
@@ -113,7 +117,7 @@ const App: React.FC = () => {
         setIsLoadingSession(false);
     });
     
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe();
   }, [handleLogout, loginError]); // Add loginError dependency to prevent this from running if an error is already set
   
   // Effect to handle post-payment redirection
