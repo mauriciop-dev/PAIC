@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Icon } from './ui/Icon';
 import { ConjuntoInfo, UserProfile } from '../types';
 
 interface InitialSetupModalProps {
   onClose: () => void;
-  onSaveSetup: (info: ConjuntoInfo) => void;
+  onSaveSetup: (info: ConjuntoInfo) => Promise<void>;
   userProfile: UserProfile;
 }
 
@@ -17,6 +18,9 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
     adminEmail: '',
     adminPhone: '',
   });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (userProfile) {
@@ -35,14 +39,24 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newConjuntoId = `conj-${Date.now()}`;
-    const completeInfo: ConjuntoInfo = {
-        ...formData,
-        id: userProfile.conjuntoId || newConjuntoId,
-        subscriptionPlan: 'Free', // Default plan
-    };
-    await onSaveSetup(completeInfo);
-    onClose(); 
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+        const newConjuntoId = `conj-${Date.now()}`;
+        const completeInfo: ConjuntoInfo = {
+            ...formData,
+            id: userProfile.conjuntoId || newConjuntoId,
+            subscriptionPlan: 'Free', // Default plan
+        };
+        await onSaveSetup(completeInfo);
+        // The parent component handles closing the modal on success.
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error inesperado.';
+        console.error("Failed to save initial setup:", err);
+        setError(`Error al guardar: ${errorMessage}. Revisa que todos los datos sean correctos. Si el problema persiste, puede ser un problema de base de datos y deberías contactar a soporte.`);
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -63,9 +77,20 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
                 <input type="email" name="adminEmail" value={formData.adminEmail} onChange={handleChange} placeholder="Correo del administrador" className="w-full p-2 border border-gray-300 rounded-md disabled:bg-gray-100" required disabled />
                 <input type="tel" name="adminPhone" value={formData.adminPhone} onChange={handleChange} placeholder="Teléfono del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
             </div>
+            
+            {error && (
+                <div className="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm">
+                    {error}
+                </div>
+            )}
+
             <div className="mt-8 flex justify-end gap-4">
-                <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                    Guardar y Continuar
+                <button 
+                    type="submit" 
+                    disabled={isLoading} 
+                    className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-wait transition-colors"
+                >
+                    {isLoading ? 'Guardando...' : 'Guardar y Continuar'}
                 </button>
             </div>
         </form>

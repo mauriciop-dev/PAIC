@@ -180,17 +180,23 @@ const App: React.FC = () => {
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     if (!userProfile) return;
     
-    // 1. Create/update conjunto info
-    await apiService.updateConjuntoInfo(info);
-    
-    // 2. Update the user's profile with the new conjuntoId
-    const updatedProfile: UserProfile = { ...userProfile, conjuntoId: info.id, fullName: info.adminName };
-    await apiService.updateUserProfile(updatedProfile);
+    try {
+        // 1. Create/update conjunto info
+        await apiService.updateConjuntoInfo(info);
+        
+        // 2. Update the user's profile with the new conjuntoId
+        const updatedProfile: UserProfile = { ...userProfile, conjuntoId: info.id, fullName: info.adminName };
+        await apiService.updateUserProfile(updatedProfile);
 
-    // 3. Update local state
-    setUserProfile(updatedProfile);
-    setConjuntoInfo(info);
-    setIsInitialSetupModalOpen(false);
+        // 3. Update local state
+        setUserProfile(updatedProfile);
+        setConjuntoInfo(info);
+        setIsInitialSetupModalOpen(false);
+    } catch (error) {
+        console.error("Error saving initial setup:", error);
+        // Re-throw the error so the modal component can catch it and display a message.
+        throw error;
+    }
   };
 
 
