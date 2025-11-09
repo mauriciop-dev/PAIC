@@ -273,9 +273,54 @@ export const apiService = {
         handleError(error, 'deleteProvider');
     },
     async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
-        const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
-        const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id, conjunto_id', ignoreDuplicates: false });
-        handleError(error, 'bulkUpsertProviders');
+        // Workaround for missing UNIQUE constraint on the natural key (e.g., company name) in the database.
+        // The direct upsert `onConflict('company', 'conjunto_id')` fails if the constraint doesn't exist.
+        // This implementation manually fetches existing records, separates new from existing, and performs separate operations.
+
+        // 1. Fetch existing providers to manually check for conflicts based on the company name.
+        const { data: existingProvidersData, error: fetchError } = await supabase
+            .from('providers')
+            .select('id, company')
+            .eq('conjunto_id', conjuntoId);
+        handleError(fetchError, 'bulkUpsertProviders (fetch)');
+
+        const existingProviders = fromSupabase(existingProvidersData) as { id: number; company: string }[];
+        // Use a case-insensitive map for matching company names.
+        const existingProviderMap = new Map(existingProviders.map(p => [p.company.toLowerCase(), p.id]));
+
+        const recordsToInsert: any[] = [];
+        const recordsToUpdate: any[] = [];
+
+        providers.forEach(provider => {
+            if (!provider.company) return; // Skip rows without a company name
+
+            const existingId = existingProviderMap.get(provider.company.toLowerCase());
+            const payload = toSupabase({ ...provider, conjuntoId });
+            
+            // The 'id' from the Excel file is irrelevant/non-existent, we manage it here.
+            delete payload.id;
+
+            if (existingId) {
+                // This provider exists, add its ID to the payload to target it for an update.
+                recordsToUpdate.push({ ...payload, id: existingId });
+            } else {
+                // This is a new provider, add it to the insert queue.
+                recordsToInsert.push(payload);
+            }
+        });
+
+        // 2. Perform batch operations.
+        if (recordsToInsert.length > 0) {
+            const { error: insertError } = await supabase.from('providers').insert(recordsToInsert);
+            handleError(insertError, 'bulkUpsertProviders (insert)');
+        }
+
+        if (recordsToUpdate.length > 0) {
+            // For updates, we use upsert targeting the primary key ('id').
+            // This will efficiently update all records in the array.
+            const { error: updateError } = await supabase.from('providers').upsert(recordsToUpdate, { onConflict: 'id' });
+            handleError(updateError, 'bulkUpsertProviders (update)');
+        }
     },
 
     // Internal Staff
