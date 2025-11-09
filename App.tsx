@@ -17,7 +17,8 @@ import { supabase } from './services/supabaseClient';
 import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 // FIX: The `Session` type is not exported in older versions of `@supabase/supabase-js`. Using `AuthSession` which was the predecessor.
-import { AuthSession } from '@supabase/supabase-js';
+// Switched to `Session` which is the correct type for Supabase JS v2.
+import { Session } from '@supabase/supabase-js';
 
 
 const App: React.FC = () => {
@@ -28,7 +29,7 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
   
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
@@ -72,14 +73,12 @@ const App: React.FC = () => {
 
     setIsLoadingSession(true);
     // FIX: `getSession` is a v2 method. The error suggests it doesn't exist. Reverting to the v1 synchronous method `session()`.
-    const sessionData = supabase.auth.session();
-    setSession(sessionData);
-    if (!sessionData) {
-        setIsLoadingSession(false);
-    }
+    // The error `Property 'session' does not exist on type 'SupabaseAuthClient'` indicates v2 types are in use.
+    // The `onAuthStateChange` listener handles the initial session, so the explicit `session()` call is removed.
 
     // FIX: `onAuthStateChange` subscription in v1 returns `{ data: subscription }`, not `{ data: { subscription } }`.
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // The error on unsubscribe suggests the structure is `{ data: { subscription } }` which is Supabase v2.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setLoginError(null); // Clear any previous error on a new auth event
         setSession(session);
         if (session?.user) {

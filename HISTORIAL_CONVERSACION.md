@@ -11,4 +11,10 @@
 
 - **Usuario:** Proporcionó la URL y la `anon key` del proyecto de Supabase.
 - **PAIC:** Actualizó el archivo `services/supabaseClient.ts` con las credenciales proporcionadas, completando la conexión del frontend a la base de datos.
-- **Estado Actual:** La aplicación está conectada. El siguiente paso recomendado es probar el inicio de sesión con Google para verificar que la autenticación y la creación de perfiles de usuario funcionen correctamente.
+- **Estado Anterior:** La aplicación estaba conectada. El siguiente paso era configurar el backend para el envío de correos.
+
+## Sesión 3: Despliegue de la Edge Function para Envíos de Correo
+
+- **Usuario:** Siguió los pasos para configurar los "Secrets" (API Key de Resend y correo de envío) y desplegar la Edge Function `send-email` a través de la interfaz de Supabase.
+- **PAIC:** Guió al usuario a través del proceso, corrigiendo el nombre inicial de la función y confirmando el despliegue exitoso.
+- **Estado Actual:** ¡Configuración del backend completada! La función `send-email` está activa. La aplicación ahora tiene la capacidad de enviar correos electrónicos a través del módulo de "Comunicaciones". El siguiente paso recomendado es probar esta funcionalidad directamente en la aplicación.

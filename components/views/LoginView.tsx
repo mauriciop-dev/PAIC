@@ -16,10 +16,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
   const handleGoogleSignIn = async () => {
     setError(null);
     // FIX: `signInWithOAuth` is a v2 method. The error suggests it doesn't exist. Reverting to the v1 method `signIn` with the corresponding options structure.
-    const { error } = await supabase.auth.signIn(
-      { provider: 'google' },
-      { redirectTo: window.location.origin }
-    );
+    // The error indicates Supabase JS v2 is used, where `signInWithOAuth` is the correct method for OAuth.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
     if (error) setError(error.message);
   };
   
