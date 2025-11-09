@@ -33,7 +33,7 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newConjuntoId = `conj-${Date.now()}`;
     const completeInfo: ConjuntoInfo = {
@@ -41,7 +41,7 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
         id: userProfile.conjuntoId || newConjuntoId,
         subscriptionPlan: 'Free', // Default plan
     };
-    onSaveSetup(completeInfo);
+    await onSaveSetup(completeInfo);
     onClose(); 
   };
 
@@ -64,9 +64,6 @@ const InitialSetupModal: React.FC<InitialSetupModalProps> = ({ onClose, onSaveSe
                 <input type="tel" name="adminPhone" value={formData.adminPhone} onChange={handleChange} placeholder="Teléfono del administrador" className="w-full p-2 border border-gray-300 rounded-md" required />
             </div>
             <div className="mt-8 flex justify-end gap-4">
-                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                    Omitir
-                </button>
                 <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                     Guardar y Continuar
                 </button>

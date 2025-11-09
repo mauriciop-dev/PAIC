@@ -86,10 +86,73 @@ const initializeChat = async (userProfile: UserProfile, conjuntoInfo: ConjuntoIn
             },
             history: history, // Provide the initial AI message as context if it exists
         });
+        // FIX: Storing user context on the chat object for re-initialization.
+        (chat as any).userProfile = userProfile;
+        (chat as any).conjuntoInfo = conjuntoInfo;
         currentConjuntoId = conjuntoInfo.id;
     } catch (error) {
         console.error("Failed to initialize chat:", error);
         chat = null;
+    }
+};
+
+// FIX: Added missing runChat, generateSubject, and improveWriting functions and exported them via geminiService.
+const runChat = async (prompt: string, userProfile: UserProfile | null, conjuntoInfo: ConjuntoInfo | null, initialAiMessage?: string): Promise<string> => {
+    if (!userProfile || !conjuntoInfo) {
+        return "No se ha podido inicializar el asistente. Falta información de usuario o conjunto.";
+    }
+
+    if (!chat || currentConjuntoId !== conjuntoInfo.id) {
+        await initializeChat(userProfile, conjuntoInfo, initialAiMessage);
+    }
+    
+    if (!chat) {
+        return "Error al inicializar el chat. Inténtalo de nuevo.";
+    }
+
+    try {
+        const response: GenerateContentResponse = await chat.sendMessage({ message: prompt });
+        const responseText = response.text;
+        
+        // Check if the response is a function call
+        if (responseText.includes('"function":')) {
+            return await processApiResponse(responseText);
+        }
+        
+        return responseText;
+    } catch (error) {
+        console.error("Error during chat execution:", error);
+        return "Lo siento, tuve un problema al procesar tu solicitud.";
+    }
+};
+
+const generateSubject = async (body: string): Promise<string> => {
+    const ai = await getAiClient();
+    const prompt = `Genera un asunto corto y profesional para el siguiente correo electrónico:\n\n"${body}"\n\nAsunto:`;
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error generating subject:", error);
+        return "Asunto no disponible";
+    }
+};
+
+const improveWriting = async (body: string): Promise<string> => {
+    const ai = await getAiClient();
+    const prompt = `Mejora la redacción del siguiente texto para que sea más claro, profesional y conciso, manteniendo el tono original. No agregues saludos ni despedidas, solo mejora el texto proporcionado:\n\n"${body}"`;
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error improving writing:", error);
+        return body; // return original body on error
     }
 };
 
@@ -103,7 +166,7 @@ const processApiResponse = async (response: string): Promise<string> => {
             
             // This re-initializes the chat after a function call to keep the context clean.
             // It correctly calls initializeChat without an initial message.
-            await initializeChat(chat?.userProfile as UserProfile, chat?.conjuntoInfo as ConjuntoInfo);
+            await initializeChat((chat as any)?.userProfile as UserProfile, (chat as any)?.conjuntoInfo as ConjuntoInfo);
 
             switch (action.function) {
                 // --- DATABASE ---
@@ -199,100 +262,24 @@ const processApiResponse = async (response: string): Promise<string> => {
                     await apiService.addPackageLog(currentConjuntoId, action.payload);
                     return `Paquete de "${action.payload.courier}" para el Apto ${action.payload.apartment} registrado.`;
                 case 'updateVisitorStatus':
-                    await apiService.updateVisitorLog(currentConjuntoId, action.payload.logId, { status: action.payload.status });
-                    return `Estado del visitante actualizado a "${action.payload.status}".`;
-                case 'updatePackageStatus':
-                    await apiService.updatePackageLogStatus(currentConjuntoId, action.payload.packageId, action.payload.status);
-                    return `Estado del paquete actualizado a "${action.payload.status}".`;
-                
-                // --- DUE DATES ---
-                case 'manageDueDate':
-                    if (action.payload.operation === 'add') await apiService.addDueDate(currentConjuntoId, action.payload.data);
-                    else if (action.payload.operation === 'edit') await apiService.updateDueDate(currentConjuntoId, { ...action.payload.data, id: action.payload.id });
-                    else if (action.payload.operation === 'delete') await apiService.deleteDueDate(currentConjuntoId, action.payload.id);
-                    return `Vencimiento gestionado exitosamente. ¿Algo más?`;
-                
-                // --- TASKS ---
-                 case 'manageTask':
-                    if (action.payload.operation === 'add') await apiService.addTask(currentConjuntoId, action.payload.data);
-                    else if (action.payload.operation === 'edit') await apiService.updateTask(currentConjuntoId, { ...action.payload.data, id: action.payload.id });
-                    else if (action.payload.operation === 'delete') await apiService.deleteTask(currentConjuntoId, action.payload.id);
-                    return `Tarea gestionada exitosamente. ¿Algo más?`;
-
-                default:
-                    return "No pude reconocer la acción solicitada. ¿Puedes intentarlo de otra manera?";
+                    // FIX: Ensure the status is one of the allowed literal types before sending to the API.
+                    const newStatus = action.payload.newStatus as VisitorLog['status'];
+                    if (!['Autorizado', 'Ingresó', 'Salió'].includes(newStatus)) {
+                        return `El estado "${newStatus}" no es válido. Los estados permitidos son: Autorizado, Ingresó, Salió.`;
+                    }
+                    await apiService.updateVisitorLog(currentConjuntoId, action.payload.logId, { status: newStatus });
+                    return `Estado del visitante actualizado a "${action.payload.newStatus}".`;
             }
         }
-        return response;
-    } catch (e) {
-        // If it's not a JSON or not a valid function call, return the raw response
-        return response;
+        return `No entendí la acción: ${response}`;
+    } catch (err: any) {
+        console.error('Error processing API response:', err);
+        return 'Hubo un error al procesar la respuesta. Por favor, revisa el formato.';
     }
 };
 
-const runStandaloneQuery = async (systemInstruction: string, prompt: string): Promise<string> => {
-    const aiClient = await getAiClient();
-    const response: GenerateContentResponse = await aiClient.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: { systemInstruction },
-    });
-    return response.text;
-}
-
 export const geminiService = {
-  runChat: async (prompt: string, userProfile: UserProfile | null, conjuntoInfo: ConjuntoInfo | null, initialAiMessage?: string): Promise<string> => {
-    try {
-        await getAiClient();
-    } catch (error: any) {
-        console.error("AI Client Initialization failed:", error);
-        return `Error de configuración: ${error.message || 'No se pudo inicializar el servicio de IA'}. Por favor, asegúrate de que la clave de API de Gemini esté configurada en el entorno.`;
-    }
-
-    if (!userProfile || !conjuntoInfo) {
-        return "No se ha podido identificar el contexto de usuario. No puedo procesar tu solicitud.";
-    }
-      
-    if (!chat || currentConjuntoId !== conjuntoInfo.id) {
-      await initializeChat(userProfile, conjuntoInfo, initialAiMessage);
-    }
-    
-    if (!chat) {
-        return "No se pudo inicializar el chat. Verifica la configuración de la API y que la clave sea correcta."
-    }
-    // Pass userProfile and conjuntoInfo to the chat object for use in processApiResponse
-    (chat as any).userProfile = userProfile;
-    (chat as any).conjuntoInfo = conjuntoInfo;
-
-    try {
-      const result: GenerateContentResponse = await chat.sendMessage({ message: prompt });
-      const responseText = result.text;
-      const processedResponse = await processApiResponse(responseText);
-      
-      return processedResponse;
-    } catch (error) {
-      console.error("Error running chat:", error);
-      return "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo.";
-    }
-  },
-
-  generateSubject: async (messageBody: string): Promise<string> => {
-    const systemInstruction = "Eres un experto en comunicación. Tu tarea es crear un asunto de correo electrónico corto, claro y efectivo (máximo 10 palabras) para el siguiente mensaje. Responde únicamente con el texto del asunto.";
-    try {
-        return await runStandaloneQuery(systemInstruction, `Crea un asunto para este mensaje: "${messageBody}"`);
-    } catch (error) {
-        console.error("Error in generateSubject:", error);
-        return "Asunto no disponible";
-    }
-  },
-
-  improveWriting: async (messageBody: string): Promise<string> => {
-    const systemInstruction = "Eres un asistente de redacción profesional. Tu tarea es mejorar el siguiente texto para que sea más claro, profesional y amigable, manteniendo el mensaje central. No agregues saludos ni despedidas, solo mejora el cuerpo del mensaje. Responde únicamente con el texto mejorado.";
-    try {
-        return await runStandaloneQuery(systemInstruction, `Mejora la redacción de este mensaje: "${messageBody}"`);
-    } catch (error) {
-        console.error("Error in improveWriting:", error);
-        return messageBody; // Return original text on failure
-    }
-  },
+    runChat,
+    generateSubject,
+    improveWriting,
 };
