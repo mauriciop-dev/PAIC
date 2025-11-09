@@ -44,7 +44,29 @@ const App: React.FC = () => {
     setLoginError(null);
   }, []);
 
+  // Effect to catch specific configuration errors from the URL on load
   useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const errorDescription = params.get('error_description');
+
+    if (errorDescription && errorDescription.includes('Database error saving new user')) {
+      setLoginError(
+        "Error de Configuración del Servidor: No se pudo crear el perfil de usuario. Parece ser un problema de sincronización en la base de datos. Por favor, contacta a soporte técnico e informa del error 'Database error saving new user'."
+      );
+      setIsLoadingSession(false);
+      // Clean up the URL to avoid showing the error message forever
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    // Don't run the main session logic if a config error was already found
+    if (loginError) {
+        setIsLoadingSession(false);
+        return;
+    }
+
     setIsLoadingSession(true);
     supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
@@ -92,7 +114,7 @@ const App: React.FC = () => {
     });
     
     return () => subscription.unsubscribe();
-  }, [handleLogout]);
+  }, [handleLogout, loginError]); // Add loginError dependency to prevent this from running if an error is already set
   
   // Effect to handle post-payment redirection
   useEffect(() => {
@@ -199,18 +221,23 @@ const App: React.FC = () => {
   }
   
   if (loginError) {
+      const isConfigError = loginError.includes("Configuración del Servidor");
       return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <div className="text-center p-8 bg-white shadow-lg rounded-lg max-w-md mx-4">
                 <Icon name="alert-triangle" className="w-12 h-12 text-red-500 mx-auto"/>
-                <h2 className="text-xl font-bold text-gray-800 mt-4">Error de Sincronización</h2>
+                <h2 className="text-xl font-bold text-gray-800 mt-4">
+                    {isConfigError ? "Error de Configuración del Servidor" : "Error de Sincronización"}
+                </h2>
                 <p className="text-gray-600 mt-2">{loginError}</p>
                 <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-                    <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                        Refrescar Página
-                    </button>
+                    {!isConfigError && (
+                         <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                            Refrescar Página
+                        </button>
+                    )}
                     <button onClick={handleLogout} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300">
-                        Cerrar Sesión
+                        Ir a Inicio
                     </button>
                 </div>
             </div>
