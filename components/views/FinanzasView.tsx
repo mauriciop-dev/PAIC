@@ -1,40 +1,169 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { UserProfile, Income, Expense, Provider, IncomeCategory, ExpenseCategory } from '../../types';
 import { apiService } from '../../services/apiService';
+import { UserProfile, Income, Expense, IncomeCategory, ExpenseCategory, ChartData, Provider } from '../../types';
 import { Icon } from '../ui/Icon';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 declare var XLSX: any;
 
+// Props interface
 interface FinanzasViewProps {
     userProfile: UserProfile;
 }
 
-type FinanzasTab = 'Resumen' | 'Ingresos' | 'Egresos';
-type ModalState = {
+enum FinanzasTab {
+    Resumen = 'Resumen',
+    Ingresos = 'Ingresos',
+    Gastos = 'Gastos',
+}
+
+// Separate components for Modals to keep code clean
+
+// IncomeModal
+interface IncomeModalProps {
     isOpen: boolean;
-    type: 'income' | 'expense';
-    data: Income | Expense | null;
+    onClose: () => void;
+    onSave: (income: Income) => void;
+    incomeToEdit: Income | null;
+}
+const IncomeModal: React.FC<IncomeModalProps> = ({ isOpen, onClose, onSave, incomeToEdit }) => {
+    const [formData, setFormData] = useState<Omit<Income, 'id'>>({
+        description: '',
+        amount: 0,
+        category: IncomeCategory.CuotaAdmin,
+        date: new Date().toISOString().split('T')[0],
+    });
+
+    useEffect(() => {
+        if (incomeToEdit) {
+            setFormData({
+                description: incomeToEdit.description,
+                amount: incomeToEdit.amount,
+                category: incomeToEdit.category,
+                date: incomeToEdit.date,
+            });
+        } else {
+            setFormData({
+                description: '',
+                amount: 0,
+                category: IncomeCategory.CuotaAdmin,
+                date: new Date().toISOString().split('T')[0],
+            });
+        }
+    }, [incomeToEdit, isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseFloat(value) || 0 : value }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ ...formData, id: incomeToEdit?.id || 0 });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">{incomeToEdit ? 'Editar Ingreso' : 'Agregar Ingreso'}</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border rounded" required />
+                    <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border rounded" required />
+                    <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border rounded bg-white">
+                        {Object.values(IncomeCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2 border rounded" required />
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 };
 
-// This function safely formats a Date object from Excel into 'YYYY-MM-DD' format, avoiding timezone issues.
-const formatDate = (date: Date): string => {
-    if (!(date instanceof Date) || isNaN(date.getTime())) {
-        return ''; // Return empty string for invalid dates
-    }
-    // Use UTC methods to prevent the date from shifting due to local timezone offsets.
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // months are 0-indexed
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+// ExpenseModal
+interface ExpenseModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (expense: Expense) => void;
+    expenseToEdit: Expense | null;
+}
+const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSave, expenseToEdit }) => {
+     const [formData, setFormData] = useState<Omit<Expense, 'id'>>({
+        description: '',
+        amount: 0,
+        category: ExpenseCategory.Servicios,
+        date: new Date().toISOString().split('T')[0],
+    });
+
+    useEffect(() => {
+        if (expenseToEdit) {
+            setFormData({
+                description: expenseToEdit.description,
+                amount: expenseToEdit.amount,
+                category: expenseToEdit.category,
+                date: expenseToEdit.date,
+            });
+        } else {
+            setFormData({
+                description: '',
+                amount: 0,
+                category: ExpenseCategory.Servicios,
+                date: new Date().toISOString().split('T')[0],
+            });
+        }
+    }, [expenseToEdit, isOpen]);
+
+    if (!isOpen) return null;
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseFloat(value) || 0 : value }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ ...formData, id: expenseToEdit?.id || 0 });
+    };
+
+    return (
+       <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">{expenseToEdit ? 'Editar Gasto' : 'Agregar Gasto'}</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border rounded" required />
+                    <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border rounded" required />
+                    <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border rounded bg-white">
+                        {Object.values(ExpenseCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2 border rounded" required />
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 };
+
 
 const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
+    const [activeTab, setActiveTab] = useState<FinanzasTab>(FinanzasTab.Resumen);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<FinanzasTab>('Resumen');
-    const [modal, setModal] = useState<ModalState>({ isOpen: false, type: 'income', data: null });
+    const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [editingIncome, setEditingIncome] = useState<Income | null>(null);
+    const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -44,65 +173,110 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
-            const [incomeData, expenseData] = await Promise.all([
+            const [incomesData, expensesData, providersData] = await Promise.all([
                 apiService.fetchIncomes(userProfile.conjuntoId),
                 apiService.fetchExpenses(userProfile.conjuntoId),
+                apiService.fetchProviders(userProfile.conjuntoId),
             ]);
-            setIncomes(incomeData);
-            setExpenses(expenseData);
+            setIncomes(incomesData);
+            setExpenses(expensesData);
+            setProviders(providersData);
         } catch (error) {
             console.error("Failed to fetch financial data:", error);
         } finally {
             setIsLoading(false);
         }
     };
-
+    
     useEffect(() => {
         fetchData();
     }, [userProfile.conjuntoId]);
-    
-    const handleSave = async (data: Income | Expense) => {
+
+    const handleOpenIncomeModal = (income: Income | null) => { setEditingIncome(income); setIsIncomeModalOpen(true); };
+    const handleOpenExpenseModal = (expense: Expense | null) => { setEditingExpense(expense); setIsExpenseModalOpen(true); };
+    const handleCloseModals = () => { setIsIncomeModalOpen(false); setIsExpenseModalOpen(false); setEditingIncome(null); setEditingExpense(null); };
+
+    const handleSaveIncome = async (income: Income) => {
         if (!userProfile.conjuntoId) return;
-        if (modal.type === 'income') {
-            modal.data?.id
-                ? await apiService.updateIncome(userProfile.conjuntoId, data as Income)
-                : await apiService.addIncome(userProfile.conjuntoId, data as Omit<Income, 'id'>);
+        if (editingIncome) {
+            await apiService.updateIncome(userProfile.conjuntoId, income);
         } else {
-            modal.data?.id
-                ? await apiService.updateExpense(userProfile.conjuntoId, data as Expense)
-                : await apiService.addExpense(userProfile.conjuntoId, data as Omit<Expense, 'id'>);
+            const { id, ...newIncome } = income;
+            await apiService.addIncome(userProfile.conjuntoId, newIncome);
         }
-        setModal({ isOpen: false, type: 'income', data: null });
         fetchData();
+        handleCloseModals();
     };
 
-    const handleDelete = async (id: number, type: 'income' | 'expense') => {
-        if (!userProfile.conjuntoId || !window.confirm('¿Estás seguro de que quieres eliminar este registro?')) return;
-        if (type === 'income') {
-            await apiService.deleteIncome(userProfile.conjuntoId, id);
+    const handleSaveExpense = async (expense: Expense) => {
+        if (!userProfile.conjuntoId) return;
+        if (editingExpense) {
+            await apiService.updateExpense(userProfile.conjuntoId, expense);
         } else {
-            await apiService.deleteExpense(userProfile.conjuntoId, id);
+            const { id, ...newExpense } = expense;
+            await apiService.addExpense(userProfile.conjuntoId, newExpense);
         }
         fetchData();
+        handleCloseModals();
     };
     
+    const handleDeleteIncome = async (id: number) => {
+        if (window.confirm('¿Seguro que quieres eliminar este ingreso?') && userProfile.conjuntoId) {
+            await apiService.deleteIncome(userProfile.conjuntoId, id);
+            fetchData();
+        }
+    };
+    
+    const handleDeleteAllIncomes = async () => {
+        if (window.confirm('¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de ingresos de forma permanente.') && userProfile.conjuntoId) {
+            await apiService.deleteAllIncomes(userProfile.conjuntoId);
+            fetchData();
+        }
+    };
+
+    const handleDeleteExpense = async (id: number) => {
+        if (window.confirm('¿Seguro que quieres eliminar este gasto?') && userProfile.conjuntoId) {
+            await apiService.deleteExpense(userProfile.conjuntoId, id);
+            fetchData();
+        }
+    };
+
+    const handleDeleteAllExpenses = async () => {
+        if (window.confirm('¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de gastos de forma permanente.') && userProfile.conjuntoId) {
+            await apiService.deleteAllExpenses(userProfile.conjuntoId);
+            fetchData();
+        }
+    };
+
+    // --- FILE UPLOAD LOGIC ---
     const handleUploadClick = () => {
         fileInputRef.current?.click();
     };
-
-    const handleDownloadTemplate = () => {
-        const templates = {
-            Ingresos: { headers: ['description', 'category', 'date', 'amount'], filename: 'plantilla_ingresos.xlsx' },
-            Egresos: { headers: ['description', 'category', 'date', 'amount'], filename: 'plantilla_egresos.xlsx' }
-        };
-        const config = templates[activeTab as keyof typeof templates];
-        if (!config) return;
-        const ws = XLSX.utils.aoa_to_sheet([config.headers]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, activeTab);
-        XLSX.writeFile(wb, config.filename);
-    };
     
+    const safeParseDate = (excelDate: any) => {
+        if (excelDate instanceof Date) {
+            // Adjust for timezone offset
+            const tzOffset = excelDate.getTimezoneOffset() * 60000;
+            const adjustedDate = new Date(excelDate.getTime() + tzOffset);
+            return adjustedDate.toISOString().split('T')[0];
+        }
+        if (typeof excelDate === 'number') {
+            // Handle Excel's serial date number format
+            const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+            return date.toISOString().split('T')[0];
+        }
+        if (typeof excelDate === 'string') {
+           // Try to parse common string formats, assuming local time
+            const date = new Date(excelDate);
+            if (!isNaN(date.getTime())) {
+                const tzOffset = date.getTimezoneOffset() * 60000;
+                const adjustedDate = new Date(date.getTime() + tzOffset);
+                return adjustedDate.toISOString().split('T')[0];
+            }
+        }
+        return null; // Return null if parsing fails
+    };
+
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -117,41 +291,69 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
               const workbook = XLSX.read(data, { type: 'array' });
               const sheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[sheetName];
-              const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true, raw: false });
+              // Use raw: true to get the underlying values (numbers for dates)
+              const json = XLSX.utils.sheet_to_json(worksheet, { raw: true, defval: null });
 
               if (json.length === 0) throw new Error("El archivo está vacío o tiene un formato incorrecto.");
               if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
-              
-              const keyMap = {
-                  'descripción': 'description', 'descripcion': 'description',
-                  'categoría': 'category', 'categoria': 'category',
-                  'fecha': 'date',
-                  'monto': 'amount', 'valor': 'amount',
-              };
 
-              const normalizedData = json.map(row => {
+              const keyMaps = {
+                  [FinanzasTab.Ingresos]: { 'descripcion': 'description', 'monto': 'amount', 'categoria': 'category', 'fecha': 'date' },
+                  [FinanzasTab.Gastos]: { 'descripcion': 'description', 'monto': 'amount', 'categoria': 'category', 'fecha': 'date', 'proveedorid': 'providerId' }
+              };
+              
+              const normalizeKeys = (row: any, map: { [key: string]: string }) => {
                   const normalizedRow: { [key: string]: any } = {};
                   for (const key in row) {
-                      const lowerKey = key.toLowerCase().trim();
-                      const mappedKey = keyMap[lowerKey as keyof typeof keyMap] || key;
+                      const lowerKey = key.toLowerCase().replace(/ /g, '').replace(/_/g, '');
+                      const mappedKey = map[lowerKey] || key;
                       normalizedRow[mappedKey] = row[key];
                   }
-                  if (normalizedRow.date && normalizedRow.date instanceof Date) {
-                      normalizedRow.date = formatDate(normalizedRow.date);
-                  }
                   return normalizedRow;
+              };
+              
+              const currentMap = keyMaps[activeTab as keyof typeof keyMaps];
+              if (!currentMap) throw new Error(`La carga masiva para ${activeTab} no está implementada.`);
+              
+              const normalizedData = json.map(row => normalizeKeys(row, currentMap));
+              
+              const finalData = normalizedData.map((row: any) => {
+                  const parsedDate = XLSX.SSF.parse_date_code(row.date);
+                  const date = parsedDate ? `${parsedDate.y}-${String(parsedDate.m).padStart(2, '0')}-${String(parsedDate.d).padStart(2, '0')}` : new Date().toISOString().split('T')[0];
+                  return { ...row, date, amount: Number(row.amount) };
               });
 
-              if (activeTab === 'Ingresos') {
-                  await apiService.bulkInsertIncomes(userProfile.conjuntoId, normalizedData as Omit<Income, 'id'>[]);
-              } else if (activeTab === 'Egresos') {
-                  await apiService.bulkInsertExpenses(userProfile.conjuntoId, normalizedData as Omit<Expense, 'id'>[]);
+              if (activeTab === FinanzasTab.Ingresos) {
+                  await apiService.bulkInsertIncomes(userProfile.conjuntoId, finalData as Omit<Income, 'id'>[]);
+              } else if (activeTab === FinanzasTab.Gastos) {
+                  const providerMap = new Map(providers.map(p => [p.company.toLowerCase(), p.id]));
+                  const invalidProviderNames = new Set<string>();
+
+                  const expensesToInsert = finalData.map((row: any) => {
+                      if (row.providerId && typeof row.providerId === 'string') {
+                          const providerIdNum = providerMap.get(row.providerId.toLowerCase());
+                          if (providerIdNum) {
+                              return { ...row, providerId: providerIdNum };
+                          } else {
+                              invalidProviderNames.add(row.providerId);
+                              return { ...row, providerId: null };
+                          }
+                      }
+                      return row;
+                  });
+
+                  if (invalidProviderNames.size > 0) {
+                      throw new Error(`Los siguientes proveedores no existen en la base de datos: ${[...invalidProviderNames].join(', ')}. Por favor, agrégalos primero.`);
+                  }
+                  
+                  await apiService.bulkInsertExpenses(userProfile.conjuntoId, expensesToInsert as Omit<Expense, 'id'>[]);
               }
-              
+
               await fetchData();
               setFeedbackMessage({type: 'success', text: `¡${json.length} registros cargados exitosamente!`});
 
           } catch (error: any) {
+              console.error("Error processing file:", error);
               setFeedbackMessage({type: 'error', text: `Error al cargar: ${error.message}`});
           } finally {
               setIsUploading(false);
@@ -162,109 +364,72 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
       reader.readAsArrayBuffer(file);
     };
 
-    const handleDeleteAll = async (type: 'income' | 'expense') => {
-        if (!userProfile.conjuntoId) return;
-        const typeSpanish = type === 'income' ? 'ingresos' : 'egresos';
-        if (window.confirm(`¿Estás SEGURO de que quieres eliminar TODOS los ${typeSpanish}? Esta acción es irreversible.`)) {
-            if (type === 'income') {
-                await apiService.deleteAllIncomes(userProfile.conjuntoId);
-            } else {
-                await apiService.deleteAllExpenses(userProfile.conjuntoId);
-            }
-            fetchData();
-        }
+    const handleDownloadTemplate = () => {
+        const templates = {
+            [FinanzasTab.Ingresos]: { headers: ['description', 'amount', 'category', 'date'], filename: 'plantilla_ingresos.xlsx' },
+            [FinanzasTab.Gastos]: { headers: ['description', 'amount', 'category', 'date', 'providerId'], filename: 'plantilla_gastos.xlsx' },
+            [FinanzasTab.Resumen]: null,
+        };
+        const templateConfig = templates[activeTab];
+        if (!templateConfig) return;
+        
+        const ws = XLSX.utils.aoa_to_sheet([templateConfig.headers]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, activeTab);
+        XLSX.writeFile(wb, templateConfig.filename);
     };
 
-
-    const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`;
-
-    const financialSummary = useMemo(() => {
-        const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0);
-        const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-        const balance = totalIncome - totalExpense;
-        return { totalIncome, totalExpense, balance };
+    const { totalIncomes, totalExpenses, balance } = useMemo(() => {
+        const totalIncomes = incomes.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const balance = totalIncomes - totalExpenses;
+        return { totalIncomes, totalExpenses, balance };
     }, [incomes, expenses]);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+    };
     
     const chartData = useMemo(() => {
-        if (isLoading) return null;
-        const monthlyData: { [key: string]: { name: string, ingresos: number, egresos: number } } = {};
-        const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        const expenseByCategory: ChartData[] = Object.values(ExpenseCategory).map((cat, index) => {
+            const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+            return {
+                name: cat,
+                value: expenses.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0),
+                fill: PIE_COLORS[index % PIE_COLORS.length]
+            }
+        }).filter(item => item.value > 0);
         
-        [...incomes, ...expenses].forEach(item => {
-            const date = new Date(item.date);
-            const monthName = months[date.getUTCMonth()]; // Use UTC month to match formatDate
-            const year = date.getUTCFullYear();
-            const key = `${year}-${date.getUTCMonth()}`;
-            if (!monthlyData[key]) {
-                monthlyData[key] = { name: `${monthName} ${String(year).slice(-2)}`, ingresos: 0, egresos: 0 };
-            }
-            if ('category' in item && Object.values(IncomeCategory).includes(item.category as any)) {
-                 monthlyData[key].ingresos += item.amount;
-            } else {
-                 monthlyData[key].egresos += item.amount;
-            }
-        });
-
-        const monthlyIncomeVsExpense = Object.values(monthlyData).sort((a, b) => a.name.localeCompare(b.name));
-
-        const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
-        const groupByCategory = (items: (Income | Expense)[]) => Object.entries(items.reduce((acc, item) => {
-                acc[item.category] = (acc[item.category] || 0) + item.amount;
-                return acc;
-            }, {} as Record<string, number>))
-            .map(([name, value], index) => ({ name, value, fill: PIE_COLORS[index % PIE_COLORS.length] }));
-
-        return {
-            monthlyIncomeVsExpense,
-            expensesByCategory: groupByCategory(expenses),
-            incomesByCategory: groupByCategory(incomes),
-        };
-    }, [incomes, expenses, isLoading]);
-
-
-    const renderSummary = () => (
+        return { expenseByCategory };
+    }, [expenses]);
+    
+    const renderResumen = () => (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-                    <p className="text-sm font-semibold text-green-700">Ingresos Totales</p>
-                    <p className="text-3xl font-bold text-green-800">{formatCurrency(financialSummary.totalIncome)}</p>
+                <div className="bg-white p-5 rounded-lg shadow-md text-center border border-green-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Ingresos Totales</h3>
+                    <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncomes)}</p>
                 </div>
-                 <div className="bg-red-50 p-6 rounded-lg border border-red-200">
-                    <p className="text-sm font-semibold text-red-700">Egresos Totales</p>
-                    <p className="text-3xl font-bold text-red-800">{formatCurrency(financialSummary.totalExpense)}</p>
+                <div className="bg-white p-5 rounded-lg shadow-md text-center border border-red-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Egresos Totales</h3>
+                    <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
                 </div>
-                 <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                    <p className="text-sm font-semibold text-blue-700">Saldo Actual</p>
-                    <p className="text-3xl font-bold text-blue-800">{formatCurrency(financialSummary.balance)}</p>
+                 <div className="bg-white p-5 rounded-lg shadow-md text-center border border-blue-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Saldo Actual</h3>
+                    <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(balance)}</p>
                 </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos vs Egresos (Últimos 12 meses)</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={chartData?.monthlyIncomeVsExpense.slice(-12)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                            <XAxis dataKey="name" fontSize={12} />
-                            <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('es-CO', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
-                            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                            <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
-                            <Bar dataKey="egresos" name="Egresos" fill="#ef4444" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Distribución de Egresos</h3>
-                     <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={chartData?.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                {chartData?.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                            </Pie>
-                            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                            <Legend wrapperStyle={{fontSize: "12px"}}/>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
+            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">Distribución de Egresos por Categoría</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie data={chartData.expenseByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                             {chartData.expenseByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Legend wrapperStyle={{fontSize: "12px"}}/>
+                    </PieChart>
+                </ResponsiveContainer>
             </div>
         </div>
     );
@@ -272,45 +437,43 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const renderTable = (type: 'income' | 'expense') => {
         const data = type === 'income' ? incomes : expenses;
         const columns = ['Descripción', 'Categoría', 'Fecha', 'Monto'];
-
+        
         return (
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b">
-                     <div className="flex items-center gap-2 flex-wrap">
-                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                     <div className="flex items-center gap-4">
+                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls" />
                         <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
                         <button onClick={handleUploadClick} disabled={isUploading} className="text-sm font-medium text-blue-600 hover:underline disabled:text-gray-400">
                             {isUploading ? 'Cargando...' : 'Cargar Archivo'}
                         </button>
-                        <button onClick={() => handleDeleteAll(type)} className="text-sm font-medium text-red-600 hover:underline">
-                            Eliminar Todos
-                        </button>
-                     </div>
-                     <button onClick={() => setModal({ isOpen: true, type, data: null})} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 text-xs flex items-center gap-1">
-                        <Icon name="user-plus" className="w-4 h-4" />
-                        Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
-                    </button>
-                </div>
-                 {feedbackMessage && (
-                    <div className={`p-3 text-sm text-center ${feedbackMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        {feedbackMessage.text}
+                        {feedbackMessage && <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{feedbackMessage.text}</p>}
                     </div>
-                )}
-                <div className="overflow-x-auto">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => type === 'income' ? handleDeleteAllIncomes() : handleDeleteAllExpenses()} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md font-semibold text-xs hover:bg-red-200">Eliminar Todos</button>
+                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(null) : handleOpenExpenseModal(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1">
+                            Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
+                        </button>
+                    </div>
+                </div>
+                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>{columns.map(col => <th key={col} scope="col" className="px-6 py-3">{col}</th>)}<th scope="col" className="px-6 py-3 text-right">Acciones</th></tr>
+                            <tr>
+                                {columns.map(col => <th key={col} scope="col" className="px-6 py-3">{col}</th>)}
+                                <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            {data.map(item => (
+                            {data.map((item: any) => (
                                 <tr key={item.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{item.description}</td>
                                     <td className="px-6 py-4">{item.category}</td>
                                     <td className="px-6 py-4">{item.date}</td>
                                     <td className="px-6 py-4 font-semibold">{formatCurrency(item.amount)}</td>
                                     <td className="px-6 py-4 text-right space-x-2">
-                                        <button onClick={() => setModal({ isOpen: true, type, data: item })} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                        <button onClick={() => handleDelete(item.id, type)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                        <button onClick={() => type === 'income' ? handleDeleteIncome(item.id) : handleDeleteExpense(item.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
                             ))}
@@ -318,85 +481,37 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </table>
                 </div>
             </div>
-        )
-    };
+        );
+    }
     
     return (
         <div className="space-y-6">
             <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    {(['Resumen', 'Ingresos', 'Egresos'] as FinanzasTab[]).map(tab => (
-                        <button key={tab} onClick={() => setActiveTab(tab)}
-                            className={`${activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}>
-                            {tab}
-                        </button>
-                    ))}
+                  {Object.values(FinanzasTab).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`${ activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
                 </nav>
             </div>
-
-            {isLoading ? <div className="text-center p-10 text-gray-500">Cargando datos financieros...</div> : (
+            
+            {isLoading ? (
+                <div className="text-center p-10 text-gray-500">Cargando datos...</div>
+            ) : (
                 <>
-                    {activeTab === 'Resumen' && renderSummary()}
-                    {activeTab === 'Ingresos' && renderTable('income')}
-                    {activeTab === 'Egresos' && renderTable('expense')}
+                    {activeTab === FinanzasTab.Resumen && renderResumen()}
+                    {activeTab === FinanzasTab.Ingresos && renderTable('income')}
+                    {activeTab === FinanzasTab.Gastos && renderTable('expense')}
                 </>
             )}
 
-            {modal.isOpen && <FinancialModal modalState={modal} onClose={() => setModal({isOpen: false, type: 'income', data: null})} onSave={handleSave} />}
-        </div>
-    );
-};
-
-const FinancialModal: React.FC<{modalState: ModalState, onClose: () => void, onSave: (data: any) => void}> = ({ modalState, onClose, onSave }) => {
-    const { type, data } = modalState;
-    const [formData, setFormData] = useState<any>(data || { description: '', amount: 0, category: '', date: new Date().toISOString().split('T')[0] });
-    
-    const isNew = !data?.id;
-    const title = `${isNew ? 'Agregar' : 'Editar'} ${type === 'income' ? 'Ingreso' : 'Egreso'}`;
-    const categories = type === 'income' ? Object.values(IncomeCategory) : Object.values(ExpenseCategory);
-
-    useEffect(() => {
-        if (data) {
-            setFormData(data);
-        } else {
-            setFormData({
-                description: '',
-                amount: 0,
-                category: categories[0],
-                date: new Date().toISOString().split('T')[0]
-            });
-        }
-    }, [data, type]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type: inputType } = e.target;
-        setFormData((prev: any) => ({ ...prev, [name]: inputType === 'number' ? parseFloat(value) : value }));
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave(formData);
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                     <input name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border border-gray-300 rounded-md" required />
-                     <input name="amount" type="number" step="0.01" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border border-gray-300 rounded-md" required />
-                     <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md bg-white" required>
-                        <option value="">Selecciona una categoría</option>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                     <input name="date" type="date" value={formData.date} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <div className="mt-8 flex justify-end gap-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar</button>
-                    </div>
-                </form>
-            </div>
+            <IncomeModal isOpen={isIncomeModalOpen} onClose={handleCloseModals} onSave={handleSaveIncome} incomeToEdit={editingIncome} />
+            <ExpenseModal isOpen={isExpenseModalOpen} onClose={handleCloseModals} onSave={handleSaveExpense} expenseToEdit={editingExpense} />
         </div>
     );
 };
