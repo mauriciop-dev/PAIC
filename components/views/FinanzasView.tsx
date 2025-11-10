@@ -1,77 +1,39 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
+import { UserProfile, Income, Expense, Provider, IncomeCategory, ExpenseCategory } from '../../types';
 import { apiService } from '../../services/apiService';
-import { Expense, Provider, ExpenseCategory, Income, IncomeCategory, ChartData, UserProfile } from '../../types';
-
-type FinanzasTab = 'Resumen' | 'Gastos' | 'Ingresos';
-declare var XLSX: any;
-
-
-const StatCard: React.FC<{ title: string; value: string; description: string; }> = ({ title, value, description }) => (
-    <div className="bg-white p-4 rounded-lg shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-500">{title}</h3>
-        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
-        <p className="text-xs text-gray-400 mt-1">{description}</p>
-    </div>
-);
+import { Icon } from '../ui/Icon';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 interface FinanzasViewProps {
     userProfile: UserProfile;
 }
 
-const expenseCategories: ExpenseCategory[] = ['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'];
-const incomeCategories: IncomeCategory[] = ['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'];
-
+type FinanzasTab = 'Resumen' | 'Ingresos' | 'Egresos';
+type ModalState = {
+    isOpen: boolean;
+    type: 'income' | 'expense';
+    data: Income | Expense | null;
+};
 
 const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
-    const [activeTab, setActiveTab] = useState<FinanzasTab>('Gastos');
-    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
-    const [providers, setProviders] = useState<Provider[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [chartData, setChartData] = useState<{ 
-        monthlyIncomeVsExpense: ChartData[],
-        expensesByCategory: ChartData[],
-        packageVolume: ChartData[],
-        visitorTraffic: ChartData[]
-    } | null>(null);
-    const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
-
-
-    // Form states
-    const [expenseDescription, setExpenseDescription] = useState('');
-    const [expenseAmount, setExpenseAmount] = useState('');
-    const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('Otros');
-    const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-    const [expenseProviderId, setExpenseProviderId] = useState<string>('');
-    
-    const [incomeDescription, setIncomeDescription] = useState('');
-    const [incomeAmount, setIncomeAmount] = useState('');
-    const [incomeCategory, setIncomeCategory] = useState<IncomeCategory>('Cuota de Administración');
-    const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0]);
-    
-    const [feedback, setFeedback] = useState<string | null>(null);
-    const [uploadFeedback, setUploadFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
+    const [activeTab, setActiveTab] = useState<FinanzasTab>('Resumen');
+    const [modal, setModal] = useState<ModalState>({ isOpen: false, type: 'income', data: null });
 
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
         setIsLoading(true);
         try {
-            const [fetchedExpenses, fetchedIncomes, fetchedProviders, fetchedChartData] = await Promise.all([
-                apiService.fetchExpenses(userProfile.conjuntoId),
+            const [incomeData, expenseData] = await Promise.all([
                 apiService.fetchIncomes(userProfile.conjuntoId),
-                apiService.fetchProviders(userProfile.conjuntoId),
-                apiService.fetchFinancialChartData(userProfile.conjuntoId),
+                apiService.fetchExpenses(userProfile.conjuntoId),
             ]);
-            setExpenses(fetchedExpenses);
-            setIncomes(fetchedIncomes);
-            setProviders(fetchedProviders);
-            setChartData(fetchedChartData);
+            setIncomes(incomeData);
+            setExpenses(expenseData);
         } catch (error) {
-            console.error("Failed to fetch finance data:", error);
+            console.error("Failed to fetch financial data:", error);
         } finally {
             setIsLoading(false);
         }
@@ -80,442 +42,90 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     useEffect(() => {
         fetchData();
     }, [userProfile.conjuntoId]);
-
-    const handleAddExpense = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!expenseDescription || !expenseAmount || !userProfile.conjuntoId) {
-            setFeedback("Por favor completa la descripción y el monto.");
-            return;
+    
+    const handleSave = async (data: Income | Expense) => {
+        if (!userProfile.conjuntoId) return;
+        if (modal.type === 'income') {
+            modal.data?.id
+                ? await apiService.updateIncome(userProfile.conjuntoId, data as Income)
+                : await apiService.addIncome(userProfile.conjuntoId, data as Omit<Income, 'id'>);
+        } else {
+            modal.data?.id
+                ? await apiService.updateExpense(userProfile.conjuntoId, data as Expense)
+                : await apiService.addExpense(userProfile.conjuntoId, data as Omit<Expense, 'id'>);
         }
-
-        const amountCleaned = expenseAmount.replace(/\./g, '');
-        const newExpense: Omit<Expense, 'id'> = {
-            description: expenseDescription,
-            amount: parseFloat(amountCleaned),
-            category: expenseCategory,
-            date: expenseDate,
-            providerId: expenseProviderId ? parseInt(expenseProviderId, 10) : null,
-        };
-
-        await apiService.addExpense(userProfile.conjuntoId, newExpense);
-        
-        setExpenseDescription('');
-        setExpenseAmount('');
-        setExpenseCategory('Otros');
-        setExpenseDate(new Date().toISOString().split('T')[0]);
-        setExpenseProviderId('');
-        
-        setFeedback("¡Gasto agregado exitosamente!");
-        setTimeout(() => setFeedback(null), 3000);
+        setModal({ isOpen: false, type: 'income', data: null });
         fetchData();
     };
 
-    const handleAddIncome = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!incomeDescription || !incomeAmount || !userProfile.conjuntoId) {
-            setFeedback("Por favor completa la descripción y el monto.");
-            return;
-        }
-
-        const amountCleaned = incomeAmount.replace(/\./g, '');
-        const newIncome: Omit<Income, 'id'> = {
-            description: incomeDescription,
-            amount: parseFloat(amountCleaned),
-            category: incomeCategory,
-            date: incomeDate,
-        };
-
-        await apiService.addIncome(userProfile.conjuntoId, newIncome);
-
-        setIncomeDescription('');
-        setIncomeAmount('');
-        setIncomeCategory('Cuota de Administración');
-        setIncomeDate(new Date().toISOString().split('T')[0]);
-
-        setFeedback("¡Ingreso agregado exitosamente!");
-        setTimeout(() => setFeedback(null), 3000);
-        fetchData();
-    };
-    
-    const handleDeleteExpense = async (id: number) => {
-        if(window.confirm('¿Estás seguro de que quieres eliminar este gasto?') && userProfile.conjuntoId) {
-            await apiService.deleteExpense(userProfile.conjuntoId, id);
-            fetchData();
-        }
-    }
-    
-    const handleDeleteIncome = async (id: number) => {
-        if(window.confirm('¿Estás seguro de que quieres eliminar este ingreso?') && userProfile.conjuntoId) {
+    const handleDelete = async (id: number, type: 'income' | 'expense') => {
+        if (!userProfile.conjuntoId || !window.confirm('¿Estás seguro de que quieres eliminar este registro?')) return;
+        if (type === 'income') {
             await apiService.deleteIncome(userProfile.conjuntoId, id);
-            fetchData();
+        } else {
+            await apiService.deleteExpense(userProfile.conjuntoId, id);
         }
-    }
-
-     const handleUploadClick = () => {
-        fileInputRef.current?.click();
+        fetchData();
     };
 
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file || !userProfile.conjuntoId) return;
+    const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`;
 
-        setIsUploading(true);
-        setUploadFeedback(null);
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
-
-                if (json.length === 0) {
-                    throw new Error("El archivo está vacío o tiene un formato incorrecto.");
-                }
-
-                const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
-                    return data.map((row: any) =>
-                        Object.keys(row).reduce((acc: any, key: string) => {
-                            const lowerKey = key.toLowerCase();
-                            if (allowedKeys.has(lowerKey)) {
-                                acc[lowerKey] = row[key];
-                            }
-                            return acc;
-                        }, {})
-                    );
-                };
-
-                const formatDate = (dateValue: any): string | null => {
-                    // This function correctly handles dates parsed by the xlsx library,
-                    // which are often created as UTC midnight, causing them to be off by one day in some timezones.
-                    if (!dateValue) return null;
-                    let dateObj: Date;
-                
-                    if (dateValue instanceof Date) {
-                        dateObj = dateValue;
-                    } else {
-                        // Fallback for strings which might be in various formats.
-                        dateObj = new Date(dateValue);
-                    }
-                    
-                    if (isNaN(dateObj.getTime())) {
-                         // Attempt to parse tricky DD/MM/YYYY format if it's a string and previous attempt failed
-                        if (typeof dateValue === 'string') {
-                            const parts = dateValue.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
-                            if (parts) {
-                                // Assuming DD/MM/YYYY
-                                const year = parseInt(parts[3], 10);
-                                const fullYear = year < 100 ? 2000 + year : year;
-                                // Use Date.UTC to avoid local timezone interpretation during creation
-                                dateObj = new Date(Date.UTC(fullYear, parseInt(parts[2], 10) - 1, parseInt(parts[1], 10)));
-                            }
-                        }
-                    }
-                    
-                    if (isNaN(dateObj.getTime())) return null;
-                
-                    // Extract date parts from UTC to prevent timezone shifts and build a clean YYYY-MM-DD string.
-                    const year = dateObj.getUTCFullYear();
-                    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-                    const day = String(dateObj.getUTCDate()).padStart(2, '0');
-                    
-                    return `${year}-${month}-${day}`;
-                };
-
-                if (activeTab === 'Gastos') {
-                    const expenseKeys = new Set(['description', 'amount', 'category', 'date', 'providerid']);
-                    const sanitizedExpenses = sanitizeData(json, expenseKeys);
-
-                    const providerNameToIdMap = new Map(providers.map(p => [p.company.toLowerCase(), p.id]));
-                    const validExpenseCategories = new Set(expenseCategories);
-
-                    const formattedExpenses = sanitizedExpenses.map((exp: any) => {
-                        const mappedCategory = validExpenseCategories.has(exp.category) ? exp.category : 'Otros';
-                        
-                        const providerName = exp.providerid ? String(exp.providerid).toLowerCase() : null;
-                        const mappedProviderId = providerName ? (providerNameToIdMap.get(providerName) || null) : null;
-
-                        return {
-                            description: exp.description || 'Sin descripción',
-                            amount: parseFloat(exp.amount) || 0,
-                            category: mappedCategory,
-                            date: formatDate(exp.date) || new Date().toISOString().split('T')[0],
-                            providerId: mappedProviderId,
-                        }
-                    });
-                    await apiService.bulkInsertExpenses(userProfile.conjuntoId!, formattedExpenses);
-                } else if (activeTab === 'Ingresos') {
-                    const incomeKeys = new Set(['description', 'amount', 'category', 'date']);
-                    const sanitizedIncomes = sanitizeData(json, incomeKeys);
-
-                    const validIncomeCategories = new Set(incomeCategories);
-
-                    const formattedIncomes = sanitizedIncomes.map((inc: any) => ({
-                        description: inc.description || 'Sin descripción',
-                        amount: parseFloat(inc.amount) || 0,
-                        category: validIncomeCategories.has(inc.category) ? inc.category : 'Otros',
-                        date: formatDate(inc.date) || new Date().toISOString().split('T')[0],
-                    }));
-                    await apiService.bulkInsertIncomes(userProfile.conjuntoId!, formattedIncomes);
-                }
-
-                setUploadFeedback({ type: 'success', text: `¡${json.length} registros cargados exitosamente!` });
-                await fetchData();
-            } catch (error: any) {
-                setUploadFeedback({ type: 'error', text: `Error al cargar: ${error.message}` });
-            } finally {
-                setIsUploading(false);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                }
-                setTimeout(() => setUploadFeedback(null), 7000);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    };
-
-    const handleDownloadTemplate = () => {
-        const headers = activeTab === 'Gastos' 
-            ? ['description', 'amount', 'category', 'date', 'providerId']
-            : ['description', 'amount', 'category', 'date'];
-        const filename = activeTab === 'Gastos' ? 'plantilla_gastos.xlsx' : 'plantilla_ingresos.xlsx';
-        
-        const ws = XLSX.utils.aoa_to_sheet([headers]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, activeTab);
-        XLSX.writeFile(wb, filename);
-    };
-
-    const monthOptions = useMemo(() => {
-        const options: { value: string; label: string }[] = [];
-        const today = new Date();
-        for (let i = 0; i < 6; i++) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const value = d.toISOString().slice(0, 7); // "YYYY-MM" format
-            const label = d.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-            options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
-        }
-        return options;
-    }, []);
-
-    const { summary, charts } = useMemo(() => {
-        if (!chartData || !expenses || !incomes) {
-            return { summary: { thisMonthIncome: 0, thisMonthExpenses: 0, currentBalance: 0, budgetExecution: 0 }, charts: { expenseChartData: [], incomeVsExpenseData: [] } };
-        }
-    
-        const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
-        const currentMonth = selectedMonthNum - 1; // JS months are 0-indexed
-        const currentYear = selectedYear;
-    
-        const thisMonthFilter = (item: { date: string }) => {
-            if (!item.date) return false;
-            const itemDate = new Date(item.date + 'T00:00:00Z');
-            return itemDate.getUTCMonth() === currentMonth && itemDate.getUTCFullYear() === currentYear;
-        };
-    
-        const thisMonthExpensesAmount = expenses.filter(thisMonthFilter).reduce((sum, e) => sum + e.amount, 0);
-        const thisMonthIncomesAmount = incomes.filter(thisMonthFilter).reduce((sum, i) => sum + i.amount, 0);
-    
-        const budgetExecution = thisMonthIncomesAmount > 0 ? (thisMonthExpensesAmount / thisMonthIncomesAmount) * 100 : 0;
-    
-        const currentMonthExpensesForPie = expenses.filter(thisMonthFilter);
-        const expensesByCategoryForPie: ChartData[] = currentMonthExpensesForPie.reduce((acc, expense) => {
-            let category = acc.find(c => c.name === expense.category);
-            if (!category) {
-                category = { name: expense.category, value: 0, fill: '' };
-                acc.push(category);
-            }
-            category.value += expense.amount;
-            return acc;
-        }, [] as ChartData[]).map((cat, i) => {
-            const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
-            cat.fill = colors[i % colors.length];
-            return cat;
-        });
-    
-        return {
-            summary: {
-                thisMonthIncome: thisMonthIncomesAmount,
-                thisMonthExpenses: thisMonthExpensesAmount,
-                currentBalance: thisMonthIncomesAmount - thisMonthExpensesAmount,
-                budgetExecution: Math.min(100, budgetExecution),
-            },
-            charts: {
-                expenseChartData: expensesByCategoryForPie,
-                incomeVsExpenseData: chartData.monthlyIncomeVsExpense,
-            }
-        };
-    }, [expenses, incomes, chartData, selectedMonth]);
+    const financialSummary = useMemo(() => {
+        const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0);
+        const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+        const balance = totalIncome - totalExpense;
+        return { totalIncome, totalExpense, balance };
+    }, [incomes, expenses]);
 
     const renderSummary = () => (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Ingresos del Mes (Registrados)" value={`$${summary.thisMonthIncome.toLocaleString()}`} description="Suma de todos los ingresos guardados" />
-                <StatCard title="Gastos del Mes" value={`$${summary.thisMonthExpenses.toLocaleString()}`} description="Pagos y compras registradas" />
-                <StatCard title="Balance del Mes" value={`$${summary.currentBalance.toLocaleString()}`} description="Ingresos (registrados) vs. Gastos" />
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 className="text-sm font-semibold text-gray-500">Ejecución Presupuestaria</h3>
-                    <p className="text-2xl font-bold text-gray-800 mt-1">{summary.budgetExecution.toFixed(1)}%</p>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${summary.budgetExecution}%` }}></div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">Porcentaje de los ingresos gastados</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                    <p className="text-sm font-semibold text-green-700">Ingresos Totales</p>
+                    <p className="text-3xl font-bold text-green-800">{formatCurrency(financialSummary.totalIncome)}</p>
                 </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Desglose de Gastos del Mes</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={charts.expenseChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                            {charts.expenseChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                        </Pie>
-                        <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                        <Legend wrapperStyle={{fontSize: "12px"}}/>
-                      </PieChart>
-                    </ResponsiveContainer>
+                 <div className="bg-red-50 p-6 rounded-lg border border-red-200">
+                    <p className="text-sm font-semibold text-red-700">Egresos Totales</p>
+                    <p className="text-3xl font-bold text-red-800">{formatCurrency(financialSummary.totalExpense)}</p>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-md h-80 flex flex-col">
-                    <h3 className="text-md font-semibold text-gray-700 mb-4">Ingresos (Registrados) vs. Gastos (Últimos 6 meses)</h3>
-                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={charts.incomeVsExpenseData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                            <XAxis dataKey="name" fontSize={12} />
-                            <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
-                            <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                            <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            <Line type="monotone" dataKey="ingresos" name="Ingresos (Registrados)" stroke="#2563eb" strokeWidth={2} />
-                            <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderExpenses = () => (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Gasto</h3>
-                <form onSubmit={handleAddExpense} className="space-y-4">
-                    <input type="text" placeholder="Descripción" value={expenseDescription} onChange={e => setExpenseDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <input type="text" inputMode="numeric" pattern="[0-9.]*" placeholder="Monto Ej: 150.000" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value as ExpenseCategory)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-                        {expenseCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                    <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <select value={expenseProviderId} onChange={e => setExpenseProviderId(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-                        <option value="">Proveedor (Opcional)</option>
-                        {providers.map(p => <option key={p.id} value={p.id}>{p.company}</option>)}
-                    </select>
-                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Agregar Gasto</button>
-                    {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
-                </form>
-            </div>
-            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-700">Últimos Gastos Registrados</h3>
-                    <div className="flex items-center gap-4">
-                        <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
-                        <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
-                            {isUploading ? 'Cargando...' : 'Cargar Información'}
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
-                    </div>
-                </div>
-                {uploadFeedback && (
-                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                        {uploadFeedback.text}
-                    </p>
-                )}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-4 py-3">Fecha</th>
-                                <th scope="col" className="px-4 py-3">Descripción</th>
-                                <th scope="col" className="px-4 py-3">Categoría</th>
-                                <th scope="col" className="px-4 py-3">Proveedor</th>
-                                <th scope="col" className="px-4 py-3 text-right">Monto</th>
-                                <th scope="col" className="px-4 py-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {expenses.map(exp => {
-                                const providerName = providers.find(p => p.id === exp.providerId)?.company || 'N/A';
-                                return (
-                                <tr key={exp.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-4 py-3">{exp.date}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{exp.description}</td>
-                                    <td className="px-4 py-3">{exp.category}</td>
-                                    <td className="px-4 py-3">{providerName}</td>
-                                    <td className="px-4 py-3 text-right">${exp.amount.toLocaleString()}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <button onClick={() => handleDeleteExpense(exp.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
-                                    </td>
-                                </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                 <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                    <p className="text-sm font-semibold text-blue-700">Saldo Actual</p>
+                    <p className="text-3xl font-bold text-blue-800">{formatCurrency(financialSummary.balance)}</p>
                 </div>
             </div>
         </div>
     );
     
-    const renderIncomes = () => (
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Ingreso</h3>
-                <form onSubmit={handleAddIncome} className="space-y-4">
-                    <input type="text" placeholder="Descripción" value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <input type="text" inputMode="numeric" pattern="[0-9.]*" placeholder="Monto Ej: 250.000" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <select value={incomeCategory} onChange={e => setIncomeCategory(e.target.value as IncomeCategory)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-                        {incomeCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                    <input type="date" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" required />
-                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Agregar Ingreso</button>
-                    {feedback && <p className="text-sm text-green-600 text-center">{feedback}</p>}
-                </form>
-            </div>
-            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-700">Últimos Ingresos Registrados</h3>
-                  <div className="flex items-center gap-4">
-                    <button onClick={handleDownloadTemplate} className="text-xs font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
-                    <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-medium text-blue-600 hover:underline disabled:text-gray-400">
-                        {isUploading ? 'Cargando...' : 'Cargar Información'}
+    const renderTable = (type: 'income' | 'expense') => {
+        const data = type === 'income' ? incomes : expenses;
+        const columns = type === 'income' 
+            ? ['Descripción', 'Categoría', 'Fecha', 'Monto']
+            : ['Descripción', 'Categoría', 'Fecha', 'Monto'];
+
+        return (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-4 flex justify-between items-center border-b">
+                     <h3 className="text-lg font-semibold text-gray-700">{type === 'income' ? 'Registro de Ingresos' : 'Registro de Egresos'}</h3>
+                     <button onClick={() => setModal({ isOpen: true, type, data: null})} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 text-xs flex items-center gap-1">
+                        <Icon name="user-plus" className="w-4 h-4" />
+                        Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
                     </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
-                  </div>
                 </div>
-                 {uploadFeedback && (
-                    <p className={`text-sm mb-4 ${uploadFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                        {uploadFeedback.text}
-                    </p>
-                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-4 py-3">Fecha</th>
-                                <th scope="col" className="px-4 py-3">Descripción</th>
-                                <th scope="col" className="px-4 py-3">Categoría</th>
-                                <th scope="col" className="px-4 py-3 text-right">Monto</th>
-                                <th scope="col" className="px-4 py-3 text-right">Acciones</th>
-                            </tr>
+                            <tr>{columns.map(col => <th key={col} scope="col" className="px-6 py-3">{col}</th>)}<th scope="col" className="px-6 py-3 text-right">Acciones</th></tr>
                         </thead>
                         <tbody>
-                            {incomes.map(inc => (
-                                <tr key={inc.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-4 py-3">{inc.date}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{inc.description}</td>
-                                    <td className="px-4 py-3">{inc.category}</td>
-                                    <td className="px-4 py-3 text-right">${inc.amount.toLocaleString()}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <button onClick={() => handleDeleteIncome(inc.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                            {data.map(item => (
+                                <tr key={item.id} className="bg-white border-b hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-medium text-gray-900">{item.description}</td>
+                                    <td className="px-6 py-4">{item.category}</td>
+                                    <td className="px-6 py-4">{item.date}</td>
+                                    <td className="px-6 py-4 font-semibold">{formatCurrency(item.amount)}</td>
+                                    <td className="px-6 py-4 text-right space-x-2">
+                                        <button onClick={() => setModal({ isOpen: true, type, data: item })} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                        <button onClick={() => handleDelete(item.id, type)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
                             ))}
@@ -523,54 +133,73 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     </table>
                 </div>
             </div>
-        </div>
-    );
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'Resumen': return renderSummary();
-            case 'Gastos': return renderExpenses();
-            case 'Ingresos': return renderIncomes();
-            default: return null;
-        }
+        )
     };
-
+    
     return (
         <div className="space-y-6">
-             <div className="mb-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-y-2">
+            <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    {(['Resumen', 'Gastos', 'Ingresos'] as FinanzasTab[]).map(tab => (
-                        <button
-                          key={tab}
-                          onClick={() => setActiveTab(tab)}
-                          className={`${
-                            activeTab === tab
-                              ? 'border-blue-500 text-blue-600'
-                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                          } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
-                        >
-                          {tab}
+                    {(['Resumen', 'Ingresos', 'Egresos'] as FinanzasTab[]).map(tab => (
+                        <button key={tab} onClick={() => setActiveTab(tab)}
+                            className={`${activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}>
+                            {tab}
                         </button>
                     ))}
                 </nav>
-                {activeTab === 'Resumen' && (
-                    <div className="flex items-center gap-2 pr-1">
-                        <label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Mes:</label>
-                        <select
-                            id="month-filter"
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="py-1 pl-2 pr-8 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            aria-label="Seleccionar mes a visualizar"
-                        >
-                            {monthOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
             </div>
-            {isLoading ? <div className="text-center p-10">Cargando datos financieros...</div> : renderContent()}
+
+            {isLoading ? <div className="text-center p-10">Cargando datos financieros...</div> : (
+                <>
+                    {activeTab === 'Resumen' && renderSummary()}
+                    {activeTab === 'Ingresos' && renderTable('income')}
+                    {activeTab === 'Egresos' && renderTable('expense')}
+                </>
+            )}
+
+            {/* A simple inline modal for adding/editing */}
+            {modal.isOpen && <FinancialModal modalState={modal} onClose={() => setModal({isOpen: false, type: 'income', data: null})} onSave={handleSave} />}
+        </div>
+    );
+};
+
+const FinancialModal: React.FC<{modalState: ModalState, onClose: () => void, onSave: (data: any) => void}> = ({ modalState, onClose, onSave }) => {
+    const { type, data } = modalState;
+    const [formData, setFormData] = useState<any>(data || { description: '', amount: 0, category: '', date: new Date().toISOString().split('T')[0] });
+    
+    const isNew = !data?.id;
+    const title = `${isNew ? 'Agregar' : 'Editar'} ${type === 'income' ? 'Ingreso' : 'Egreso'}`;
+    const categories = type === 'income' ? Object.values(IncomeCategory) : Object.values(ExpenseCategory);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData((prev: any) => ({ ...prev, [name]: type === 'number' ? parseFloat(value) : value }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">{title}</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                     <input name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border border-gray-300 rounded-md" required />
+                     <input name="amount" type="number" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border border-gray-300 rounded-md" required />
+                     <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md bg-white" required>
+                        <option value="">Selecciona una categoría</option>
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                     <input name="date" type="date" value={formData.date} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md" required />
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };

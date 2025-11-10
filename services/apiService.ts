@@ -1,766 +1,614 @@
-// services/apiService.ts
 import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import {
-    Resident,
-    AccountStatus,
-    Provider,
-    InternalStaff,
-    PlatformUser,
-    UserRole,
-    UserRoleDefinition,
-    Booking,
-    CommonArea,
-    DueDate,
-    Task,
-    Expense,
-    Income,
-    VisitorLog,
-    PackageLog,
-    AccessPoint,
-    ConjuntoInfo,
-    DashboardSummary,
-    ChartData,
-    NotificationItem,
-    Tab,
-    PlatformStats,
-    SuperAdminChartData,
-    StoredFile,
-    UserProfile,
+  UserProfile,
+  ConjuntoInfo,
+  Resident,
+  AccountStatus,
+  Provider,
+  InternalStaff,
+  PlatformUser,
+  UserRoleDefinition,
+  Booking,
+  CommonArea,
+  DueDate,
+  Task,
+  Income,
+  Expense,
+  VisitorLog,
+  PackageLog,
+  DashboardSummary,
+  ChartData,
+  NotificationItem,
+  PlatformStats,
+  SuperAdminChartData,
+  StoredFile,
+  AccessPoint,
+  UserRole,
+  Tab
 } from '../types';
-import { PostgrestError } from '@supabase/supabase-js';
 
-// In a real app, this list might come from a DB table or a more secure source.
-const SUPER_ADMIN_EMAILS = ['superadmin@paic.com', 'test.superadmin@example.com']; // Example email for testing
-
-const handleError = (error: PostgrestError | null, context: string) => {
+// A helper for handling Supabase errors
+const handleSupabaseError = ({ error, data }: { error: any, data?: any }, context: string) => {
     if (error) {
         console.error(`Error in ${context}:`, error);
-        throw new Error(`Database error in ${context}: ${error.message}`);
+        throw new Error(error.message);
     }
+    return data;
 };
 
-// A helper to generate random colors for common areas
-const getRandomColor = () => {
+// --- AUTH & USERS ---
+
+async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+    const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+    handleSupabaseError({ data, error }, 'fetchUserProfile');
+    return fromSupabase(data);
+}
+
+async function updateUserProfile(profile: UserProfile): Promise<void> {
+    const { error } = await supabase
+        .from('user_profiles')
+        .update(toSupabase(profile))
+        .eq('id', profile.id);
+    handleSupabaseError({ error }, 'updateUserProfile');
+}
+
+async function authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
+    const { data, error } = await supabase.rpc('authenticate_user', {
+        p_email: email,
+        p_password: password
+    });
+    handleSupabaseError({ error }, 'authenticateUser');
+    return fromSupabase(data);
+}
+
+// --- CONJUNTO ---
+
+async function fetchConjuntoInfo(conjuntoId: string): Promise<ConjuntoInfo | null> {
+    const { data, error } = await supabase
+        .from('conjuntos')
+        .select('*')
+        .eq('id', conjuntoId)
+        .single();
+    handleSupabaseError({ data, error }, 'fetchConjuntoInfo');
+    return fromSupabase(data);
+}
+
+async function addConjuntoInfo(conjuntoInfo: ConjuntoInfo): Promise<void> {
+    const { error } = await supabase
+        .from('conjuntos')
+        .insert(toSupabase(conjuntoInfo));
+    handleSupabaseError({ error }, 'addConjuntoInfo');
+}
+
+async function updateConjuntoInfo(conjuntoInfo: ConjuntoInfo): Promise<void> {
+    const { error } = await supabase
+        .from('conjuntos')
+        .update(toSupabase(conjuntoInfo))
+        .eq('id', conjuntoInfo.id);
+    handleSupabaseError({ error }, 'updateConjuntoInfo');
+}
+
+// --- DATABASE TABLES ---
+
+async function fetchResidents(conjuntoId: string): Promise<Resident[]> {
+    const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchResidents'));
+}
+async function addResident(conjuntoId: string, resident: Resident): Promise<void> {
+    await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
+}
+async function updateResident(conjuntoId: string, resident: Resident): Promise<void> {
+    await supabase.from('residents').update(toSupabase(resident)).match({ conjunto_id: conjuntoId, apartment: resident.apartment });
+}
+async function deleteResident(conjuntoId: string, apartment: string): Promise<void> {
+    await supabase.from('residents').delete().match({ conjunto_id: conjuntoId, apartment });
+}
+async function bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<void> {
+    const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
+    const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'conjunto_id, apartment' });
+    handleSupabaseError({ error }, 'bulkUpsertResidents');
+}
+async function fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
+    const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchResidentByApartment'));
+}
+
+async function fetchAccountStatus(conjuntoId: string): Promise<AccountStatus[]> {
+    const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchAccountStatus'));
+}
+async function fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
+    const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchAccountStatusByApartment'));
+}
+async function addAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
+    await supabase.from('account_status').insert(toSupabase({ ...account, conjuntoId }));
+}
+async function updateAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
+    await supabase.from('account_status').update(toSupabase(account)).match({ conjunto_id: conjuntoId, apartment: account.apartment });
+}
+async function deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
+    await supabase.from('account_status').delete().match({ conjunto_id: conjuntoId, apartment });
+}
+async function bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
+    const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
+    const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id, apartment' });
+    handleSupabaseError({ error }, 'bulkUpsertAccountStatus');
+}
+async function fetchDebtors(conjuntoId: string): Promise<{ apartment: string, name: string, balance: number }[]> {
+    const { data: accounts, error: accError } = await supabase.from('account_status').select('apartment, outstanding_balance').eq('conjunto_id', conjuntoId).gt('outstanding_balance', 0);
+    handleSupabaseError({ data: accounts, error: accError }, 'fetchDebtors (accounts)');
+
+    if (!accounts || accounts.length === 0) return [];
+    
+    const apartments = accounts.map(a => a.apartment);
+    const { data: residents, error: resError } = await supabase.from('residents').select('apartment, name').eq('conjunto_id', conjuntoId).in('apartment', apartments);
+    handleSupabaseError({ data: residents, error: resError }, 'fetchDebtors (residents)');
+
+    const residentMap = new Map(residents.map(r => [r.apartment, r.name]));
+    
+    return accounts.map(acc => ({
+        apartment: acc.apartment,
+        name: residentMap.get(acc.apartment) || 'Residente no encontrado',
+        balance: acc.outstanding_balance
+    }));
+}
+
+
+async function fetchProviders(conjuntoId: string): Promise<Provider[]> {
+    const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchProviders'));
+}
+async function fetchProvidersBySpecialty(conjuntoId: string, specialty: string): Promise<Provider[]> {
+    const query = supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
+    if(specialty) {
+        query.ilike('specialty', `%${specialty}%`);
+    }
+    const { data, error } = await query;
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchProvidersBySpecialty'));
+}
+async function addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
+    await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
+}
+async function updateProvider(conjuntoId: string, provider: Provider): Promise<void> {
+    await supabase.from('providers').update(toSupabase(provider)).match({ id: provider.id, conjunto_id: conjuntoId });
+}
+async function deleteProvider(conjuntoId: string, id: number): Promise<void> {
+    await supabase.from('providers').delete().match({ id: id, conjunto_id: conjuntoId });
+}
+async function bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
+    const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
+    const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id, conjunto_id' });
+     handleSupabaseError({ error }, 'bulkUpsertProviders');
+}
+
+async function fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
+    const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchInternalStaff'));
+}
+async function addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
+    await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
+}
+async function updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
+    await supabase.from('internal_staff').update(toSupabase(staff)).match({ conjunto_id: conjuntoId, name: staff.name });
+}
+async function deleteInternalStaff(conjuntoId: string, name: string): Promise<void> {
+    await supabase.from('internal_staff').delete().match({ conjunto_id: conjuntoId, name: name });
+}
+async function bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
+    const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
+    const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'conjunto_id, name' });
+    handleSupabaseError({ error }, 'bulkUpsertInternalStaff');
+}
+
+async function fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
+    const { data, error } = await supabase.from('platform_users').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchUsers'));
+}
+async function addUser(conjuntoId: string, user: PlatformUser): Promise<void> {
+    const { error } = await supabase.from('platform_users').insert(toSupabase({ ...user, conjuntoId }));
+    handleSupabaseError({ error }, 'addUser');
+}
+async function updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
+    const { error } = await supabase.from('platform_users').update(toSupabase(user)).match({ id: user.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateUser');
+}
+async function deleteUser(conjuntoId: string, userId: number): Promise<void> {
+    const { error } = await supabase.from('platform_users').delete().match({ id: userId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteUser');
+}
+
+async function fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
+    const { data, error } = await supabase.from('user_roles').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchRoles'));
+}
+async function addRole(conjuntoId: string, role: Omit<UserRoleDefinition, 'id'>): Promise<void> {
+    const { error } = await supabase.from('user_roles').insert(toSupabase({ ...role, conjuntoId }));
+    handleSupabaseError({ error }, 'addRole');
+}
+async function updateRole(conjuntoId: string, role: UserRoleDefinition): Promise<void> {
+    const { error } = await supabase.from('user_roles').update(toSupabase(role)).match({ id: role.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateRole');
+}
+async function deleteRole(conjuntoId: string, roleId: string): Promise<void> {
+    const { error } = await supabase.from('user_roles').delete().match({ id: roleId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteRole');
+}
+
+async function fetchBookings(conjuntoId: string): Promise<Booking[]> {
+    const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchBookings'));
+}
+async function addBooking(conjuntoId: string, booking: Booking): Promise<void> {
+    const { error } = await supabase.from('bookings').insert(toSupabase({ ...booking, conjuntoId }));
+    handleSupabaseError({ error }, 'addBooking');
+}
+
+async function fetchCommonAreas(conjuntoId: string): Promise<CommonArea[]> {
+    const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchCommonAreas'));
+}
+async function addCommonArea(conjuntoId: string, areaName: string): Promise<void> {
     const colors = [
-      { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
-      { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
-      { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
-      { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
-      { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
+        { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+        { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+        { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+        { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+        { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
     ];
-    return colors[Math.floor(Math.random() * colors.length)];
-};
-
-
-export const apiService = {
-
-    // =================================================================
-    // CONJUNTO & PLATFORM
-    // =================================================================
+    const { data: areas, error: countError } = await supabase.from('common_areas').select('id', { count: 'exact' }).eq('conjunto_id', conjuntoId);
+    handleSupabaseError({ error: countError }, 'addCommonArea (count)');
+    const color = colors[areas?.length % colors.length];
     
-    async fetchConjuntoInfo(conjuntoId: string): Promise<ConjuntoInfo | null> {
-        const { data, error } = await supabase.from('conjuntos').select('*').eq('id', conjuntoId).single();
-        handleError(error, 'fetchConjuntoInfo');
-        return fromSupabase(data) as ConjuntoInfo | null;
-    },
+    const { error } = await supabase.from('common_areas').insert(toSupabase({ name: areaName, color, conjuntoId }));
+    handleSupabaseError({ error }, 'addCommonArea');
+}
+async function removeCommonArea(conjuntoId: string, areaId: string): Promise<void> {
+    const { error } = await supabase.from('common_areas').delete().match({ id: areaId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'removeCommonArea');
+}
+
+async function fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
+    const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchDueDates'));
+}
+async function addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
+    const { error } = await supabase.from('due_dates').insert(toSupabase({ ...dueDate, conjuntoId }));
+    handleSupabaseError({ error }, 'addDueDate');
+}
+async function updateDueDate(conjuntoId: string, dueDate: DueDate): Promise<void> {
+    const { error } = await supabase.from('due_dates').update(toSupabase(dueDate)).match({ id: dueDate.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateDueDate');
+}
+async function deleteDueDate(conjuntoId: string, dueDateId: number): Promise<void> {
+    const { error } = await supabase.from('due_dates').delete().match({ id: dueDateId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteDueDate');
+}
+
+async function fetchTasks(conjuntoId: string): Promise<Task[]> {
+    const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchTasks'));
+}
+async function addTask(conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> {
+    const { error } = await supabase.from('tasks').insert(toSupabase({ ...task, conjuntoId }));
+    handleSupabaseError({ error }, 'addTask');
+}
+async function updateTask(conjuntoId: string, task: Task): Promise<void> {
+    const { error } = await supabase.from('tasks').update(toSupabase(task)).match({ id: task.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateTask');
+}
+async function deleteTask(conjuntoId: string, taskId: number): Promise<void> {
+    const { error } = await supabase.from('tasks').delete().match({ id: taskId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteTask');
+}
+
+async function fetchIncomes(conjuntoId: string): Promise<Income[]> {
+    const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchIncomes'));
+}
+async function addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
+    const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
+    handleSupabaseError({ error }, 'addIncome');
+}
+async function updateIncome(conjuntoId: string, income: Income): Promise<void> {
+    const { error } = await supabase.from('incomes').update(toSupabase(income)).match({ id: income.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateIncome');
+}
+async function deleteIncome(conjuntoId: string, incomeId: number): Promise<void> {
+    const { error } = await supabase.from('incomes').delete().match({ id: incomeId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteIncome');
+}
+
+async function fetchExpenses(conjuntoId: string): Promise<Expense[]> {
+    const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchExpenses'));
+}
+async function addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
+    const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
+    handleSupabaseError({ error }, 'addExpense');
+}
+async function updateExpense(conjuntoId: string, expense: Expense): Promise<void> {
+    const { error } = await supabase.from('expenses').update(toSupabase(expense)).match({ id: expense.id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateExpense');
+}
+async function deleteExpense(conjuntoId: string, expenseId: number): Promise<void> {
+    const { error } = await supabase.from('expenses').delete().match({ id: expenseId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteExpense');
+}
+
+async function fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
+    const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId).order('id', { ascending: false });
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchVisitorLogs'));
+}
+async function addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
+    const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
+    handleSupabaseError({ error }, 'addVisitorLog');
+}
+async function updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
+    const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).match({ id: logId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updateVisitorLog');
+}
+
+async function fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
+    const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('id', { ascending: false });
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchPackageLogs'));
+}
+async function addPackageLog(conjuntoId: string, log: Partial<Omit<PackageLog, 'id'>>): Promise<void> {
+    const payload = {
+        ...log,
+        conjuntoId,
+        receivedDate: new Date().toISOString(),
+        status: 'En recepción'
+    };
+    const { error } = await supabase.from('package_logs').insert(toSupabase(payload));
+    handleSupabaseError({ error }, 'addPackageLog');
+}
+async function updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
+    const { error } = await supabase.from('package_logs').update({ status }).match({ id: packageId, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'updatePackageLogStatus');
+}
+
+async function fetchAccessPoints(conjuntoId: string): Promise<AccessPoint[]> {
+    const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchAccessPoints'));
+}
+async function addAccessPoint(conjuntoId: string, name: string): Promise<void> {
+    const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'addAccessPoint');
+}
+async function deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
+    const { error } = await supabase.from('access_points').delete().match({ id, conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteAccessPoint');
+}
+
+// --- DASHBOARD & ANALYTICS ---
+
+async function fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> {
+    // This would be better as a single RPC call in a real DB
+    const [debtors, tasks, dueDates, packages] = await Promise.all([
+        fetchDebtors(conjuntoId),
+        fetchTasks(conjuntoId),
+        fetchDueDates(conjuntoId),
+        fetchPackageLogs(conjuntoId),
+    ]);
+
+    const notifications: NotificationItem[] = [];
+    const overdue = dueDates.filter(d => d.status === 'Vencido');
+    if(overdue.length > 0) {
+        notifications.push({ id: 'due-1', type: 'due-date', text: `${overdue.length} pagos se encuentran vencidos.`, details: `Ej: ${overdue[0].item}`, urgency: 'high', linkTo: Tab.DueDates });
+    }
+    const pendingTasks = tasks.filter(t => !t.completed);
+    if(pendingTasks.length > 0) {
+        notifications.push({ id: 'task-1', type: 'task', text: `Tienes ${pendingTasks.length} tareas pendientes.`, details: `Ej: ${pendingTasks[0].text}`, urgency: 'medium', linkTo: Tab.PendingTasks });
+    }
+    const packagesToDeliver = packages.filter(p => p.status === 'En recepción');
+    if(packagesToDeliver.length > 0) {
+        notifications.push({ id: 'pkg-1', type: 'package', text: `${packagesToDeliver.length} paquetes por entregar.`, details: `Ej: Paquete de ${packagesToDeliver[0].courier}`, urgency: 'low', linkTo: Tab.Seguridad });
+    }
     
-    async addConjuntoInfo(info: ConjuntoInfo): Promise<void> {
-        const { error } = await supabase.from('conjuntos').insert(toSupabase(info));
-        handleError(error, 'addConjuntoInfo');
-    },
+    return {
+        stats: {
+            residentsInDebt: { count: debtors.length, details: debtors.slice(0, 5).map(d => `Apto ${d.apartment}: $${d.balance.toLocaleString()}`) },
+            pendingTasks: { count: pendingTasks.length, details: pendingTasks.slice(0, 5).map(t => t.text) },
+            overduePayments: { count: overdue.length, details: overdue.slice(0, 5).map(d => d.item) },
+            packagesToDeliver: { count: packagesToDeliver.length, details: packagesToDeliver.slice(0, 5).map(p => `Apto ${p.apartment} de ${p.courier}`) },
+        },
+        notifications: notifications.slice(0, 4)
+    };
+}
+async function fetchFinancialChartData(conjuntoId: string): Promise<any> {
+    // Dummy data for now. In production, this would be an RPC call.
+     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+     const monthlyIncomeVsExpense = months.map(month => ({
+        name: month,
+        ingresos: Math.floor(Math.random() * 2000000) + 5000000,
+        gastos: Math.floor(Math.random() * 1500000) + 4000000,
+    }));
+     const expensesByCategory = [
+        { name: 'Servicios', value: 400000, fill: '#0088FE' },
+        { name: 'Mantenimiento', value: 300000, fill: '#00C49F' },
+        { name: 'Nómina', value: 800000, fill: '#FFBB28' },
+        { name: 'Otros', value: 200000, fill: '#FF8042' },
+    ];
+     const packageVolume = months.map(month => ({ name: month, value: Math.floor(Math.random() * 100) + 50 }));
+     const visitorTraffic = [
+        { name: 'Portería Principal', value: 450, fill: '#AF19FF' },
+        { name: 'Portería Vehicular', value: 220, fill: '#FF8042' },
+    ];
+    
+    return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
+}
 
-    async updateConjuntoInfo(info: ConjuntoInfo): Promise<void> {
-        const { error } = await supabase.from('conjuntos').update(toSupabase(info)).eq('id', info.id);
-        handleError(error, 'updateConjuntoInfo');
-    },
+// --- SUPER ADMIN ---
 
-    async fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
-        const { data, error } = await supabase.from('conjuntos').select('*');
-        handleError(error, 'fetchAllConjuntos');
-        return fromSupabase(data) as ConjuntoInfo[];
-    },
+async function fetchAllConjuntos(): Promise<ConjuntoInfo[]> {
+    const { data, error } = await supabase.from('conjuntos').select('*');
+    return fromSupabase(handleSupabaseError({ data, error }, 'fetchAllConjuntos'));
+}
 
-    async fetchPlatformStats(): Promise<PlatformStats> {
-        // Mocked data for demonstration
+async function fetchPlatformStats(): Promise<PlatformStats> {
+    // Dummy data, would be RPC calls
+    return { totalConjuntos: 15, paidSubscriptions: 8, totalResidents: 1250, monthlyRecurringRevenue: 1120000, newThisMonth: 2 };
+}
+
+async function fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
+    // Dummy data
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+    return {
+        chatbotUsage: months.map(m => ({ name: m, value: Math.floor(Math.random() * 200) + 100 })),
+        packageVolume: [],
+        visitorTraffic: []
+    };
+}
+
+// --- COMMUNICATIONS & FILES ---
+
+async function uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
+    const { error } = await supabase.storage.from('conjunto-files').upload(`${conjuntoId}/${file.name}`, file);
+    handleSupabaseError({ error }, 'uploadFileForConjunto');
+}
+async function listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
+    const { data, error } = await supabase.storage.from('conjunto-files').list(conjuntoId);
+    handleSupabaseError({ error }, 'listFilesForConjunto');
+    if (!data) return [];
+    
+    return data.map(file => {
+        const { data: { publicUrl } } = supabase.storage.from('conjunto-files').getPublicUrl(`${conjuntoId}/${file.name}`);
         return {
-            totalConjuntos: 25,
-            paidSubscriptions: 18,
-            totalResidents: 1250,
-            monthlyRecurringRevenue: 18 * 140000,
-            newThisMonth: 3,
-        };
-    },
-    
-    async fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
-        // Mocked data
-        // FIX: Added 'fill' property to chart data objects to satisfy the ChartData type.
-        return {
-            chatbotUsage: [
-                { name: 'Ene', value: 400, fill: '#8884d8' }, { name: 'Feb', value: 300, fill: '#8884d8' }, { name: 'Mar', value: 500, fill: '#8884d8' },
-                { name: 'Abr', value: 450, fill: '#8884d8' }, { name: 'May', value: 600, fill: '#8884d8' }, { name: 'Jun', value: 700, fill: '#8884d8' },
-            ],
-            packageVolume: [],
-            visitorTraffic: [],
-        };
-    },
-
-    // =================================================================
-    // AUTH & USERS
-    // =================================================================
-    
-    async fetchUserProfile(userId: string): Promise<UserProfile | null> {
-        const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
-        if (error && error.code !== 'PGRST116') { // Ignore 'not found' error
-            handleError(error, 'fetchUserProfile');
-        }
-        return fromSupabase(data) as UserProfile | null;
-    },
-    
-    async updateUserProfile(profile: UserProfile): Promise<void> {
-        const { error } = await supabase.from('user_profiles').update(toSupabase(profile)).eq('id', profile.id);
-        handleError(error, 'updateUserProfile');
-    },
-    
-    async checkIfSuperAdmin(email: string): Promise<boolean> {
-        const { data } = await supabase.from('user_profiles').select('role').eq('email', email).single();
-        return data?.role === UserRole.Admin;
-    },
-    
-    // FIX: Add missing authenticateUser method for internal staff login.
-    async authenticateUser(email: string, password: string): Promise<PlatformUser | null> {
-        const { data, error } = await supabase.from('users').select('*').eq('email', email).single();
-        
-        if (error && error.code !== 'PGRST116') { // ignore not found
-            handleError(error, 'authenticateUser: fetch user');
-        }
-
-        // IMPORTANT: This is plain text password comparison. This is very insecure and should be replaced with a proper hashing mechanism in a real application.
-        // Implementing it this way to match what seems to be the existing (flawed) application design.
-        if (data && data.password === password) { 
-            return fromSupabase(data) as PlatformUser;
-        }
-
-        return null;
-    },
-
-
-    // The methods below manage `platform_users`, which are distinct from Supabase Auth users.
-    // They are for internal staff (Guard, Accountant) created by a conjunto admin.
-    
-    async addUser(conjuntoId: string, user: Omit<PlatformUser, 'id'>): Promise<void> {
-        const { error } = await supabase.from('users').insert(toSupabase({ ...user, conjuntoId }));
-        handleError(error, 'addUser');
-    },
-
-    async updateUser(conjuntoId: string, user: PlatformUser): Promise<void> {
-        const { error } = await supabase.from('users').update(toSupabase(user)).eq('id', user.id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateUser');
-    },
-
-    async deleteUser(conjuntoId: string, userId: number): Promise<void> {
-        const { error } = await supabase.from('users').delete().eq('id', userId).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteUser');
-    },
-
-    async fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {
-        const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchUsers');
-        return fromSupabase(data) as PlatformUser[];
-    },
-
-
-    // =================================================================
-    // DATABASE VIEWS
-    // =================================================================
-
-    // Residents
-    async fetchResidents(conjuntoId: string): Promise<Resident[]> {
-        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchResidents');
-        return fromSupabase(data) as Resident[];
-    },
-    async fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
-        const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
-        if (error && error.code !== 'PGRST116') handleError(error, 'fetchResidentByApartment');
-        return fromSupabase(data) as Resident | null;
-    },
-    async addResident(conjuntoId: string, resident: Omit<Resident, 'id'>): Promise<void> {
-        const { error } = await supabase.from('residents').insert(toSupabase({ ...resident, conjuntoId }));
-        handleError(error, 'addResident');
-    },
-    async updateResident(conjuntoId: string, resident: Resident): Promise<void> {
-        const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('apartment', resident.apartment).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateResident');
-    },
-    async deleteResident(conjuntoId: string, apartment: string): Promise<void> {
-        const { error } = await supabase.from('residents').delete().eq('apartment', apartment).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteResident');
-    },
-    async bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<void> {
-        const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
-        const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'apartment, conjunto_id' });
-        handleError(error, 'bulkUpsertResidents');
-    },
-
-    // Account Status
-    async fetchAccountStatus(conjuntoId: string): Promise<AccountStatus[]> {
-        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchAccountStatus');
-        return fromSupabase(data) as AccountStatus[];
-    },
-    async fetchAccountStatusByApartment(conjuntoId: string, apartment: string): Promise<AccountStatus | null> {
-        const { data, error } = await supabase.from('account_status').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
-        if (error && error.code !== 'PGRST116') handleError(error, 'fetchAccountStatusByApartment');
-        return fromSupabase(data) as AccountStatus | null;
-    },
-    async fetchDebtors(conjuntoId: string): Promise<{ apartment: string; name: string; balance: number }[]> {
-        const statuses = await this.fetchAccountStatus(conjuntoId);
-        const residents = await this.fetchResidents(conjuntoId);
-        const residentMap = new Map(residents.map(r => [r.apartment, r.name]));
-        return statuses
-            .filter(s => s.outstandingBalance > 0)
-            .map(s => ({
-                apartment: s.apartment,
-                name: residentMap.get(s.apartment) || 'N/A',
-                balance: s.outstandingBalance,
-            }));
-    },
-    async addAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
-        const { error } = await supabase.from('account_status').insert(toSupabase({ ...account, conjuntoId }));
-        handleError(error, 'addAccountStatus');
-    },
-    async updateAccountStatus(conjuntoId: string, account: AccountStatus): Promise<void> {
-        const { error } = await supabase.from('account_status').update(toSupabase(account)).eq('apartment', account.apartment).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateAccountStatus');
-    },
-    async deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
-        const { error } = await supabase.from('account_status').delete().eq('apartment', apartment).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteAccountStatus');
-    },
-    async bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
-        const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
-        const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'apartment, conjunto_id' });
-        handleError(error, 'bulkUpsertAccountStatus');
-    },
-    
-    // Providers
-    async fetchProviders(conjuntoId: string): Promise<Provider[]> {
-        const { data, error } = await supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchProviders');
-        return fromSupabase(data) as Provider[];
-    },
-     async fetchProvidersBySpecialty(conjuntoId: string, specialty: string): Promise<Provider[]> {
-        let query = supabase.from('providers').select('*').eq('conjunto_id', conjuntoId);
-        if (specialty) {
-            query = query.ilike('specialty', `%${specialty}%`);
-        }
-        const { data, error } = await query;
-        handleError(error, 'fetchProvidersBySpecialty');
-        return fromSupabase(data) as Provider[];
-    },
-    async addProvider(conjuntoId: string, provider: Omit<Provider, 'id'>): Promise<void> {
-        const { error } = await supabase.from('providers').insert(toSupabase({ ...provider, conjuntoId }));
-        handleError(error, 'addProvider');
-    },
-    async updateProvider(conjuntoId: string, provider: Provider): Promise<void> {
-        const { error } = await supabase.from('providers').update(toSupabase(provider)).eq('id', provider.id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateProvider');
-    },
-    async deleteProvider(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('providers').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteProvider');
-    },
-    async bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
-        // Workaround for missing UNIQUE constraint on the natural key (e.g., company name) in the database.
-        // The direct upsert `onConflict('company', 'conjunto_id')` fails if the constraint doesn't exist.
-        // This implementation manually fetches existing records, separates new from existing, and performs separate operations.
-
-        // 1. Fetch existing providers to manually check for conflicts based on the company name.
-        const { data: existingProvidersData, error: fetchError } = await supabase
-            .from('providers')
-            .select('id, company')
-            .eq('conjunto_id', conjuntoId);
-        handleError(fetchError, 'bulkUpsertProviders (fetch)');
-
-        const existingProviders = fromSupabase(existingProvidersData) as { id: number; company: string }[];
-        // Use a case-insensitive map for matching company names.
-        const existingProviderMap = new Map(existingProviders.map(p => [p.company.toLowerCase(), p.id]));
-
-        const recordsToInsert: any[] = [];
-        const recordsToUpdate: any[] = [];
-
-        providers.forEach(provider => {
-            if (!provider.company) return; // Skip rows without a company name
-
-            const existingId = existingProviderMap.get(provider.company.toLowerCase());
-            const payload = toSupabase({ ...provider, conjuntoId });
-            
-            // The 'id' from the Excel file is irrelevant/non-existent, we manage it here.
-            delete payload.id;
-
-            if (existingId) {
-                // This provider exists, add its ID to the payload to target it for an update.
-                recordsToUpdate.push({ ...payload, id: existingId });
-            } else {
-                // This is a new provider, add it to the insert queue.
-                recordsToInsert.push(payload);
-            }
-        });
-
-        // 2. Perform batch operations.
-        if (recordsToInsert.length > 0) {
-            const { error: insertError } = await supabase.from('providers').insert(recordsToInsert);
-            handleError(insertError, 'bulkUpsertProviders (insert)');
-        }
-
-        if (recordsToUpdate.length > 0) {
-            // For updates, we use upsert targeting the primary key ('id').
-            // This will efficiently update all records in the array.
-            const { error: updateError } = await supabase.from('providers').upsert(recordsToUpdate, { onConflict: 'id' });
-            handleError(updateError, 'bulkUpsertProviders (update)');
-        }
-    },
-
-    // Internal Staff
-    async fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
-        const { data, error } = await supabase.from('internal_staff').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchInternalStaff');
-        return fromSupabase(data) as InternalStaff[];
-    },
-    async addInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
-        const { error } = await supabase.from('internal_staff').insert(toSupabase({ ...staff, conjuntoId }));
-        handleError(error, 'addInternalStaff');
-    },
-    async updateInternalStaff(conjuntoId: string, staff: InternalStaff): Promise<void> {
-        const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('name', staff.name).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateInternalStaff');
-    },
-    async deleteInternalStaff(conjuntoId: string, name: string): Promise<void> {
-        const { error } = await supabase.from('internal_staff').delete().eq('name', name).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteInternalStaff');
-    },
-    async bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
-        const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
-        const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'name, conjunto_id' });
-        handleError(error, 'bulkUpsertInternalStaff');
-    },
-    
-    // Roles
-    async fetchRoles(conjuntoId: string): Promise<UserRoleDefinition[]> {
-        const { data, error } = await supabase.from('user_roles').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchRoles');
-        return fromSupabase(data) as UserRoleDefinition[];
-    },
-    async addRole(conjuntoId: string, role: Omit<UserRoleDefinition, 'id'>): Promise<void> {
-        const { error } = await supabase.from('user_roles').insert(toSupabase({ ...role, conjuntoId }));
-        handleError(error, 'addRole');
-    },
-    async updateRole(conjuntoId: string, role: UserRoleDefinition): Promise<void> {
-        const { error } = await supabase.from('user_roles').update(toSupabase(role)).eq('id', role.id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateRole');
-    },
-    async deleteRole(conjuntoId: string, id: string): Promise<void> {
-        const { error } = await supabase.from('user_roles').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteRole');
-    },
-    
-
-    // =================================================================
-    // FEATURES
-    // =================================================================
-
-    // Common Areas
-    async fetchCommonAreas(conjuntoId: string): Promise<CommonArea[]> {
-        const { data, error } = await supabase.from('common_areas').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchCommonAreas');
-        return fromSupabase(data) as CommonArea[];
-    },
-    async addCommonArea(conjuntoId: string, name: string): Promise<void> {
-        const newArea = { name, conjuntoId, color: getRandomColor() };
-        const { error } = await supabase.from('common_areas').insert(toSupabase(newArea));
-        handleError(error, 'addCommonArea');
-    },
-    async removeCommonArea(conjuntoId: string, id: string): Promise<void> {
-        const { error } = await supabase.from('common_areas').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'removeCommonArea');
-    },
-
-    // Bookings
-    async fetchBookings(conjuntoId: string): Promise<Booking[]> {
-        const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchBookings');
-        return fromSupabase(data) as Booking[];
-    },
-    async addBooking(conjuntoId: string, booking: Booking): Promise<void> {
-        const { error } = await supabase.from('bookings').insert(toSupabase({ ...booking, conjuntoId }));
-        handleError(error, 'addBooking');
-    },
-
-    // Due Dates
-    async fetchDueDates(conjuntoId: string): Promise<DueDate[]> {
-        const { data, error } = await supabase.from('due_dates').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchDueDates');
-        return fromSupabase(data) as DueDate[];
-    },
-    async addDueDate(conjuntoId: string, dueDate: Omit<DueDate, 'id'>): Promise<void> {
-        const { error } = await supabase.from('due_dates').insert(toSupabase({ ...dueDate, conjuntoId }));
-        handleError(error, 'addDueDate');
-    },
-    async updateDueDate(conjuntoId: string, dueDate: DueDate): Promise<void> {
-        const { error } = await supabase.from('due_dates').update(toSupabase(dueDate)).eq('id', dueDate.id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateDueDate');
-    },
-    async deleteDueDate(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('due_dates').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteDueDate');
-    },
-
-    // Tasks
-    async fetchTasks(conjuntoId: string): Promise<Task[]> {
-        const { data, error } = await supabase.from('tasks').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchTasks');
-        return fromSupabase(data) as Task[];
-    },
-    async addTask(conjuntoId: string, task: Omit<Task, 'id'>): Promise<void> {
-        const { error } = await supabase.from('tasks').insert(toSupabase({ ...task, conjuntoId }));
-        handleError(error, 'addTask');
-    },
-    async updateTask(conjuntoId: string, task: Task): Promise<void> {
-        const { error } = await supabase.from('tasks').update(toSupabase(task)).eq('id', task.id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateTask');
-    },
-    async deleteTask(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('tasks').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteTask');
-    },
-
-    // Finances
-    async fetchExpenses(conjuntoId: string): Promise<Expense[]> {
-        const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchExpenses');
-        return fromSupabase(data) as Expense[];
-    },
-    async addExpense(conjuntoId: string, expense: Omit<Expense, 'id'>): Promise<void> {
-        const { error } = await supabase.from('expenses').insert(toSupabase({ ...expense, conjuntoId }));
-        handleError(error, 'addExpense');
-    },
-    async deleteExpense(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteExpense');
-    },
-    async bulkInsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
-        const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
-        const { error } = await supabase.from('expenses').insert(payload);
-        handleError(error, 'bulkInsertExpenses');
-    },
-    async fetchIncomes(conjuntoId: string): Promise<Income[]> {
-        const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchIncomes');
-        return fromSupabase(data) as Income[];
-    },
-    async addIncome(conjuntoId: string, income: Omit<Income, 'id'>): Promise<void> {
-        const { error } = await supabase.from('incomes').insert(toSupabase({ ...income, conjuntoId }));
-        handleError(error, 'addIncome');
-    },
-    async deleteIncome(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteIncome');
-    },
-    async bulkInsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
-        const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
-        const { error } = await supabase.from('incomes').insert(payload);
-        handleError(error, 'bulkInsertIncomes');
-    },
-
-    // Security
-    async fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
-        const { data, error } = await supabase.from('visitor_logs').select('*').eq('conjunto_id', conjuntoId).order('date', { ascending: false });
-        handleError(error, 'fetchVisitorLogs');
-        return fromSupabase(data) as VisitorLog[];
-    },
-    async addVisitorLog(conjuntoId: string, log: Omit<VisitorLog, 'id'>): Promise<void> {
-        const { error } = await supabase.from('visitor_logs').insert(toSupabase({ ...log, conjuntoId }));
-        handleError(error, 'addVisitorLog');
-    },
-    async updateVisitorLog(conjuntoId: string, logId: number, updates: Partial<Omit<VisitorLog, 'id'>>): Promise<void> {
-        const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('id', logId).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updateVisitorLog');
-    },
-    async fetchPackageLogs(conjuntoId: string): Promise<PackageLog[]> {
-        const { data, error } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
-        handleError(error, 'fetchPackageLogs');
-        return fromSupabase(data) as PackageLog[];
-    },
-    async addPackageLog(conjuntoId: string, log: Omit<PackageLog, 'id' | 'status' | 'receivedDate'>): Promise<void> {
-        const { error } = await supabase.from('package_logs').insert(toSupabase({
-            ...log,
-            conjuntoId,
-            status: 'En recepción',
-            receivedDate: new Date().toISOString()
-        }));
-        handleError(error, 'addPackageLog');
-    },
-    async updatePackageLogStatus(conjuntoId: string, packageId: number, status: PackageLog['status']): Promise<void> {
-        const { error } = await supabase.from('package_logs').update({ status }).eq('id', packageId).eq('conjunto_id', conjuntoId);
-        handleError(error, 'updatePackageLogStatus');
-    },
-
-    // Access Points
-    async fetchAccessPoints(conjuntoId: string): Promise<AccessPoint[]> {
-        const { data, error } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
-        handleError(error, 'fetchAccessPoints');
-        return fromSupabase(data) as AccessPoint[];
-    },
-    async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
-        const { error } = await supabase.from('access_points').insert({ name, conjunto_id: conjuntoId });
-        handleError(error, 'addAccessPoint');
-    },
-    async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
-        const { error } = await supabase.from('access_points').delete().eq('id', id).eq('conjunto_id', conjuntoId);
-        handleError(error, 'deleteAccessPoint');
-    },
-
-
-    // =================================================================
-    // COMMUNICATIONS
-    // =================================================================
-
-    async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ message: string }> {
-        // This is a mock. The real implementation is sendCommunicationEmail.
-        console.log(`Sending email to ${group} for ${conjuntoId}: ${subject}`);
-        return { message: `Email to ${group} sent.` };
-    },
-
-    async uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{ name: string; url: string } | null> {
-        const filePath = `communications/${conjuntoId}/${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage.from('conjunto-files').upload(filePath, file);
-        if (error) {
-            console.error('Error uploading attachment:', error);
-            return null;
-        }
-        const { data } = supabase.storage.from('conjunto-files').getPublicUrl(filePath);
-        return { name: file.name, url: data.publicUrl };
-    },
-
-    async sendCommunicationEmail(recipients: string[], subject: string, body: string, attachments: { name: string, url: string }[], fromName: string, fromEmail: string): Promise<{ success: boolean, error?: string }> {
-        let finalHtml = body.replace(/\n/g, '<br>');
-        if (attachments.length > 0) {
-            finalHtml += '<br/><hr/><h3>Archivos Adjuntos:</h3><ul>';
-            attachments.forEach(att => {
-                finalHtml += `<li><a href="${att.url}" target="_blank" rel="noopener noreferrer">${att.name}</a></li>`;
-            });
-            finalHtml += '</ul>';
-        }
-
-        const { data, error } = await supabase.functions.invoke('send-email', {
-            body: {
-                to: recipients,
-                subject,
-                html: finalHtml,
-                fromName,
-            },
-        });
-
-        if (error) {
-            console.error('Error invoking send-email function:', error);
-            return { success: false, error: error.message };
-        }
-        return data;
-    },
-    
-    // =================================================================
-    // LOGGING & DASHBOARDS
-    // =================================================================
-
-    async logChatbotInteraction(conjuntoId: string): Promise<void> {
-        const { error } = await supabase.from('chatbot_interactions').insert({ conjunto_id: conjuntoId });
-        if(error) console.error("Error logging chatbot interaction:", error);
-    },
-
-    async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> {
-        const [debtorsData, tasksData, dueDatesData, packagesData] = await Promise.all([
-            this.fetchDebtors(conjuntoId),
-            this.fetchTasks(conjuntoId),
-            this.fetchDueDates(conjuntoId),
-            this.fetchPackageLogs(conjuntoId)
-        ]);
-    
-        const pendingTasks = tasksData.filter(t => !t.completed);
-        const overduePayments = dueDatesData.filter(d => d.status === 'Vencido');
-        const packagesToDeliver = packagesData.filter(p => p.status === 'En recepción');
-    
-        const notifications: NotificationItem[] = [];
-        const urgentDueDate = dueDatesData.find(d => d.status === 'Pendiente');
-        if (urgentDueDate) {
-            notifications.push({ id: `due-${urgentDueDate.id}`, type: 'due-date', text: `Vencimiento próximo: ${urgentDueDate.item}`, details: `Vence el ${urgentDueDate.dueDate}`, urgency: 'high', linkTo: Tab.DueDates });
-        }
-        const urgentTask = pendingTasks[0];
-        if (urgentTask) {
-            notifications.push({ id: `task-${urgentTask.id}`, type: 'task', text: `Tarea pendiente: ${urgentTask.text}`, details: `Vence el ${urgentTask.dueDate || 'N/A'}`, urgency: 'medium', linkTo: Tab.PendingTasks });
-        }
-        const newPackage = packagesToDeliver[0];
-        if (newPackage) {
-            notifications.push({ id: `pkg-${newPackage.id}`, type: 'package', text: `Paquete para Apto ${newPackage.apartment}`, details: `De ${newPackage.courier}`, urgency: 'low', linkTo: Tab.Seguridad });
-        }
-    
-        return {
-            stats: {
-                residentsInDebt: { 
-                    count: debtorsData.length, 
-                    details: debtorsData.slice(0, 10).map(d => `Apto ${d.apartment}: $${d.balance.toLocaleString()}`)
-                },
-                pendingTasks: { 
-                    count: pendingTasks.length, 
-                    details: pendingTasks.slice(0, 10).map(t => t.text)
-                },
-                overduePayments: { 
-                    count: overduePayments.length, 
-                    details: overduePayments.slice(0, 10).map(d => d.item)
-                },
-                packagesToDeliver: { 
-                    count: packagesToDeliver.length, 
-                    details: packagesToDeliver.slice(0, 10).map(p => `Paquete para Apto ${p.apartment}`)
-                },
-            },
-            notifications: notifications.slice(0, 3)
-        };
-    },
-    
-    async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] }> {
-        const [expenses, incomes, packages, visitors, accessPoints] = await Promise.all([
-            this.fetchExpenses(conjuntoId),
-            this.fetchIncomes(conjuntoId),
-            this.fetchPackageLogs(conjuntoId),
-            this.fetchVisitorLogs(conjuntoId),
-            this.fetchAccessPoints(conjuntoId)
-        ]);
-    
-        // Monthly Income vs Expense (last 12 months)
-        const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
-        const today = new Date();
-        for (let i = 11; i >= 0; i--) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const monthName = d.toLocaleString('es-ES', { month: 'short' });
-            monthlyData[key] = { ingresos: 0, gastos: 0 };
-        }
-    
-        incomes.forEach(inc => {
-            const d = new Date(inc.date + 'T00:00:00Z');
-            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-            if (monthlyData[key]) monthlyData[key].ingresos += inc.amount;
-        });
-        expenses.forEach(exp => {
-            const d = new Date(exp.date + 'T00:00:00Z');
-            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-            if (monthlyData[key]) monthlyData[key].gastos += exp.amount;
-        });
-    
-        const monthlyIncomeVsExpense = Object.keys(monthlyData).map(key => {
-             const d = new Date(`${key}-01T00:00:00Z`);
-             const monthName = d.toLocaleString('es-ES', { month: 'short' });
-             return {
-                name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-                ingresos: monthlyData[key].ingresos,
-                gastos: monthlyData[key].gastos,
-                value: 0,
-                fill: ''
-             }
-        });
-    
-        // Expenses by Category (current month)
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        const currentMonthExpenses = expenses.filter(e => {
-            const d = new Date(e.date + 'T00:00:00Z');
-            return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
-        });
-    
-        const expensesByCategoryMap: { [key: string]: number } = {};
-        currentMonthExpenses.forEach(exp => {
-            expensesByCategoryMap[exp.category] = (expensesByCategoryMap[exp.category] || 0) + exp.amount;
-        });
-        const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
-        const expensesByCategory = Object.keys(expensesByCategoryMap).map((key, index) => ({
-            name: key,
-            value: expensesByCategoryMap[key],
-            fill: PIE_COLORS[index % PIE_COLORS.length]
-        }));
-        
-        // Package Volume (last 6 months)
-        const packageVolumeData: {[key: string]: number} = {};
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            packageVolumeData[key] = 0;
-        }
-        packages.forEach(pkg => {
-            const d = new Date(pkg.receivedDate);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            if(packageVolumeData.hasOwnProperty(key)) packageVolumeData[key]++;
-        });
-        const packageVolume = Object.keys(packageVolumeData).map(key => {
-            const d = new Date(`${key}-01`);
-            const monthName = d.toLocaleString('es-ES', { month: 'short' });
-            return { name: monthName.charAt(0).toUpperCase() + monthName.slice(1), value: packageVolumeData[key], fill: '#82ca9d' };
-        });
-
-        // FIX: Refactored to use a Map for collecting visitor traffic data,
-        // which avoids potential type inference issues with using an object as a map with numeric keys.
-        // Visitor Traffic by Access Point
-        const visitorTrafficMap = new Map<number, number>();
-        visitors.forEach(vis => {
-            if (vis.accessPointId) {
-                const currentCount = visitorTrafficMap.get(vis.accessPointId) || 0;
-                visitorTrafficMap.set(vis.accessPointId, currentCount + 1);
-            }
-        });
-        const accessPointMap = new Map(accessPoints.map(ap => [ap.id, ap.name]));
-        const visitorTraffic = Array.from(visitorTrafficMap.entries()).map(([pointId, value], index) => ({
-            name: accessPointMap.get(pointId) || `Punto ${pointId}`,
-            value: value,
-            fill: PIE_COLORS[index % PIE_COLORS.length],
-        }));
-    
-        return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
-    },
-
-    // =================================================================
-    // FILE MANAGEMENT
-    // =================================================================
-    async listFilesForConjunto(conjuntoId: string): Promise<StoredFile[]> {
-        const { data, error } = await supabase.storage.from('conjunto-files').list(conjuntoId, {
-            limit: 100,
-            offset: 0,
-            sortBy: { column: 'created_at', order: 'desc' },
-        });
-        // FIX: The error from supabase.storage.list() is a `StorageError`, not a `PostgrestError`,
-        // which caused a type mismatch with the `handleError` utility function.
-        // Replaced with direct error handling that preserves the original logic.
-        if (error) {
-            console.error(`Error in listFilesForConjunto:`, error);
-            throw new Error(`Database error in listFilesForConjunto: ${error.message}`);
-        }
-        if (!data) return [];
-
-        return data.map(file => ({
-            id: file.id ?? file.name,
+            id: file.id,
             name: file.name,
-            url: supabase.storage.from('conjunto-files').getPublicUrl(`${conjuntoId}/${file.name}`).data.publicUrl,
+            url: publicUrl,
             size: file.metadata.size,
             mimeType: file.metadata.mimetype,
             createdAt: file.created_at,
-        }));
-    },
-    async uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
-        const filePath = `${conjuntoId}/${file.name}`;
-        const { error } = await supabase.storage.from('conjunto-files').upload(filePath, file, { upsert: true });
-        if(error) throw error;
-    },
-    async deleteFileForConjunto(conjuntoId: string, fileName: string): Promise<void> {
-        const { error } = await supabase.storage.from('conjunto-files').remove([`${conjuntoId}/${fileName}`]);
-        if(error) throw error;
+        }
+    });
+}
+async function deleteFileForConjunto(conjuntoId: string, fileName: string): Promise<void> {
+    const { error } = await supabase.storage.from('conjunto-files').remove([`${conjuntoId}/${fileName}`]);
+    handleSupabaseError({ error }, 'deleteFileForConjunto');
+}
+async function uploadCommunicationAttachment(conjuntoId: string, file: File): Promise<{ name: string; url: string } | null> {
+    const filePath = `communications/${conjuntoId}/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from('conjunto-files').upload(filePath, file);
+    handleSupabaseError({ error }, 'uploadCommunicationAttachment');
+
+    const { data: { publicUrl } } = supabase.storage.from('conjunto-files').getPublicUrl(filePath);
+    return { name: file.name, url: publicUrl };
+}
+async function sendCommunicationEmail(to: string[], subject: string, body: string, attachments: {name: string, url: string}[], fromName: string, fromEmail: string): Promise<{ success: boolean; error?: string; }> {
+    let htmlBody = `<p>${body.replace(/\n/g, '<br>')}</p>`;
+    if (attachments.length > 0) {
+        htmlBody += '<br><hr><b>Archivos Adjuntos:</b><ul>';
+        attachments.forEach(att => {
+            htmlBody += `<li><a href="${att.url}">${att.name}</a></li>`;
+        });
+        htmlBody += '</ul>';
     }
+    
+    const { data, error } = await supabase.functions.invoke('send-email', {
+        body: { to, subject, html: htmlBody, fromName },
+    });
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return data;
+}
+async function sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{ message: string; }> {
+     // This is a simplified version for the chatbot
+    return { message: `Simulación: Correo masivo enviado al grupo '${group}' con el asunto '${subject}'.` };
+}
+
+// --- LOGGING ---
+async function logChatbotInteraction(conjuntoId: string): Promise<void> {
+    const { error } = await supabase.from('chatbot_interactions').insert({ conjunto_id: conjuntoId });
+    if(error) console.error("Failed to log chatbot interaction:", error);
+}
+
+export const apiService = {
+    fetchUserProfile,
+    updateUserProfile,
+    authenticateUser,
+    fetchConjuntoInfo,
+    addConjuntoInfo,
+    updateConjuntoInfo,
+    fetchResidents,
+    addResident,
+    updateResident,
+    deleteResident,
+    bulkUpsertResidents,
+    fetchResidentByApartment,
+    fetchAccountStatus,
+    fetchAccountStatusByApartment,
+    addAccountStatus,
+    updateAccountStatus,
+    deleteAccountStatus,
+    bulkUpsertAccountStatus,
+    fetchDebtors,
+    fetchProviders,
+    fetchProvidersBySpecialty,
+    addProvider,
+    updateProvider,
+    deleteProvider,
+    bulkUpsertProviders,
+    fetchInternalStaff,
+    addInternalStaff,
+    updateInternalStaff,
+    deleteInternalStaff,
+    bulkUpsertInternalStaff,
+    fetchUsers,
+    addUser,
+    updateUser,
+    deleteUser,
+    fetchRoles,
+    addRole,
+    updateRole,
+    deleteRole,
+    fetchBookings,
+    addBooking,
+    fetchCommonAreas,
+    addCommonArea,
+    removeCommonArea,
+    fetchDueDates,
+    addDueDate,
+    updateDueDate,
+    deleteDueDate,
+    fetchTasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    fetchIncomes,
+    addIncome,
+    updateIncome,
+    deleteIncome,
+    fetchExpenses,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    fetchVisitorLogs,
+    addVisitorLog,
+    updateVisitorLog,
+    fetchPackageLogs,
+    addPackageLog,
+    updatePackageLogStatus,
+    fetchAccessPoints,
+    addAccessPoint,
+    deleteAccessPoint,
+    fetchDashboardSummary,
+    fetchFinancialChartData,
+    fetchAllConjuntos,
+    fetchPlatformStats,
+    fetchSuperAdminChartData,
+    uploadFileForConjunto,
+    listFilesForConjunto,
+    deleteFileForConjunto,
+    uploadCommunicationAttachment,
+    sendCommunicationEmail,
+    sendMassEmail,
+    logChatbotInteraction,
 };
