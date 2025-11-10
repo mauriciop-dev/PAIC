@@ -188,17 +188,40 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 };
 
                 const formatDate = (dateValue: any): string | null => {
-                     if (!dateValue) return null;
-                     if (dateValue instanceof Date) {
-                        const adjustedDate = new Date(dateValue.getTime() - (dateValue.getTimezoneOffset() * 60000));
-                        return isNaN(adjustedDate.getTime()) ? null : adjustedDate.toISOString().split('T')[0];
-                     }
-                     const parsedDate = new Date(dateValue);
-                     if (!isNaN(parsedDate.getTime())) {
-                        const adjustedDate = new Date(parsedDate.getTime() - (parsedDate.getTimezoneOffset() * 60000));
-                        return adjustedDate.toISOString().split('T')[0];
-                     }
-                     return null;
+                    // This function correctly handles dates parsed by the xlsx library,
+                    // which are often created as UTC midnight, causing them to be off by one day in some timezones.
+                    if (!dateValue) return null;
+                    let dateObj: Date;
+                
+                    if (dateValue instanceof Date) {
+                        dateObj = dateValue;
+                    } else {
+                        // Fallback for strings which might be in various formats.
+                        dateObj = new Date(dateValue);
+                    }
+                    
+                    if (isNaN(dateObj.getTime())) {
+                         // Attempt to parse tricky DD/MM/YYYY format if it's a string and previous attempt failed
+                        if (typeof dateValue === 'string') {
+                            const parts = dateValue.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+                            if (parts) {
+                                // Assuming DD/MM/YYYY
+                                const year = parseInt(parts[3], 10);
+                                const fullYear = year < 100 ? 2000 + year : year;
+                                // Use Date.UTC to avoid local timezone interpretation during creation
+                                dateObj = new Date(Date.UTC(fullYear, parseInt(parts[2], 10) - 1, parseInt(parts[1], 10)));
+                            }
+                        }
+                    }
+                    
+                    if (isNaN(dateObj.getTime())) return null;
+                
+                    // Extract date parts from UTC to prevent timezone shifts and build a clean YYYY-MM-DD string.
+                    const year = dateObj.getUTCFullYear();
+                    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+                    
+                    return `${year}-${month}-${day}`;
                 };
 
                 if (activeTab === 'Gastos') {

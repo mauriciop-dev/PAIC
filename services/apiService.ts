@@ -707,19 +707,21 @@ export const apiService = {
             return { name: monthName.charAt(0).toUpperCase() + monthName.slice(1), value: packageVolumeData[key], fill: '#82ca9d' };
         });
 
+        // FIX: Refactored to use a Map for collecting visitor traffic data,
+        // which avoids potential type inference issues with using an object as a map with numeric keys.
         // Visitor Traffic by Access Point
-        const visitorTrafficMap: { [key: string]: number } = {};
+        const visitorTrafficMap = new Map<number, number>();
         visitors.forEach(vis => {
             if (vis.accessPointId) {
-                visitorTrafficMap[vis.accessPointId] = (visitorTrafficMap[vis.accessPointId] || 0) + 1;
+                const currentCount = visitorTrafficMap.get(vis.accessPointId) || 0;
+                visitorTrafficMap.set(vis.accessPointId, currentCount + 1);
             }
         });
         const accessPointMap = new Map(accessPoints.map(ap => [ap.id, ap.name]));
-        // FIX: Changed numeric index signature to string for visitorTrafficMap to resolve TS inference issue.
-        const visitorTraffic = Object.keys(visitorTrafficMap).map((key, index) => ({
-            name: accessPointMap.get(Number(key)) || `Punto ${key}`,
-            value: visitorTrafficMap[key],
-            fill: PIE_COLORS[index % PIE_COLORS.length]
+        const visitorTraffic = Array.from(visitorTrafficMap.entries()).map(([pointId, value], index) => ({
+            name: accessPointMap.get(pointId) || `Punto ${pointId}`,
+            value: value,
+            fill: PIE_COLORS[index % PIE_COLORS.length],
         }));
     
         return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
