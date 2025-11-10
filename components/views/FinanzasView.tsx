@@ -252,30 +252,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const handleUploadClick = () => {
         fileInputRef.current?.click();
     };
-    
-    const safeParseDate = (excelDate: any) => {
-        if (excelDate instanceof Date) {
-            // Adjust for timezone offset
-            const tzOffset = excelDate.getTimezoneOffset() * 60000;
-            const adjustedDate = new Date(excelDate.getTime() + tzOffset);
-            return adjustedDate.toISOString().split('T')[0];
-        }
-        if (typeof excelDate === 'number') {
-            // Handle Excel's serial date number format
-            const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
-            return date.toISOString().split('T')[0];
-        }
-        if (typeof excelDate === 'string') {
-           // Try to parse common string formats, assuming local time
-            const date = new Date(excelDate);
-            if (!isNaN(date.getTime())) {
-                const tzOffset = date.getTimezoneOffset() * 60000;
-                const adjustedDate = new Date(date.getTime() + tzOffset);
-                return adjustedDate.toISOString().split('T')[0];
-            }
-        }
-        return null; // Return null if parsing fails
-    };
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -291,7 +267,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
               const workbook = XLSX.read(data, { type: 'array' });
               const sheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[sheetName];
-              // Use raw: true to get the underlying values (numbers for dates)
               const json = XLSX.utils.sheet_to_json(worksheet, { raw: true, defval: null });
 
               if (json.length === 0) throw new Error("El archivo está vacío o tiene un formato incorrecto.");
@@ -399,9 +374,33 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 fill: PIE_COLORS[index % PIE_COLORS.length]
             }
         }).filter(item => item.value > 0);
+
+        const monthlyDataMap = new Map<string, { name: string, ingresos: number, gastos: number }>();
+        const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
         
-        return { expenseByCategory };
-    }, [expenses]);
+        incomes.forEach(income => {
+            const month = new Date(income.date + 'T00:00:00').getMonth();
+            const year = new Date(income.date + 'T00:00:00').getFullYear();
+            const key = `${year}-${month}`;
+            const name = `${monthNames[month]} ${year}`;
+            if (!monthlyDataMap.has(key)) monthlyDataMap.set(key, { name, ingresos: 0, gastos: 0 });
+            monthlyDataMap.get(key)!.ingresos += income.amount;
+        });
+
+        expenses.forEach(expense => {
+            const month = new Date(expense.date + 'T00:00:00').getMonth();
+            const year = new Date(expense.date + 'T00:00:00').getFullYear();
+            const key = `${year}-${month}`;
+            const name = `${monthNames[month]} ${year}`;
+            if (!monthlyDataMap.has(key)) monthlyDataMap.set(key, { name, ingresos: 0, gastos: 0 });
+            monthlyDataMap.get(key)!.gastos += expense.amount;
+        });
+        
+        // FIX: The year argument for the Date constructor must be a number, not a string.
+        const monthlyData = Array.from(monthlyDataMap.values()).sort((a,b) => new Date(Number(a.name.split(' ')[1]), monthNames.indexOf(a.name.split(' ')[0])).getTime() - new Date(Number(b.name.split(' ')[1]), monthNames.indexOf(b.name.split(' ')[0])).getTime());
+
+        return { expenseByCategory, monthlyData };
+    }, [incomes, expenses]);
     
     const renderResumen = () => (
         <div className="space-y-6">
@@ -419,17 +418,33 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                     <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(balance)}</p>
                 </div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Distribución de Egresos por Categoría</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie data={chartData.expenseByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                             {chartData.expenseByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    </PieChart>
-                </ResponsiveContainer>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Distribución de Egresos por Categoría</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie data={chartData.expenseByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                {chartData.expenseByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend wrapperStyle={{fontSize: "12px"}}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+                 <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos vs. Gastos</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData.monthlyData.slice(-6)} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" fontSize={12} />
+                            <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('es-CO', { notation: 'compact', compactDisplay: 'short' }).format(value as number)}/>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend wrapperStyle={{fontSize: "12px"}}/>
+                            <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
+                            <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
         </div>
     );
