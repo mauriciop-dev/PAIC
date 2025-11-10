@@ -108,10 +108,10 @@ async function updateResident(conjuntoId: string, resident: Resident): Promise<v
 async function deleteResident(conjuntoId: string, apartment: string): Promise<void> {
     await supabase.from('residents').delete().match({ conjunto_id: conjuntoId, apartment });
 }
-async function bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<void> {
+async function bulkUpsertResidents(conjuntoId: string, residents: Resident[]): Promise<Resident[]> {
     const payload = residents.map(r => toSupabase({ ...r, conjuntoId }));
-    const { error } = await supabase.from('residents').upsert(payload, { onConflict: 'conjunto_id, apartment' });
-    handleSupabaseError({ error }, 'bulkUpsertResidents');
+    const { data, error } = await supabase.from('residents').upsert(payload, { onConflict: 'conjunto_id, apartment' }).select();
+    return fromSupabase(handleSupabaseError({ data, error }, 'bulkUpsertResidents'));
 }
 async function fetchResidentByApartment(conjuntoId: string, apartment: string): Promise<Resident | null> {
     const { data, error } = await supabase.from('residents').select('*').eq('conjunto_id', conjuntoId).eq('apartment', apartment).single();
@@ -135,10 +135,10 @@ async function updateAccountStatus(conjuntoId: string, account: AccountStatus): 
 async function deleteAccountStatus(conjuntoId: string, apartment: string): Promise<void> {
     await supabase.from('account_status').delete().match({ conjunto_id: conjuntoId, apartment });
 }
-async function bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<void> {
+async function bulkUpsertAccountStatus(conjuntoId: string, accounts: AccountStatus[]): Promise<AccountStatus[]> {
     const payload = accounts.map(a => toSupabase({ ...a, conjuntoId }));
-    const { error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id, apartment' });
-    handleSupabaseError({ error }, 'bulkUpsertAccountStatus');
+    const { data, error } = await supabase.from('account_status').upsert(payload, { onConflict: 'conjunto_id, apartment' }).select();
+    return fromSupabase(handleSupabaseError({ data, error }, 'bulkUpsertAccountStatus'));
 }
 async function fetchDebtors(conjuntoId: string): Promise<{ apartment: string, name: string, balance: number }[]> {
     const { data: accounts, error: accError } = await supabase.from('account_status').select('apartment, outstanding_balance').eq('conjunto_id', conjuntoId).gt('outstanding_balance', 0);
@@ -181,10 +181,10 @@ async function updateProvider(conjuntoId: string, provider: Provider): Promise<v
 async function deleteProvider(conjuntoId: string, id: number): Promise<void> {
     await supabase.from('providers').delete().match({ id: id, conjunto_id: conjuntoId });
 }
-async function bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<void> {
+async function bulkUpsertProviders(conjuntoId: string, providers: Provider[]): Promise<Provider[]> {
     const payload = providers.map(p => toSupabase({ ...p, conjuntoId }));
-    const { error } = await supabase.from('providers').upsert(payload, { onConflict: 'id, conjunto_id' });
-     handleSupabaseError({ error }, 'bulkUpsertProviders');
+    const { data, error } = await supabase.from('providers').upsert(payload, { onConflict: 'conjunto_id, company' }).select();
+    return fromSupabase(handleSupabaseError({ data, error }, 'bulkUpsertProviders'));
 }
 
 async function fetchInternalStaff(conjuntoId: string): Promise<InternalStaff[]> {
@@ -200,10 +200,10 @@ async function updateInternalStaff(conjuntoId: string, staff: InternalStaff): Pr
 async function deleteInternalStaff(conjuntoId: string, name: string): Promise<void> {
     await supabase.from('internal_staff').delete().match({ conjunto_id: conjuntoId, name: name });
 }
-async function bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<void> {
+async function bulkUpsertInternalStaff(conjuntoId: string, staff: InternalStaff[]): Promise<InternalStaff[]> {
     const payload = staff.map(s => toSupabase({ ...s, conjuntoId }));
-    const { error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'conjunto_id, name' });
-    handleSupabaseError({ error }, 'bulkUpsertInternalStaff');
+    const { data, error } = await supabase.from('internal_staff').upsert(payload, { onConflict: 'conjunto_id, name' }).select();
+    return fromSupabase(handleSupabaseError({ data, error }, 'bulkUpsertInternalStaff'));
 }
 
 async function fetchUsers(conjuntoId: string): Promise<PlatformUser[]> {

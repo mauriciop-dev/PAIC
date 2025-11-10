@@ -53,3 +53,9 @@
         -   La pestaña "Permisos de usuario" permite al administrador asignar permisos de acceso a cada módulo de la plataforma de forma granular a cada usuario, a través de un modal con checkboxes.
     3.  **Control de Acceso:** La barra de navegación principal ahora es dinámica y muestra únicamente los módulos a los que el usuario interno tiene acceso según los permisos asignados.
 - **Estado Actual:** El sistema de roles y permisos está completamente funcional. Los administradores pueden crear usuarios internos y delegar acceso a secciones específicas de la plataforma de forma segura.
+
+## Sesión 8: Clarificación sobre Datos Vacíos Post-Integración
+
+- **Usuario:** Notó que las tablas en la sección de "Base de datos" estaban vacías y preguntó si la información se había perdido o si era un problema de carga.
+- **PAIC:** Explicó que este es el comportamiento esperado, ya que la conexión a la nueva base de datos de Supabase comienza con un estado limpio. Se aclaró que los datos anteriores eran de prueba y no se migran automáticamente. Se le indicó al usuario que ahora debe cargar la información real de su conjunto utilizando las herramientas "Cargar Información" o "Agregar Registro".
+- **Estado Actual:** El usuario ha comprendido la situación y procederá a cargar los datos de su conjunto residencial en la plataforma. PAIC está a la espera de nuevas instrucciones.

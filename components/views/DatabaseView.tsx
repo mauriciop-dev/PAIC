@@ -330,11 +330,16 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               }
               
               const normalizedData = json.map(row => normalizeKeys(row, currentMap));
+              let recordCount = 0;
 
               switch(activeDbTab) {
                   case DbTab.Residents:
                       if (!normalizedData[0] || !normalizedData[0].apartment) throw new Error("El archivo debe contener una columna 'Apartamento'.");
-                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, normalizedData as Resident[]);
+                      const upsertedResidents = await apiService.bulkUpsertResidents(userProfile.conjuntoId, normalizedData as Resident[]);
+                      const residentsMap = new Map(residents.map(r => [r.apartment, r]));
+                      upsertedResidents.forEach(res => residentsMap.set(res.apartment, res));
+                      setResidents(Array.from(residentsMap.values()));
+                      recordCount = upsertedResidents.length;
                       break;
                   case DbTab.AccountStatus:
                       if (!normalizedData[0] || !normalizedData[0].apartment) throw new Error("El archivo debe contener una columna 'Apartamento'.");
@@ -342,20 +347,31 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           ...account,
                           lastPaymentDate: account.lastPaymentDate ? new Date(account.lastPaymentDate).toISOString().split('T')[0] : null,
                       }));
-                      await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
+                      const upsertedAccounts = await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
+                      const accountsMap = new Map(accountStatus.map(a => [a.apartment, a]));
+                      upsertedAccounts.forEach(acc => accountsMap.set(acc.apartment, acc));
+                      setAccountStatus(Array.from(accountsMap.values()));
+                      recordCount = upsertedAccounts.length;
                       break;
                   case DbTab.Providers:
                       if (!normalizedData[0] || !normalizedData[0].company) throw new Error("El archivo debe contener una columna 'Empresa' o 'Nombre o Empresa'.");
-                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, normalizedData as Provider[]);
+                      const upsertedProviders = await apiService.bulkUpsertProviders(userProfile.conjuntoId, normalizedData as Provider[]);
+                      const providersMap = new Map(providers.map(p => [p.id, p]));
+                      upsertedProviders.forEach(prov => providersMap.set(prov.id, prov));
+                      setProviders(Array.from(providersMap.values()));
+                      recordCount = upsertedProviders.length;
                       break;
                   case DbTab.Internal:
                        if (!normalizedData[0] || !normalizedData[0].name) throw new Error("El archivo debe contener una columna 'Nombre'.");
-                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, normalizedData as InternalStaff[]);
+                      const upsertedStaff = await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, normalizedData as InternalStaff[]);
+                      const staffMap = new Map(internalStaff.map(s => [s.name, s]));
+                      upsertedStaff.forEach(staffMember => staffMap.set(staffMember.name, staffMember));
+                      setInternalStaff(Array.from(staffMap.values()));
+                      recordCount = upsertedStaff.length;
                       break;
               }
               
-              await fetchData();
-              setFeedbackMessage({type: 'success', text: `¡${json.length} registros de ${activeDbTab} cargados exitosamente!`});
+              setFeedbackMessage({type: 'success', text: `¡${recordCount} registros de ${activeDbTab} cargados/actualizados exitosamente!`});
 
           } catch (error: any) {
               console.error("Error processing file:", error);
