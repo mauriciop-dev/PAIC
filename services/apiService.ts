@@ -460,7 +460,8 @@ async function fetchSuperAdminChartData(): Promise<SuperAdminChartData> {
     // Dummy data
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
     return {
-        chatbotUsage: months.map(m => ({ name: m, value: Math.floor(Math.random() * 200) + 100 })),
+        // FIX: Add missing 'fill' property to satisfy ChartData type
+        chatbotUsage: months.map(m => ({ name: m, value: Math.floor(Math.random() * 200) + 100, fill: '#8884d8' })),
         packageVolume: [],
         visitorTraffic: []
     };

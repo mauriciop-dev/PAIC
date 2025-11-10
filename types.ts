@@ -148,7 +148,13 @@ export interface Task {
     completed: boolean;
 }
 
-export type ExpenseCategory = 'Servicios' | 'Mantenimiento' | 'Nómina' | 'Administrativos' | 'Otros';
+export enum ExpenseCategory {
+    Servicios = 'Servicios',
+    Mantenimiento = 'Mantenimiento',
+    Nomina = 'Nómina',
+    Administrativos = 'Administrativos',
+    Otros = 'Otros'
+}
 export interface Expense {
     id: number;
     description: string;
@@ -158,7 +164,12 @@ export interface Expense {
     providerId?: number | null;
 }
 
-export type IncomeCategory = 'Cuota de Administración' | 'Multas' | 'Alquiler de Áreas' | 'Otros';
+export enum IncomeCategory {
+    CuotaAdmin = 'Cuota de Administración',
+    Multas = 'Multas',
+    AlquilerAreas = 'Alquiler de Áreas',
+    Otros = 'Otros'
+}
 export interface Income {
     id: number;
     description: string;
