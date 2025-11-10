@@ -3,10 +3,12 @@ import React, { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { Icon } from '../ui/Icon';
 import LoginForm from '../LoginForm';
-import { UserProfile } from '../../types';
+// FIX: Import PlatformUser to use in props.
+import { PlatformUser, UserProfile } from '../../types';
 
 interface LoginViewProps {
-  onInternalAuthSuccess: (userProfile: UserProfile) => void;
+  // FIX: Changed prop to accept PlatformUser to align with handler in App.tsx.
+  onInternalAuthSuccess: (user: PlatformUser) => void;
 }
 
 const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {

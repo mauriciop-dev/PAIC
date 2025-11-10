@@ -110,6 +110,7 @@ export interface UserProfile {
   role: UserRole;
   trialExpiresAt?: string; // nullable timestamptz
   conjuntoId?: string; // This will be set after initial setup
+  permissions?: Tab[];
 }
 
 

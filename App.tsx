@@ -208,14 +208,39 @@ const App: React.FC = () => {
     setIsSettingsModalOpen(false);
   };
   
-  const handleInternalAuthSuccess = (profile: UserProfile) => {
-    setUserProfile(profile);
-    // You might want to fetch conjuntoInfo here as well if internal users need it
-    if (profile.conjuntoId) {
-      apiService.fetchConjuntoInfo(profile.conjuntoId).then(info => {
-        if (info) setConjuntoInfo(info);
-      });
-    }
+  const handleInternalAuthSuccess = async (platformUser: PlatformUser) => {
+      if (!platformUser.conjuntoId) return;
+
+      const roles = await apiService.fetchRoles(platformUser.conjuntoId);
+      const userRoleDef = roles.find(r => r.name === platformUser.role);
+
+      let permissions: Tab[] = [];
+      if (userRoleDef) {
+          permissions = userRoleDef.permissions;
+      } else {
+          // Handle predefined static roles
+          if (platformUser.role === 'Guard') {
+              permissions = [Tab.Seguridad];
+          } else if (platformUser.role === 'Contador') {
+              permissions = [Tab.Finanzas];
+          }
+      }
+      
+      const profile: UserProfile = {
+          id: `internal-${platformUser.id}`,
+          fullName: platformUser.name,
+          email: platformUser.email,
+          role: UserRole.Internal,
+          conjuntoId: platformUser.conjuntoId,
+          permissions: permissions,
+      };
+
+      setUserProfile(profile);
+
+      if (profile.conjuntoId) {
+          const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+          if (info) setConjuntoInfo(info);
+      }
   };
 
   if (isLoadingSession) {

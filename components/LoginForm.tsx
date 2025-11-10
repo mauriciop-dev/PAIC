@@ -1,10 +1,13 @@
+
 import React, { useState } from 'react';
-import { UserProfile, UserRole } from '../types';
+// FIX: Import PlatformUser type for the onAuthSuccess prop.
+import { PlatformUser, UserProfile, UserRole } from '../types';
 import { apiService } from '../services/apiService';
 import { Icon } from './ui/Icon';
 
 interface LoginFormProps {
-    onAuthSuccess: (userProfile: UserProfile) => void;
+    // FIX: The handler expects the full PlatformUser object, not the mapped UserProfile.
+    onAuthSuccess: (user: PlatformUser) => void;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onAuthSuccess }) => {
@@ -23,14 +26,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onAuthSuccess }) => {
             if (user) {
                 // FIX: Object literal may only specify known properties, and 'name' does not exist in type 'UserProfile'.
                 // Map the internal PlatformUser to the app's UserProfile state shape.
-                const userProfile: UserProfile = {
-                    id: `internal-${user.id}`, // Internal users don't have UUIDs, creating a unique string ID
-                    fullName: user.name,
-                    email: user.email,
-                    role: UserRole.Internal, // All platform users are considered 'Internal' in the main app state
-                    conjuntoId: user.conjuntoId
-                };
-                onAuthSuccess(userProfile);
+                // FIX: Pass the raw PlatformUser object to the parent component for processing.
+                onAuthSuccess(user);
             } else {
                 setError('Correo o contraseña incorrectos.');
             }

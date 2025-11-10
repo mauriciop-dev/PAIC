@@ -4,10 +4,9 @@ import { Icon } from './ui/Icon';
 
 interface RoleModalProps {
   isOpen: boolean;
-  roleToEdit: UserRoleDefinition | null;
   onClose: () => void;
-  onSave: (role: UserRoleDefinition, userIdToAssign?: number) => void;
-  users: PlatformUser[];
+  onSave: (role: UserRoleDefinition, userIdToAssign?: number) => Promise<void>;
+  userToEdit: PlatformUser;
   allRoles: UserRoleDefinition[];
   error?: string | null;
 }
@@ -16,96 +15,57 @@ const allPermissions = Object.values(Tab);
 
 const getBasePermissions = (roleName: UserRole | string): Tab[] => {
     switch (roleName) {
-        // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
         case 'Guard': return [Tab.Seguridad];
-        // FIX: Property 'Contador' does not exist on type 'typeof UserRole'. Use string literal instead.
         case 'Contador': return [Tab.Finanzas];
         default: return [];
     }
 };
 
-const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSave, users, allRoles, error }) => {
-  const [formData, setFormData] = useState<Partial<UserRoleDefinition>>({ name: '', permissions: [] });
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const isNew = !roleToEdit;
-
+const RoleModal: React.FC<RoleModalProps> = ({ isOpen, onClose, onSave, userToEdit, allRoles, error }) => {
+  const [permissions, setPermissions] = useState<Tab[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  
   useEffect(() => {
-    if (roleToEdit) {
-      setFormData(roleToEdit);
-      setSelectedUserId('');
-    } else {
-      setFormData({
-        name: '',
-        permissions: [],
-      });
-      if (users.length > 0) {
-        // Pre-select first user if available
-        // setSelectedUserId(String(users[0].id));
-        // handleUserChange({ target: { value: String(users[0].id) } } as any);
-      } else {
-        setSelectedUserId('');
-      }
-    }
-  }, [roleToEdit, isOpen, users]);
-
-  if (!isOpen) return null;
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handlePermissionChange = (permission: Tab) => {
-      const currentPermissions = formData.permissions || [];
-      const newPermissions = currentPermissions.includes(permission)
-        ? currentPermissions.filter(p => p !== permission)
-        : [...currentPermissions, permission];
-      setFormData(prev => ({ ...prev, permissions: newPermissions }));
-  }
-  
-  const handleUserChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const userId = e.target.value;
-    setSelectedUserId(userId);
-    if (userId) {
-        const user = users.find(u => u.id === parseInt(userId, 10));
-        if (user) {
-            const userCustomRoleDef = allRoles.find(r => r.name === user.role);
-
-            let initialPermissions: Tab[] = [];
-            let roleName = `Personalizado para ${user.name}`;
-
-            if (userCustomRoleDef) {
-                initialPermissions = userCustomRoleDef.permissions;
-                roleName = userCustomRoleDef.name;
-            } else {
-                initialPermissions = getBasePermissions(user.role);
-            }
-
-            setFormData({
-                name: roleName,
-                permissions: initialPermissions,
-            });
+    if (userToEdit) {
+        const customRole = allRoles.find(r => r.name === userToEdit.role);
+        if (customRole) {
+            setPermissions(customRole.permissions);
+        } else {
+            setPermissions(getBasePermissions(userToEdit.role));
         }
-    } else {
-        setFormData({ name: '', permissions: [] });
     }
-  };
+  }, [userToEdit, allRoles, isOpen]);
 
+  if (!isOpen || !userToEdit) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePermissionChange = (permission: Tab) => {
+      setPermissions(prev => 
+        prev.includes(permission)
+          ? prev.filter(p => p !== permission)
+          : [...prev, permission]
+      );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isNew && !selectedUserId) {
-        alert("Por favor, selecciona un usuario.");
-        return;
-    }
-    if(!formData.name?.trim()) return;
+    setIsSaving(true);
+    
+    try {
+        const customRoleName = `Personalizado para ${userToEdit.name}`;
+        const existingRole = allRoles.find(r => r.name === userToEdit.role && r.name.startsWith('Personalizado para'));
 
-    const finalData: UserRoleDefinition = {
-        id: roleToEdit?.id || '',
-        name: formData.name,
-        permissions: formData.permissions || []
-    };
-    onSave(finalData, selectedUserId ? parseInt(selectedUserId, 10) : undefined);
+        const finalData: UserRoleDefinition = {
+            id: existingRole?.id || '',
+            name: customRoleName,
+            permissions: permissions
+        };
+        await onSave(finalData, userToEdit.id);
+        // On success, the parent component will close the modal.
+    } catch (e) {
+        // Error is handled by parent component and passed back via props
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -114,45 +74,32 @@ const RoleModal: React.FC<RoleModalProps> = ({ isOpen, roleToEdit, onClose, onSa
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
           <Icon name="x" className="w-6 h-6"/>
         </button>
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">{isNew ? 'Agregar Permisos' : 'Editar Permisos'}</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Permisos para {userToEdit.name}</h2>
+        <p className="text-sm text-gray-500 mb-6">Selecciona los módulos a los que este usuario tendrá acceso.</p>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-            {isNew ? (
-                <div>
-                    <label htmlFor="user" className="block text-sm font-medium text-gray-700">Nombre de usuario</label>
-                    <select id="user" value={selectedUserId} onChange={handleUserChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
-                        <option value="">Selecciona un usuario...</option>
-                        {users.filter(u => u.role !== UserRole.Admin).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
-                    </select>
-                     <p className="text-xs text-gray-500 mt-1">Solo se pueden asignar permisos personalizados a roles no-administradores.</p>
-                </div>
-            ) : (
-                <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre del Rol</label>
-                    <input type="text" id="name" name="name" value={formData.name || ''} onChange={handleTextChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
-                </div>
-            )}
             <div>
-                <label className="block text-sm font-medium text-gray-700">Permisos</label>
-                <div className="mt-2 grid grid-cols-2 gap-2 border border-gray-200 p-2 rounded-md max-h-48 overflow-y-auto">
+                <div className="mt-2 grid grid-cols-2 gap-3 border border-gray-200 p-4 rounded-md max-h-60 overflow-y-auto">
                     {allPermissions.map(perm => (
-                        <div key={perm} className="flex items-center">
+                        <label key={perm} htmlFor={`perm-${perm}`} className="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer">
                             <input
                                 id={`perm-${perm}`}
                                 type="checkbox"
-                                checked={formData.permissions?.includes(perm) || false}
+                                checked={permissions.includes(perm)}
                                 onChange={() => handlePermissionChange(perm)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                                disabled={!selectedUserId && isNew}
+                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <label htmlFor={`perm-${perm}`} className="ml-2 block text-sm text-gray-900">{perm}</label>
-                        </div>
+                            <span className="ml-3 block text-sm font-medium text-gray-800">{perm}</span>
+                        </label>
                     ))}
                 </div>
             </div>
             {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
           <div className="mt-8 flex justify-end gap-4">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-            <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar</button>
+            <button type="submit" disabled={isSaving} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300">
+                {isSaving ? 'Guardando...' : 'Guardar Permisos'}
+            </button>
           </div>
         </form>
       </div>

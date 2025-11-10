@@ -26,10 +26,16 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
 
   const visibleTabs = useMemo(() => {
     if (!userProfile) return [];
-    // TODO: When custom roles are fully implemented via the UI, this logic will need to read
-    // the permissions from the user's specific role definition.
+
+    if (userProfile.role === UserRole.Internal) {
+        if (userProfile.permissions && userProfile.permissions.length > 0) {
+            return allTabs.filter(tab => userProfile.permissions!.includes(tab.id));
+        }
+        return [];
+    }
+
     return allTabs.filter(tab => tab.roles.includes(userProfile.role));
-  }, [userProfile.role]);
+  }, [userProfile]);
 
   const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
 

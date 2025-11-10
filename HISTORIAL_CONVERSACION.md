@@ -32,3 +32,24 @@
 - **Usuario:** Preguntó si toda la funcionalidad desarrollada previamente (CRUD en tablas, carga/descarga de plantillas, actualización de gráficas, acciones del chatbot) se había visto afectada por la integración con Supabase. También consultó sobre la robustez técnica de la plataforma.
 - **PAIC:** Realizó un análisis técnico y confirmó que toda la funcionalidad no solo estaba intacta, sino que había sido **mejorada significativamente**. Explicó que la lógica ahora opera sobre una base de datos real y persistente (`apiService.ts`) en lugar de datos de prueba (`mockApiService.ts`), lo cual le da a la plataforma estabilidad, seguridad y escalabilidad reales.
 - **Estado Actual:** La plataforma está 100% conectada a Supabase. Se ha verificado que las funcionalidades principales están operativas y conectadas a la base de datos en la nube. El sistema de autenticación y las políticas de seguridad de datos están funcionando correctamente. La plataforma está en un estado robusto y lista para continuar con el desarrollo o las pruebas de usuario.
+
+## Sesión 6: Propuesta para Reimplementar Roles y Permisos
+
+- **Usuario:** Solicitó la reimplementación del sistema de roles y permisos para usuarios internos (ej. vigilantes, contadores), que anteriormente se gestionaba en la sección "Base de datos". Pidió una sugerencia de implementación lógica y ágil.
+- **PAIC:** Propuso un plan detallado de 4 pasos sin modificar el código:
+    1.  **Modelo de Datos:** Crear dos nuevas tablas en Supabase: `platform_users` (para usuarios internos con contraseñas encriptadas) y `user_roles` (para definir permisos personalizados por conjunto).
+    2.  **Flujo de Usuario (UX):** Añadir dos pestañas en la vista "Base de datos": "Usuarios" (para crear/editar usuarios) y "Permisos de usuario" (para asignar accesos a módulos específicos mediante checkboxes a cada usuario).
+    3.  **Lógica del Sistema:** Implementar la lógica de autenticación para usuarios internos y filtrar las pestañas visibles en la `NavBar` según los permisos asignados.
+    4.  **Seguridad (RLS):** Aplicar políticas de seguridad a nivel de fila para asegurar que cada administrador solo pueda gestionar los usuarios y roles de su propio conjunto.
+- **Estado Anterior:** A la espera de la aprobación del plan por parte del usuario para proceder con la implementación.
+
+## Sesión 7: Implementación del Sistema de Roles y Permisos
+
+- **Usuario:** Aprobó el plan y solicitó la implementación.
+- **PAIC:** Implementó la funcionalidad completa:
+    1.  **Autenticación Interna:** Se actualizó el flujo de login para que los usuarios internos (vigilantes, contadores) carguen sus permisos específicos al iniciar sesión.
+    2.  **UI de Administración:** En la sección `Base de datos`, se implementaron las pestañas "Usuarios" y "Permisos de usuario".
+        -   La pestaña "Usuarios" permite el CRUD completo de usuarios internos a través de un modal.
+        -   La pestaña "Permisos de usuario" permite al administrador asignar permisos de acceso a cada módulo de la plataforma de forma granular a cada usuario, a través de un modal con checkboxes.
+    3.  **Control de Acceso:** La barra de navegación principal ahora es dinámica y muestra únicamente los módulos a los que el usuario interno tiene acceso según los permisos asignados.
+- **Estado Actual:** El sistema de roles y permisos está completamente funcional. Los administradores pueden crear usuarios internos y delegar acceso a secciones específicas de la plataforma de forma segura.

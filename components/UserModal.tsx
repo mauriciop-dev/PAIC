@@ -16,7 +16,6 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
     name: '',
     email: '',
     phoneNumber: '',
-    // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
     role: 'Guard',
     password: '',
   });
@@ -39,7 +38,6 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         name: '',
         email: '',
         phoneNumber: '',
-        // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
         role: 'Guard',
         password: '',
       });
@@ -55,8 +53,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isNewUser && formData.role !== UserRole.Admin && (!formData.password || formData.password.trim().length === 0)) {
-        alert("La contraseña es obligatoria para todos los roles que no son 'Administrador'.");
+    if (isNewUser && (!formData.password || formData.password.trim().length === 0)) {
+        alert("La contraseña es obligatoria para usuarios nuevos.");
         return;
     }
     if (formData.password && formData.password.length > 0 && formData.password.length < 6) {
@@ -65,12 +63,14 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
     }
     onSave(formData as PlatformUser);
   };
+  
+  // Filter out custom roles that are just for permissions to not clutter the dropdown
+  const predefinedRoles = availableRoles.filter(r => !r.name.startsWith('Personalizado para'));
 
-  const allRoles = [
-      { id: UserRole.Admin, name: UserRole.Admin },
-      // FIX: Property 'Guard' does not exist on type 'typeof UserRole'. Use string literal instead.
-      { id: 'Guard', name: 'Guard' },
-      ...availableRoles,
+  const allRoleOptions = [
+      { name: 'Guard' },
+      { name: 'Contador' },
+      ...predefinedRoles,
   ];
 
   return (
@@ -106,11 +106,11 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</label>
               <select id="role" name="role" value={formData.role} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
-                {allRoles.map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
+                {allRoleOptions.map(role => (
+                    <option key={role.name} value={role.name}>{role.name}</option>
                 ))}
               </select>
-               <p className="text-xs text-gray-500 mt-1">El rol 'Administrador' solo puede iniciar sesión con Google.</p>
+               <p className="text-xs text-gray-500 mt-1">Para asignar permisos personalizados, hazlo desde la pestaña 'Permisos de usuario'.</p>
             </div>
              <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">Contraseña</label>
@@ -120,9 +120,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
                 name="password" 
                 value={formData.password} 
                 onChange={handleChange} 
-                className="mt-1 w-full p-2 border border-gray-300 rounded-md disabled:bg-gray-100" 
-                placeholder={isNewUser ? (formData.role !== UserRole.Admin ? "Contraseña (obligatoria)" : "No aplica para Admin") : "Dejar en blanco para no cambiar"}
-                disabled={formData.role === UserRole.Admin}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md" 
+                placeholder={isNewUser ? "Contraseña (obligatoria)" : "Dejar en blanco para no cambiar"}
               />
             </div>
              {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
