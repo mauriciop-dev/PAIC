@@ -323,6 +323,16 @@ async function deleteIncome(conjuntoId: string, incomeId: number): Promise<void>
     const { error } = await supabase.from('incomes').delete().match({ id: incomeId, conjunto_id: conjuntoId });
     handleSupabaseError({ error }, 'deleteIncome');
 }
+async function deleteAllIncomes(conjuntoId: string): Promise<void> {
+    const { error } = await supabase.from('incomes').delete().match({ conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteAllIncomes');
+}
+async function bulkInsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
+    const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
+    const { error } = await supabase.from('incomes').insert(payload);
+    handleSupabaseError({ error }, 'bulkInsertIncomes');
+}
+
 
 async function fetchExpenses(conjuntoId: string): Promise<Expense[]> {
     const { data, error } = await supabase.from('expenses').select('*').eq('conjunto_id', conjuntoId);
@@ -339,6 +349,15 @@ async function updateExpense(conjuntoId: string, expense: Expense): Promise<void
 async function deleteExpense(conjuntoId: string, expenseId: number): Promise<void> {
     const { error } = await supabase.from('expenses').delete().match({ id: expenseId, conjunto_id: conjuntoId });
     handleSupabaseError({ error }, 'deleteExpense');
+}
+async function deleteAllExpenses(conjuntoId: string): Promise<void> {
+    const { error } = await supabase.from('expenses').delete().match({ conjunto_id: conjuntoId });
+    handleSupabaseError({ error }, 'deleteAllExpenses');
+}
+async function bulkInsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
+    const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
+    const { error } = await supabase.from('expenses').insert(payload);
+    handleSupabaseError({ error }, 'bulkInsertExpenses');
 }
 
 async function fetchVisitorLogs(conjuntoId: string): Promise<VisitorLog[]> {
@@ -587,10 +606,14 @@ export const apiService = {
     addIncome,
     updateIncome,
     deleteIncome,
+    deleteAllIncomes,
+    bulkInsertIncomes,
     fetchExpenses,
     addExpense,
     updateExpense,
     deleteExpense,
+    deleteAllExpenses,
+    bulkInsertExpenses,
     fetchVisitorLogs,
     addVisitorLog,
     updateVisitorLog,
