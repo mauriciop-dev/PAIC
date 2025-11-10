@@ -580,72 +580,149 @@ export const apiService = {
     },
 
     async fetchDashboardSummary(conjuntoId: string): Promise<DashboardSummary> {
-        // Mock data. A real implementation would run DB queries.
+        const [debtorsData, tasksData, dueDatesData, packagesData] = await Promise.all([
+            this.fetchDebtors(conjuntoId),
+            this.fetchTasks(conjuntoId),
+            this.fetchDueDates(conjuntoId),
+            this.fetchPackageLogs(conjuntoId)
+        ]);
+    
+        const pendingTasks = tasksData.filter(t => !t.completed);
+        const overduePayments = dueDatesData.filter(d => d.status === 'Vencido');
+        const packagesToDeliver = packagesData.filter(p => p.status === 'En recepción');
+    
+        const notifications: NotificationItem[] = [];
+        const urgentDueDate = dueDatesData.find(d => d.status === 'Pendiente');
+        if (urgentDueDate) {
+            notifications.push({ id: `due-${urgentDueDate.id}`, type: 'due-date', text: `Vencimiento próximo: ${urgentDueDate.item}`, details: `Vence el ${urgentDueDate.dueDate}`, urgency: 'high', linkTo: Tab.DueDates });
+        }
+        const urgentTask = pendingTasks[0];
+        if (urgentTask) {
+            notifications.push({ id: `task-${urgentTask.id}`, type: 'task', text: `Tarea pendiente: ${urgentTask.text}`, details: `Vence el ${urgentTask.dueDate || 'N/A'}`, urgency: 'medium', linkTo: Tab.PendingTasks });
+        }
+        const newPackage = packagesToDeliver[0];
+        if (newPackage) {
+            notifications.push({ id: `pkg-${newPackage.id}`, type: 'package', text: `Paquete para Apto ${newPackage.apartment}`, details: `De ${newPackage.courier}`, urgency: 'low', linkTo: Tab.Seguridad });
+        }
+    
         return {
             stats: {
                 residentsInDebt: { 
-                    count: 5, 
-                    details: ['Apto 101', 'Apto 203', 'Apto 305', 'Apto 401', 'Apto 502'] 
+                    count: debtorsData.length, 
+                    details: debtorsData.slice(0, 10).map(d => `Apto ${d.apartment}: $${d.balance.toLocaleString()}`)
                 },
                 pendingTasks: { 
-                    count: 3, 
-                    details: ['Revisar bomba de agua', 'Comprar pintura pasillos', 'Llamar a empresa de jardinería'] 
+                    count: pendingTasks.length, 
+                    details: pendingTasks.slice(0, 10).map(t => t.text)
                 },
                 overduePayments: { 
-                    count: 2, 
-                    details: ['Pago de seguridad (Vencido)', 'Mantenimiento ascensor (Vencido)'] 
+                    count: overduePayments.length, 
+                    details: overduePayments.slice(0, 10).map(d => d.item)
                 },
                 packagesToDeliver: { 
-                    count: 8, 
-                    details: [
-                        'Paquete para Apto 505', 
-                        'Sobre para Apto 102', 
-                        'Caja para Apto 301', 
-                        'Paquete para Apto 604', 
-                        'Sobre para Apto 202', 
-                        'Paquete para Apto 701', 
-                        'Caja para Apto 403',
-                        'Paquete para Apto 104'
-                    ] 
+                    count: packagesToDeliver.length, 
+                    details: packagesToDeliver.slice(0, 10).map(p => `Paquete para Apto ${p.apartment}`)
                 },
             },
-            notifications: [
-                { id: 1, type: 'due-date', text: 'Pago de vigilancia vence pronto', details: 'Vence en 3 días', urgency: 'high', linkTo: Tab.DueDates },
-                { id: 2, type: 'task', text: 'Revisar cámaras de seguridad', details: 'Asignada a: Personal', urgency: 'medium', linkTo: Tab.PendingTasks },
-                { id: 3, type: 'package', text: 'Paquete para Apto 101', details: 'Recibido de Servientrega', urgency: 'low', linkTo: Tab.Seguridad },
-            ]
+            notifications: notifications.slice(0, 3)
         };
     },
     
     async fetchFinancialChartData(conjuntoId: string): Promise<{ monthlyIncomeVsExpense: ChartData[], expensesByCategory: ChartData[], packageVolume: ChartData[], visitorTraffic: ChartData[] }> {
-        // Mock data
-        return {
-            monthlyIncomeVsExpense: [
-                // FIX: Added 'value' and 'fill' properties to conform to ChartData type.
-                { name: 'Ene', ingresos: 4000, gastos: 2400, value: 0, fill: '' },
-                { name: 'Feb', ingresos: 3000, gastos: 1398, value: 0, fill: '' },
-                { name: 'Mar', ingresos: 2000, gastos: 9800, value: 0, fill: '' },
-                { name: 'Abr', ingresos: 2780, gastos: 3908, value: 0, fill: '' },
-                { name: 'May', ingresos: 1890, gastos: 4800, value: 0, fill: '' },
-                { name: 'Jun', ingresos: 2390, gastos: 3800, value: 0, fill: '' },
-            ],
-            expensesByCategory: [
-                { name: 'Servicios', value: 400, fill: '#0088FE' },
-                { name: 'Mantenimiento', value: 300, fill: '#00C49F' },
-                { name: 'Nómina', value: 300, fill: '#FFBB28' },
-                { name: 'Otros', value: 200, fill: '#FF8042' },
-            ],
-            packageVolume: [
-                // FIX: Added 'fill' property to conform to ChartData type.
-                { name: 'Ene', value: 50, fill: '#82ca9d' }, { name: 'Feb', value: 65, fill: '#82ca9d' }, { name: 'Mar', value: 70, fill: '#82ca9d' },
-                { name: 'Abr', value: 82, fill: '#82ca9d' }, { name: 'May', value: 95, fill: '#82ca9d' }, { name: 'Jun', value: 110, fill: '#82ca9d' },
-            ],
-            visitorTraffic: [
-                 // FIX: Added 'fill' property to conform to ChartData type.
-                 { name: 'Portería 1', value: 400, fill: '#0088FE' },
-                 { name: 'Portería 2', value: 250, fill: '#00C49F' },
-            ],
-        };
+        const [expenses, incomes, packages, visitors, accessPoints] = await Promise.all([
+            this.fetchExpenses(conjuntoId),
+            this.fetchIncomes(conjuntoId),
+            this.fetchPackageLogs(conjuntoId),
+            this.fetchVisitorLogs(conjuntoId),
+            this.fetchAccessPoints(conjuntoId)
+        ]);
+    
+        // Monthly Income vs Expense (last 12 months)
+        const monthlyData: { [key: string]: { ingresos: number, gastos: number } } = {};
+        const today = new Date();
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const monthName = d.toLocaleString('es-ES', { month: 'short' });
+            monthlyData[key] = { ingresos: 0, gastos: 0 };
+        }
+    
+        incomes.forEach(inc => {
+            const d = new Date(inc.date + 'T00:00:00Z');
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+            if (monthlyData[key]) monthlyData[key].ingresos += inc.amount;
+        });
+        expenses.forEach(exp => {
+            const d = new Date(exp.date + 'T00:00:00Z');
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+            if (monthlyData[key]) monthlyData[key].gastos += exp.amount;
+        });
+    
+        const monthlyIncomeVsExpense = Object.keys(monthlyData).map(key => {
+             const d = new Date(`${key}-01T00:00:00Z`);
+             const monthName = d.toLocaleString('es-ES', { month: 'short' });
+             return {
+                name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+                ingresos: monthlyData[key].ingresos,
+                gastos: monthlyData[key].gastos,
+                value: 0,
+                fill: ''
+             }
+        });
+    
+        // Expenses by Category (current month)
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const currentMonthExpenses = expenses.filter(e => {
+            const d = new Date(e.date + 'T00:00:00Z');
+            return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
+        });
+    
+        const expensesByCategoryMap: { [key: string]: number } = {};
+        currentMonthExpenses.forEach(exp => {
+            expensesByCategoryMap[exp.category] = (expensesByCategoryMap[exp.category] || 0) + exp.amount;
+        });
+        const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+        const expensesByCategory = Object.keys(expensesByCategoryMap).map((key, index) => ({
+            name: key,
+            value: expensesByCategoryMap[key],
+            fill: PIE_COLORS[index % PIE_COLORS.length]
+        }));
+        
+        // Package Volume (last 6 months)
+        const packageVolumeData: {[key: string]: number} = {};
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            packageVolumeData[key] = 0;
+        }
+        packages.forEach(pkg => {
+            const d = new Date(pkg.receivedDate);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if(packageVolumeData.hasOwnProperty(key)) packageVolumeData[key]++;
+        });
+        const packageVolume = Object.keys(packageVolumeData).map(key => {
+            const d = new Date(`${key}-01`);
+            const monthName = d.toLocaleString('es-ES', { month: 'short' });
+            return { name: monthName.charAt(0).toUpperCase() + monthName.slice(1), value: packageVolumeData[key], fill: '#82ca9d' };
+        });
+
+        // Visitor Traffic by Access Point
+        const visitorTrafficMap: { [key: string]: number } = {};
+        visitors.forEach(vis => {
+            if (vis.accessPointId) {
+                visitorTrafficMap[vis.accessPointId] = (visitorTrafficMap[vis.accessPointId] || 0) + 1;
+            }
+        });
+        const accessPointMap = new Map(accessPoints.map(ap => [ap.id, ap.name]));
+        // FIX: Changed numeric index signature to string for visitorTrafficMap to resolve TS inference issue.
+        const visitorTraffic = Object.keys(visitorTrafficMap).map((key, index) => ({
+            name: accessPointMap.get(Number(key)) || `Punto ${key}`,
+            value: visitorTrafficMap[key],
+            fill: PIE_COLORS[index % PIE_COLORS.length]
+        }));
+    
+        return { monthlyIncomeVsExpense, expensesByCategory, packageVolume, visitorTraffic };
     },
 
     // =================================================================
