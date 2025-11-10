@@ -271,7 +271,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               const workbook = XLSX.read(data, { type: 'array' });
               const sheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[sheetName];
-              const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
+              const json = XLSX.utils.sheet_to_json(worksheet, { cellDates: true, raw: false }); // raw:false helps with dates
 
               if (json.length === 0) {
                   throw new Error("El archivo está vacío o tiene un formato incorrecto.");
@@ -279,69 +279,73 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               
               if (!userProfile.conjuntoId) throw new Error("ID de conjunto no encontrado.");
               
-              const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
-                  return data.map((row: any) => 
-                      Object.keys(row).reduce((acc: any, key: string) => {
-                          if (allowedKeys.has(key)) {
-                              acc[key] = row[key];
-                          }
-                          return acc;
-                      }, {})
-                  );
+              const keyMaps = {
+                  [DbTab.Residents]: {
+                      'apartamento': 'apartment', 'apto': 'apartment',
+                      'nombre': 'name',
+                      'correo': 'email', 'e-mail': 'email',
+                      'telefono': 'phone', 'celular': 'phone',
+                  },
+                  [DbTab.AccountStatus]: {
+                      'apartamento': 'apartment', 'apto': 'apartment',
+                      'fecha ultimo pago': 'lastPaymentDate', 'fechaultimopago': 'lastPaymentDate',
+                      'valor cuota': 'adminFeeValue', 'valorcuota': 'adminFeeValue',
+                      'cuotas pendientes': 'pendingInstallments', 'cuotaspendientes': 'pendingInstallments',
+                      'otros cargos': 'otherCharges', 'otroscargos': 'otherCharges',
+                      'saldo pendiente': 'outstandingBalance', 'saldopendiente': 'outstandingBalance',
+                  },
+                  [DbTab.Providers]: {
+                      'empresa': 'company', 'nombre o empresa': 'company',
+                      'especialidad': 'specialty',
+                      'correo': 'email', 'e-mail': 'email',
+                      'telefono': 'phone', 'celular': 'phone',
+                  },
+                  [DbTab.Internal]: {
+                       'nombre': 'name',
+                       'cargo': 'position', 'puesto': 'position',
+                       'correo': 'email', 'e-mail': 'email',
+                       'telefono': 'phone', 'celular': 'phone',
+                  }
               };
+
+              const normalizeKeys = (row: any, map: { [key: string]: string }) => {
+                  const normalizedRow: { [key: string]: any } = {};
+                  for (const key in row) {
+                      const lowerKey = key.toLowerCase().replace(/ /g, '');
+                      const mappedKey = map[lowerKey] || key; // Fallback to original key if no mapping found
+                      normalizedRow[mappedKey] = row[key];
+                  }
+                  return normalizedRow;
+              };
+
+              const currentMap = keyMaps[activeDbTab as keyof typeof keyMaps];
+              if (!currentMap) {
+                   throw new Error(`La carga masiva para ${activeDbTab} no está implementada.`);
+              }
+              
+              const normalizedData = json.map(row => normalizeKeys(row, currentMap));
 
               switch(activeDbTab) {
                   case DbTab.Residents:
-                      const residentKeys = new Set(['apartment', 'name', 'email', 'phone']);
-                      const sanitizedResidents = sanitizeData(json, residentKeys);
-                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, sanitizedResidents as Resident[]);
+                      if (!normalizedData[0] || !normalizedData[0].apartment) throw new Error("El archivo debe contener una columna 'Apartamento'.");
+                      await apiService.bulkUpsertResidents(userProfile.conjuntoId, normalizedData as Resident[]);
                       break;
                   case DbTab.AccountStatus:
-                      const accountKeys = new Set(['apartment', 'lastPaymentDate', 'adminFeeValue', 'pendingInstallments', 'otherCharges', 'outstandingBalance']);
-                      const sanitizedAccounts = sanitizeData(json, accountKeys);
-                      
-                      const formattedAccounts = sanitizedAccounts.map((account: any) => {
-                          let formattedDate: string | null = null;
-                          const dateValue = account.lastPaymentDate;
-                          
-                          if (dateValue) {
-                              if (dateValue instanceof Date) {
-                                  // Path 1: It's a Date object from an Excel serial number.
-                                  // Correct for timezone offset, as xlsx library might create it in local time.
-                                  const adjustedDate = new Date(dateValue.getTime() - (dateValue.getTimezoneOffset() * 60000));
-                                  if (!isNaN(adjustedDate.getTime())) {
-                                      formattedDate = adjustedDate.toISOString().split('T')[0];
-                                  }
-                              } else {
-                                  // Path 2: It's not a Date object, likely a string or number.
-                                  const parsedDate = new Date(dateValue);
-                                  if (!isNaN(parsedDate.getTime())) {
-                                      // Correct for timezone if it's just a date string like '2024-05-04'
-                                      const adjustedDate = new Date(parsedDate.getTime() - (parsedDate.getTimezoneOffset() * 60000));
-                                      formattedDate = adjustedDate.toISOString().split('T')[0];
-                                  }
-                              }
-                          }
-                          return {
-                              ...account,
-                              lastPaymentDate: formattedDate,
-                          };
-                      });
-
+                      if (!normalizedData[0] || !normalizedData[0].apartment) throw new Error("El archivo debe contener una columna 'Apartamento'.");
+                      const formattedAccounts = normalizedData.map((account: any) => ({
+                          ...account,
+                          lastPaymentDate: account.lastPaymentDate ? new Date(account.lastPaymentDate).toISOString().split('T')[0] : null,
+                      }));
                       await apiService.bulkUpsertAccountStatus(userProfile.conjuntoId, formattedAccounts as AccountStatus[]);
                       break;
                   case DbTab.Providers:
-                      const providerKeys = new Set(['company', 'specialty', 'email', 'phone']);
-                      const sanitizedProviders = sanitizeData(json, providerKeys);
-                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, sanitizedProviders as Provider[]);
+                      if (!normalizedData[0] || !normalizedData[0].company) throw new Error("El archivo debe contener una columna 'Empresa' o 'Nombre o Empresa'.");
+                      await apiService.bulkUpsertProviders(userProfile.conjuntoId, normalizedData as Provider[]);
                       break;
                   case DbTab.Internal:
-                      const staffKeys = new Set(['name', 'position', 'email', 'phone']);
-                      const sanitizedStaff = sanitizeData(json, staffKeys);
-                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, sanitizedStaff as InternalStaff[]);
+                       if (!normalizedData[0] || !normalizedData[0].name) throw new Error("El archivo debe contener una columna 'Nombre'.");
+                      await apiService.bulkUpsertInternalStaff(userProfile.conjuntoId, normalizedData as InternalStaff[]);
                       break;
-                  default:
-                      throw new Error(`La carga masiva para ${activeDbTab} no está implementada.`);
               }
               
               await fetchData();

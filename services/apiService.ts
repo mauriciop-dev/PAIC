@@ -450,10 +450,10 @@ export const apiService = {
         const { error } = await supabase.from('expenses').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         handleError(error, 'deleteExpense');
     },
-    async bulkUpsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
+    async bulkInsertExpenses(conjuntoId: string, expenses: Omit<Expense, 'id'>[]): Promise<void> {
         const payload = expenses.map(e => toSupabase({ ...e, conjuntoId }));
-        const { error } = await supabase.from('expenses').upsert(payload, { onConflict: 'id, conjunto_id' });
-        handleError(error, 'bulkUpsertExpenses');
+        const { error } = await supabase.from('expenses').insert(payload);
+        handleError(error, 'bulkInsertExpenses');
     },
     async fetchIncomes(conjuntoId: string): Promise<Income[]> {
         const { data, error } = await supabase.from('incomes').select('*').eq('conjunto_id', conjuntoId);
@@ -468,10 +468,10 @@ export const apiService = {
         const { error } = await supabase.from('incomes').delete().eq('id', id).eq('conjunto_id', conjuntoId);
         handleError(error, 'deleteIncome');
     },
-    async bulkUpsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
+    async bulkInsertIncomes(conjuntoId: string, incomes: Omit<Income, 'id'>[]): Promise<void> {
         const payload = incomes.map(i => toSupabase({ ...i, conjuntoId }));
-        const { error } = await supabase.from('incomes').upsert(payload, { onConflict: 'id, conjunto_id' });
-        handleError(error, 'bulkUpsertIncomes');
+        const { error } = await supabase.from('incomes').insert(payload);
+        handleError(error, 'bulkInsertIncomes');
     },
 
     // Security

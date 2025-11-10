@@ -19,14 +19,16 @@ interface FinanzasViewProps {
     userProfile: UserProfile;
 }
 
+const expenseCategories: ExpenseCategory[] = ['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'];
+const incomeCategories: IncomeCategory[] = ['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'];
+
+
 const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
-    const [activeTab, setActiveTab] = useState<FinanzasTab>('Resumen');
+    const [activeTab, setActiveTab] = useState<FinanzasTab>('Gastos');
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    // FIX: Updated the state type to match the data structure returned by `apiService.fetchFinancialChartData`,
-    // which includes `packageVolume` and `visitorTraffic`, and removed the unused `monthlyBudget` property.
     const [chartData, setChartData] = useState<{ 
         monthlyIncomeVsExpense: ChartData[],
         expensesByCategory: ChartData[],
@@ -176,8 +178,9 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 const sanitizeData = (data: any[], allowedKeys: Set<string>) => {
                     return data.map((row: any) =>
                         Object.keys(row).reduce((acc: any, key: string) => {
-                            if (allowedKeys.has(key)) {
-                                acc[key] = row[key];
+                            const lowerKey = key.toLowerCase();
+                            if (allowedKeys.has(lowerKey)) {
+                                acc[lowerKey] = row[key];
                             }
                             return acc;
                         }, {})
@@ -199,24 +202,40 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                 };
 
                 if (activeTab === 'Gastos') {
-                    const expenseKeys = new Set(['description', 'amount', 'category', 'date', 'providerId']);
+                    const expenseKeys = new Set(['description', 'amount', 'category', 'date', 'providerid']);
                     const sanitizedExpenses = sanitizeData(json, expenseKeys);
-                    const formattedExpenses = sanitizedExpenses.map((exp: any) => ({
-                        ...exp,
-                        amount: parseFloat(exp.amount) || 0,
-                        date: formatDate(exp.date) || new Date().toISOString().split('T')[0],
-                        providerId: exp.providerId ? parseInt(exp.providerId, 10) : null,
-                    }));
-                    await apiService.bulkUpsertExpenses(userProfile.conjuntoId!, formattedExpenses);
+
+                    const providerNameToIdMap = new Map(providers.map(p => [p.company.toLowerCase(), p.id]));
+                    const validExpenseCategories = new Set(expenseCategories);
+
+                    const formattedExpenses = sanitizedExpenses.map((exp: any) => {
+                        const mappedCategory = validExpenseCategories.has(exp.category) ? exp.category : 'Otros';
+                        
+                        const providerName = exp.providerid ? String(exp.providerid).toLowerCase() : null;
+                        const mappedProviderId = providerName ? (providerNameToIdMap.get(providerName) || null) : null;
+
+                        return {
+                            description: exp.description || 'Sin descripción',
+                            amount: parseFloat(exp.amount) || 0,
+                            category: mappedCategory,
+                            date: formatDate(exp.date) || new Date().toISOString().split('T')[0],
+                            providerId: mappedProviderId,
+                        }
+                    });
+                    await apiService.bulkInsertExpenses(userProfile.conjuntoId!, formattedExpenses);
                 } else if (activeTab === 'Ingresos') {
                     const incomeKeys = new Set(['description', 'amount', 'category', 'date']);
                     const sanitizedIncomes = sanitizeData(json, incomeKeys);
+
+                    const validIncomeCategories = new Set(incomeCategories);
+
                     const formattedIncomes = sanitizedIncomes.map((inc: any) => ({
-                        ...inc,
+                        description: inc.description || 'Sin descripción',
                         amount: parseFloat(inc.amount) || 0,
+                        category: validIncomeCategories.has(inc.category) ? inc.category : 'Otros',
                         date: formatDate(inc.date) || new Date().toISOString().split('T')[0],
                     }));
-                    await apiService.bulkUpsertIncomes(userProfile.conjuntoId!, formattedIncomes);
+                    await apiService.bulkInsertIncomes(userProfile.conjuntoId!, formattedIncomes);
                 }
 
                 setUploadFeedback({ type: 'success', text: `¡${json.length} registros cargados exitosamente!` });
@@ -306,9 +325,6 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             }
         };
     }, [expenses, incomes, chartData, selectedMonth]);
-    
-    const expenseCategories: ExpenseCategory[] = ['Servicios', 'Mantenimiento', 'Nómina', 'Administrativos', 'Otros'];
-    const incomeCategories: IncomeCategory[] = ['Cuota de Administración', 'Multas', 'Alquiler de Áreas', 'Otros'];
 
     const renderSummary = () => (
         <div className="space-y-6">
