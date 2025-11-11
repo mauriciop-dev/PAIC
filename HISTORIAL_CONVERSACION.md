@@ -222,3 +222,13 @@
 -   **IA:**
     -   **Diagnóstico:** Se confirma que el código en `apiService.ts` está intentando acceder a una tabla llamada `profiles` que no existe. Esta es la causa raíz del "Error de Sincronización".
     -   **Solución (Frontend):** Se actualiza el archivo `apiService.ts` para que todas las llamadas a la base de datos (específicamente `fetchUserProfile` y `updateUserProfile`) apunten al nombre de tabla correcto: `user_profiles`. Esta corrección soluciona definitivamente el problema de no poder encontrar el perfil del usuario después de iniciar sesión.
+
+---
+
+## Sesión 22: Creación de Archivo de Referencia del Esquema
+
+-   **Usuario:** Proporciona una lista detallada de todas las tablas de la base de datos y solicita que se añada al proyecto como referencia.
+-   **IA:**
+    -   **Acción:** Crea un nuevo archivo `SCHEMA_REFERENCE.md` en la raíz del proyecto.
+    -   **Contenido:** Formatea la información proporcionada por el usuario en una tabla Markdown clara y legible, documentando el propósito, tamaño y estado de cada tabla de la base de datos.
+    -   **Beneficio:** Proporciona una referencia rápida y centralizada del esquema de la base de datos para facilitar el desarrollo y mantenimiento futuro.
