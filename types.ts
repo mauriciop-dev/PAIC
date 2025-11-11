@@ -50,8 +50,9 @@ export interface Message {
 
 export interface ChartData {
     name: string;
-    value: number;
-    fill: string;
+    // FIX: Made value and fill optional to support different chart types.
+    value?: number;
+    fill?: string;
     // Added for dual bar charts
     ingresos?: number;
     gastos?: number;

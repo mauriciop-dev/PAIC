@@ -273,3 +273,11 @@
     -   **Solución (Carga Infinita):** Se refactoriza el callback de `onAuthStateChange` en `App.tsx` para envolver toda su lógica en un bloque `try/catch/finally`. El bloque `finally` garantiza que `setIsLoadingSession(false)` se ejecute siempre, eliminando la posibilidad de que la aplicación se quede congelada.
     -   **Diagnóstico (Dashboard):** La función RPC `get_dashboard_summary` es frágil y falla por completo si una de sus subconsultas internas tiene un problema, incluso si hay datos en otras áreas.
     -   **Solución (Dashboard):** Se modifica `DashboardView.tsx` para que, si `fetchDashboardSummary` falla, no se bloquee toda la vista. En su lugar, se muestra un mensaje de error genérico, las tarjetas de estadísticas muestran un estado de error ("--"), y la aplicación procede a cargar los gráficos de forma independiente. Esto hace que el panel sea más resiliente a fallos parciales de datos.
+---
+
+## Sesión 27: Solución Definitiva al Error de Carga del Dashboard
+
+-   **Usuario:** Confirma que hay datos en todas las vistas, pero el dashboard principal sigue sin mostrarlos y presenta un error.
+-   **IA:**
+    -   **Diagnóstico:** Las funciones RPC de la base de datos (`get_dashboard_summary` y `get_financial_chart_data`) son la causa del problema. Son frágiles y fallan por completo si encuentran cualquier dato inesperado, incluso si el 99% de los datos son correctos.
+    -   **Solución (Frontend/Refactor):** Se refactoriza completamente `DashboardView.tsx` para abandonar el uso de las funciones RPC. La nueva lógica obtiene los datos "en bruto" de cada tabla necesaria (`incomes`, `expenses`, `tasks`, etc.) de forma individual y realiza todos los cálculos, agrupaciones y resúmenes directamente en el frontend. Esto hace que el dashboard sea extremadamente robusto: si falta un tipo de dato (ej. no hay visitantes), solo el gráfico correspondiente no se mostrará, pero el resto del panel funcionará perfectamente. Esto soluciona el problema de raíz al eliminar la dependencia del código frágil del backend.

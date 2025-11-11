@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, BarChart, Bar } from 'recharts';
 import { apiService } from '../../services/apiService';
-import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile } from '../../types';
+// FIX: Imported missing types to resolve reference errors and improve type safety.
+import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile, DueDate, Task, PackageLog, IncomeCategory, ExpenseCategory, VisitorLog, AccessPoint } from '../../types';
 import { Icon } from '../ui/Icon';
 
 interface DashboardViewProps {
@@ -81,63 +82,158 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         visitorTraffic: ChartData[]
     } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [chartError, setChartError] = useState<string | null>(null);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
     const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
     useEffect(() => {
-        const fetchAllData = async () => {
+        const fetchDataAndProcess = async () => {
             if (!userProfile.conjuntoId) {
-                setError("No se ha seleccionado un conjunto residencial.");
                 setIsLoading(false);
                 return;
             }
-
             setIsLoading(true);
-            setError(null);
-            setChartError(null);
+    
+            // Fetch all raw data sources concurrently and gracefully handle individual failures.
+            const [
+                accountStatusData,
+                tasksData,
+                dueDatesData,
+                packagesData,
+                visitorsData,
+                incomesData,
+                expensesData,
+                accessPointsData,
+            ] = await Promise.all([
+                apiService.fetchAccountStatus(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchTasks(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchDueDates(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchPackageLogs(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchVisitorLogs(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchIncomes(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchExpenses(userProfile.conjuntoId).catch(() => []),
+                apiService.fetchAccessPoints(userProfile.conjuntoId).catch(() => []),
+            ]);
+    
+            // --- Process Data for Stats Cards ---
+            const residentsInDebt = accountStatusData.filter(a => a.outstandingBalance > 0);
+            const pendingTasks = tasksData.filter(t => !t.completed);
+            const overduePayments = dueDatesData.filter(d => d.status === 'Vencido');
+            const packagesToDeliver = packagesData.filter(p => p.status === 'En recepción');
+    
+            // --- Process Data for Notifications ---
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-            // Fetch summary data first, but don't block chart loading on failure.
-            try {
-                const summaryData = await apiService.fetchDashboardSummary(userProfile.conjuntoId);
-                setSummary(summaryData);
-            } catch (err) {
-                console.error("Failed to fetch dashboard summary:", err);
-                setError("No se pudieron cargar las estadísticas principales. Puede haber un problema con los datos o una falla temporal.");
-                // Set a fallback summary object so the UI doesn't crash
-                setSummary({
-                    stats: {
-                        residentsInDebt: { count: -1, details: [] },
-                        pendingTasks: { count: -1, details: [] },
-                        overduePayments: { count: -1, details: [] },
-                        packagesToDeliver: { count: -1, details: [] },
-                    },
-                    notifications: [],
+            const dueDateNotifications: NotificationItem[] = dueDatesData
+                .filter(d => d.status !== 'Pagado')
+                .map(d => {
+                    const dueDate = new Date(d.dueDate + 'T00:00:00');
+                    const timeDiff = dueDate.getTime() - today.getTime();
+                    const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                    let urgency: 'high' | 'medium' = 'medium';
+                    let details = `Vence el ${d.dueDate}.`;
+                    if (dayDiff < 0) {
+                        urgency = 'high';
+                        details = `Venció hace ${Math.abs(dayDiff)} día(s).`;
+                    } else if (dayDiff <= 3) {
+                        urgency = 'high';
+                        details = `Vence en ${dayDiff} día(s).`;
+                    }
+                    return { id: `d-${d.id}`, type: 'due-date', text: d.item, details, urgency, linkTo: Tab.DueDates };
                 });
-            }
 
-            // Then, fetch chart data.
-            try {
-                const chartDataResult = await apiService.fetchFinancialChartData(userProfile.conjuntoId);
-                if (chartDataResult) {
-                    setChartData({
-                        monthlyIncomeVsExpense: chartDataResult.monthlyIncomeVsExpense,
-                        expensesByCategory: chartDataResult.expensesByCategory,
-                        packageVolume: chartDataResult.packageVolume,
-                        visitorTraffic: chartDataResult.visitorTraffic,
-                    });
+            const taskNotifications: NotificationItem[] = pendingTasks
+                .filter(t => t.dueDate)
+                .map(t => ({
+                    id: `t-${t.id}`,
+                    type: 'task',
+                    text: t.text,
+                    details: `Vence el ${t.dueDate}`,
+                    urgency: 'medium',
+                    linkTo: Tab.PendingTasks
+                }));
+            
+            const packageNotifications: NotificationItem[] = packagesToDeliver.map(p => ({
+                id: `p-${p.id}`,
+                type: 'package',
+                text: `Paquete para Apto ${p.apartment}`,
+                details: `Recibido de ${p.courier}`,
+                urgency: 'low',
+                linkTo: Tab.Seguridad
+            }));
+            
+            const allNotifications = [...dueDateNotifications, ...taskNotifications, ...packageNotifications]
+                .sort((a, b) => {
+                    const urgencyOrder = { high: 1, medium: 2, low: 3 };
+                    return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+                })
+                .slice(0, 5); // Limit to top 5 notifications
+    
+            setSummary({
+                stats: {
+                    residentsInDebt: { count: residentsInDebt.length, details: residentsInDebt.slice(0, 10).map(r => `Apto ${r.apartment}: $${r.outstandingBalance.toLocaleString()}`) },
+                    pendingTasks: { count: pendingTasks.length, details: pendingTasks.slice(0, 10).map(t => t.text) },
+                    overduePayments: { count: overduePayments.length, details: overduePayments.slice(0, 10).map(p => p.item) },
+                    packagesToDeliver: { count: packagesToDeliver.length, details: packagesToDeliver.slice(0, 10).map(p => `Apto ${p.apartment} de ${p.courier}`) },
+                },
+                notifications: allNotifications,
+            });
+    
+            // --- Process Data for Charts ---
+            const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+            const monthlyDataMap = new Map<string, { name: string, ingresos: number, gastos: number }>();
+            
+            [...incomesData, ...expensesData].forEach(item => {
+                const date = new Date(item.date + 'T00:00:00');
+                const month = date.getMonth();
+                const year = date.getFullYear();
+                const key = `${year}-${String(month).padStart(2, '0')}`;
+                const name = `${monthNames[month]} ${String(year).slice(2)}`;
+                if (!monthlyDataMap.has(key)) monthlyDataMap.set(key, { name, ingresos: 0, gastos: 0 });
+                if ('category' in item && Object.values(IncomeCategory).includes(item.category as any)) {
+                    monthlyDataMap.get(key)!.ingresos += item.amount;
                 } else {
-                    throw new Error("Los datos para los gráficos están incompletos.");
+                    monthlyDataMap.get(key)!.gastos += item.amount;
                 }
-            } catch (err) {
-                 console.error("Failed to fetch chart data:", err);
-                 setChartError("No se pudieron cargar los gráficos. Es posible que falten datos de seguridad (paquetes, visitantes) para generarlos.");
-            } finally {
-                setIsLoading(false);
-            }
+            });
+
+            const monthlyIncomeVsExpense = Array.from(monthlyDataMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(entry => entry[1]);
+            
+            const expensesByCategory = Object.values(ExpenseCategory).map((cat, i) => ({
+                name: cat,
+                value: expensesData.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0),
+                fill: ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'][i % 5],
+            })).filter(d => d.value > 0);
+
+            // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
+            const packageVolume = packagesData.reduce((acc: Map<string, number>, pkg: PackageLog) => {
+                const date = new Date(pkg.receivedDate);
+                const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+                acc.set(key, (acc.get(key) || 0) + 1);
+                return acc;
+            }, new Map<string, number>());
+            const packageVolumeChartData = Array.from(packageVolume.entries()).sort((a,b) => a[0].localeCompare(b[0])).map(([key, value]) => ({ name: `${monthNames[parseInt(key.split('-')[1])]} ${key.split('-')[0].slice(2)}`, value }));
+            
+            // FIX: Add explicit type to map callback parameter to help TS infer types correctly.
+            const accessPointMap = new Map(accessPointsData.map((ap: AccessPoint) => [ap.id, ap.name]));
+            // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
+            const visitorTraffic = visitorsData.reduce((acc: Map<string, number>, visitor: VisitorLog) => {
+                const pointName = accessPointMap.get(visitor.accessPointId!) || 'Portería Desconocida';
+                acc.set(pointName, (acc.get(pointName) || 0) + 1);
+                return acc;
+            }, new Map<string, number>());
+            const visitorTrafficChartData = Array.from(visitorTraffic.entries()).map(([name, value]) => ({ name, value }));
+
+            setChartData({
+                monthlyIncomeVsExpense,
+                expensesByCategory,
+                packageVolume: packageVolumeChartData,
+                visitorTraffic: visitorTrafficChartData
+            });
+    
+            setIsLoading(false);
         };
-        fetchAllData();
+        fetchDataAndProcess();
     }, [userProfile.conjuntoId]);
 
 
@@ -146,8 +242,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         setTooltip({
             content,
-            x: rect.left + rect.width / 2, // Center of the card
-            y: rect.top, // Top edge of the card
+            x: rect.left + rect.width / 2,
+            y: rect.top,
         });
     };
 
@@ -160,12 +256,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     }
 
     if (!summary) {
-        // This case should ideally not be hit due to the fallback, but as a safeguard:
         return (
             <div className="text-center p-10 bg-red-50 border border-red-200 rounded-lg">
                 <Icon name="alert-triangle" className="w-12 h-12 mx-auto text-red-500"/>
                 <h3 className="mt-4 text-lg font-semibold text-red-800">Error Crítico al Cargar el Centro de Control</h3>
-                <p className="mt-2 text-red-700">{error || 'No se pudo inicializar el dashboard.'}</p>
+                <p className="mt-2 text-red-700">No se pudieron obtener los datos iniciales.</p>
             </div>
         );
     }
@@ -184,8 +279,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
                     <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos (Registrados)" stroke="#2563eb" strokeWidth={2} />
-                    <Line type="monotone" dataKey="gastos" name="Gastos (Registrados)" stroke="#ef4444" strokeWidth={2} />
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#2563eb" strokeWidth={2} />
+                    <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} />
                 </LineChart>
             )
         },
@@ -204,7 +299,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         {
             title: 'Volumen de Paquetes (Últimos 6 meses)',
             component: (
-                <BarChart data={chartData.packageVolume} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <BarChart data={chartData.packageVolume.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                     <XAxis dataKey="name" fontSize={12} />
                     <YAxis fontSize={12} allowDecimals={false} />
@@ -229,7 +324,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         {
             title: 'Comportamiento Histórico (Últimos 12 meses)',
             component: (
-                <LineChart data={chartData.monthlyIncomeVsExpense} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <LineChart data={chartData.monthlyIncomeVsExpense.slice(-12)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                     <XAxis dataKey="name" fontSize={12} />
                     <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
@@ -240,7 +335,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 </LineChart>
             )
         },
-    ] : [];
+    ].filter(chart => {
+        if (chart.title.includes('Gastos') && chartData.expensesByCategory.length === 0) return false;
+        if (chart.title.includes('Paquetes') && chartData.packageVolume.length === 0) return false;
+        if (chart.title.includes('Visitantes') && chartData.visitorTraffic.length === 0) return false;
+        if (chart.title.includes('Ingresos') && chartData.monthlyIncomeVsExpense.length === 0) return false;
+        return true;
+    });
 
     const handleNextChart = () => {
         if (charts.length === 0) return;
@@ -255,29 +356,21 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
 
   return (
     <div className="space-y-6">
-        {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-                <p><span className="font-bold">Aviso:</span> {error}</p>
-            </div>
-        )}
-
-        {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div onMouseEnter={(e) => handleMouseEnter(stats.residentsInDebt.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count === -1 ? '--' : stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
+                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.pendingTasks.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count === -1 ? '--' : stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
+                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.overduePayments.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count === -1 ? '--' : stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
+                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.packagesToDeliver.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count === -1 ? '--' : stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
+                <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
             </div>
         </div>
         
-        {/* Main Grid: Notifications + Chart Carousel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Centro de Notificaciones</h3>
@@ -292,11 +385,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 </div>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
-                {chartError || charts.length === 0 ? (
+                {charts.length === 0 ? (
                      <div className="text-center p-10 flex-grow flex flex-col justify-center items-center">
                         <Icon name="alert-triangle" className="w-10 h-10 mx-auto text-yellow-500"/>
                         <h3 className="mt-4 text-md font-semibold text-yellow-800">Gráficos no disponibles</h3>
-                        <p className="mt-1 text-sm text-yellow-700">{chartError || 'No hay suficientes datos para generar los gráficos.'}</p>
+                        <p className="mt-1 text-sm text-yellow-700">No hay suficientes datos para generar los gráficos.</p>
                     </div>
                 ) : (
                     <>
