@@ -301,3 +301,12 @@
     -   **Solución (Congelamiento):** Se blinda el callback envolviendo toda la lógica en un `try/catch/finally` para garantizar que `setIsLoadingSession(false)` se ejecute siempre, eliminando la posibilidad de congelamiento.
     -   **Mejora UX:** Se acoge la sugerencia del usuario y se añaden botones de recarga (`refresh-cw`) a todas las vistas con tablas (`DatabaseView`, `FinanzasView`, `SeguridadView`, `DueDatesView`, `PendingTasksView`) para permitir la actualización de datos sin recargar la página completa.
     -   **Aclaración Técnica:** Se explica de forma clara y con una analogía que la nueva lógica del dashboard no es "scraping", sino que obtiene los datos en bruto directamente de la base de datos y realiza los cálculos en el frontend para ser más resiliente a fallos, lo cual es una práctica robusta y estándar.
+
+---
+
+## Sesión 30: Solución a Congelamiento por "Canales Zombie"
+
+-   **Usuario:** Reporta que el problema de la pantalla "Cargando PAIC..." persiste al abrir la aplicación en una nueva pestaña después de cerrar una anterior.
+-   **IA:**
+    -   **Diagnóstico:** El problema se debe a "canales zombie" de Supabase Realtime. Al cerrar una pestaña, la conexión no se termina limpiamente. Al abrir una nueva, el cliente de Supabase intenta reanudar esta conexión rota, causando un error interno no capturable que detiene la ejecución.
+    -   **Solución:** Se modifica `App.tsx` para añadir `supabase.removeAllChannels()` al inicio del callback de `onAuthStateChange`. Esto fuerza una limpieza completa de todas las conexiones al cargar la sesión, asegurando un estado limpio y previniendo el error, solucionando así el congelamiento.

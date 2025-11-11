@@ -205,26 +205,24 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 fill: ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'][i % 5],
             })).filter(d => d.value > 0);
 
-            // FIX: The generic type argument on .reduce is not supported in this environment, causing type inference issues.
-            // Explicitly typing the accumulator in the callback and the initial value Map resolves this.
-            const packageVolume = packagesData.reduce((acc: Map<string, number>, pkg) => {
+            // FIX: The reduce method was causing type inference errors in this environment. Switched to a forEach loop which is functionally equivalent and avoids the issue.
+            const packageVolume = new Map<string, number>();
+            packagesData.forEach(pkg => {
                 const date = new Date(pkg.receivedDate);
                 const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
-                acc.set(key, (acc.get(key) || 0) + 1);
-                return acc;
-            }, new Map<string, number>());
+                packageVolume.set(key, (packageVolume.get(key) || 0) + 1);
+            });
             const packageVolumeChartData = Array.from(packageVolume.entries()).sort((a,b) => a[0].localeCompare(b[0])).map(([key, value]) => ({ name: `${monthNames[parseInt(key.split('-')[1])]} ${key.split('-')[0].slice(2)}`, value }));
             
             // FIX: Add explicit type to map callback parameter to help TS infer types correctly.
             // FIX: Explicitly setting the return type of the map callback to a tuple `[number, string]` ensures that the Map constructor correctly infers its generic types as `Map<number, string>`.
             const accessPointMap = new Map(accessPointsData.map((ap: AccessPoint): [number, string] => [ap.id, ap.name]));
-            // FIX: The generic type argument on .reduce is not supported in this environment, causing type inference issues.
-            // Explicitly typing the accumulator in the callback and the initial value Map resolves this.
-            const visitorTraffic = visitorsData.reduce((acc: Map<string, number>, visitor) => {
+            // FIX: The reduce method was causing type inference errors in this environment. Switched to a forEach loop which is functionally equivalent and avoids the issue.
+            const visitorTraffic = new Map<string, number>();
+            visitorsData.forEach(visitor => {
                 const pointName = accessPointMap.get(visitor.accessPointId!) || 'Portería Desconocida';
-                acc.set(pointName, (acc.get(pointName) || 0) + 1);
-                return acc;
-            }, new Map<string, number>());
+                visitorTraffic.set(pointName, (visitorTraffic.get(pointName) || 0) + 1);
+            });
             const visitorTrafficChartData = Array.from(visitorTraffic.entries()).map(([name, value]) => ({ name, value }));
 
             setChartData({
