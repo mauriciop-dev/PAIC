@@ -164,3 +164,12 @@
 -   **IA:**
     -   **Diagnóstico:** Dado que los nombres son diferentes, el problema no es de duplicados. El error `JSON.parse` indica una violación de reglas del bucket. La hipótesis es que el primer archivo subido cumplía las reglas (PDF, <5MB) pero el segundo no, violando las políticas que el usuario configuró directamente en Supabase.
     -   **Solución:** Implementa una robusta validación del lado del cliente en `ArchivosView.tsx` y `FileManagerModal.tsx`. El código ahora comprueba explícitamente que el archivo sea `application/pdf` y que su tamaño sea menor a 5MB *antes* de intentar la subida. Esto proporciona un feedback inmediato y claro al usuario ("Solo se permiten PDFs", "El archivo supera los 5MB") y previene la llamada al servidor que causa el error críptico. Se mejora también el mensaje de error en el `catch` para ser más descriptivo.
+
+---
+
+## Sesión 16: Error de Sincronización de Perfil al Iniciar Sesión
+
+-   **Usuario:** Reporta un "Error de Sincronización" que impide el acceso después de un inicio de sesión exitoso, especialmente para usuarios nuevos.
+-   **IA:**
+    -   **Diagnóstico:** Se identifica una condición de carrera (race condition). El frontend intenta leer el perfil del usuario desde la tabla `profiles` inmediatamente después de que Supabase Auth confirma el login, pero antes de que el trigger de la base de datos haya tenido tiempo de crear dicho perfil.
+    -   **Solución:** Se modifica el listener `onAuthStateChange` en `App.tsx`. Se implementa un mecanismo de reintento que busca el perfil del usuario hasta 3 veces, con una pausa de 1 segundo entre cada intento. Esto le da a la base de datos tiempo suficiente para sincronizarse y asegura que el perfil se cargue correctamente, eliminando el error para los nuevos usuarios.
