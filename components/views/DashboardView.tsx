@@ -15,7 +15,7 @@ interface TooltipData {
     y: number;
 }
 
-const StatCard: React.FC<{ title: string; value: number; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
+const StatCard: React.FC<{ title: string; value: number | string; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
     <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
         <div className={`p-3 rounded-full ${iconColor}`}>
             <Icon name={icon} className="w-6 h-6 text-white" />
@@ -98,22 +98,26 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
             setError(null);
             setChartError(null);
 
-            // Fetch summary data first, as it's critical
+            // Fetch summary data first, but don't block chart loading on failure.
             try {
                 const summaryData = await apiService.fetchDashboardSummary(userProfile.conjuntoId);
-                if (summaryData) {
-                    setSummary(summaryData);
-                } else {
-                    throw new Error("No se pudieron cargar las estadísticas principales.");
-                }
+                setSummary(summaryData);
             } catch (err) {
                 console.error("Failed to fetch dashboard summary:", err);
-                setError("No se pudieron cargar los datos del centro de control. Es posible que no haya información financiera registrada todavía. Intenta agregar algunos ingresos o gastos.");
-                setIsLoading(false);
-                return; // Stop if summary fails
+                setError("No se pudieron cargar las estadísticas principales. Puede haber un problema con los datos o una falla temporal.");
+                // Set a fallback summary object so the UI doesn't crash
+                setSummary({
+                    stats: {
+                        residentsInDebt: { count: -1, details: [] },
+                        pendingTasks: { count: -1, details: [] },
+                        overduePayments: { count: -1, details: [] },
+                        packagesToDeliver: { count: -1, details: [] },
+                    },
+                    notifications: [],
+                });
             }
 
-            // Then, fetch chart data. If this fails, the dashboard can still partially render.
+            // Then, fetch chart data.
             try {
                 const chartDataResult = await apiService.fetchFinancialChartData(userProfile.conjuntoId);
                 if (chartDataResult) {
@@ -155,12 +159,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
     }
 
-    if (error || !summary) {
+    if (!summary) {
+        // This case should ideally not be hit due to the fallback, but as a safeguard:
         return (
             <div className="text-center p-10 bg-red-50 border border-red-200 rounded-lg">
                 <Icon name="alert-triangle" className="w-12 h-12 mx-auto text-red-500"/>
-                <h3 className="mt-4 text-lg font-semibold text-red-800">Error al Cargar el Centro de Control</h3>
-                <p className="mt-2 text-red-700">{error || 'Los datos del dashboard no se pudieron cargar.'}</p>
+                <h3 className="mt-4 text-lg font-semibold text-red-800">Error Crítico al Cargar el Centro de Control</h3>
+                <p className="mt-2 text-red-700">{error || 'No se pudo inicializar el dashboard.'}</p>
             </div>
         );
     }
@@ -250,19 +255,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
 
   return (
     <div className="space-y-6">
+        {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                <p><span className="font-bold">Aviso:</span> {error}</p>
+            </div>
+        )}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div onMouseEnter={(e) => handleMouseEnter(stats.residentsInDebt.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
+                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count === -1 ? '--' : stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.pendingTasks.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
+                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count === -1 ? '--' : stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.overduePayments.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
+                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count === -1 ? '--' : stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.packagesToDeliver.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
+                <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count === -1 ? '--' : stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
             </div>
         </div>
         

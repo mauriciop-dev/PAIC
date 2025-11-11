@@ -263,3 +263,13 @@
 -   **IA:**
     -   **Diagnóstico:** El problema se debe a una desestructuración insegura en `App.tsx` al suscribirse a los cambios de estado de autenticación (`onAuthStateChange`). Si la API de Supabase devuelve una respuesta inesperada (ej. con `data: null`), el código genera un `TypeError` no capturado, lo que impide que el estado `isLoadingSession` se actualice a `false`.
     -   **Solución (Frontend):** Se modifica el `useEffect` en `App.tsx` para manejar de forma segura la respuesta de `onAuthStateChange`. Se desestructura `data` primero y luego se accede a `data?.subscription`, evitando el fallo y asegurando que el estado de carga se resuelva siempre, ya sea para mostrar la aplicación o una pantalla de error.
+---
+
+## Sesión 26: Solución a Carga Infinita y Error Persistente en Dashboard
+
+-   **Usuario:** Reporta que la aplicación sigue quedándose congelada en "Cargando..." al refrescar y que el error del Centro de Control persiste a pesar de tener datos.
+-   **IA:**
+    -   **Diagnóstico (Carga Infinita):** El problema es un error no manejado dentro del callback de `onAuthStateChange`. Si cualquier `await` dentro de la función falla, la ejecución se detiene y nunca se llega a actualizar el estado de carga.
+    -   **Solución (Carga Infinita):** Se refactoriza el callback de `onAuthStateChange` en `App.tsx` para envolver toda su lógica en un bloque `try/catch/finally`. El bloque `finally` garantiza que `setIsLoadingSession(false)` se ejecute siempre, eliminando la posibilidad de que la aplicación se quede congelada.
+    -   **Diagnóstico (Dashboard):** La función RPC `get_dashboard_summary` es frágil y falla por completo si una de sus subconsultas internas tiene un problema, incluso si hay datos en otras áreas.
+    -   **Solución (Dashboard):** Se modifica `DashboardView.tsx` para que, si `fetchDashboardSummary` falla, no se bloquee toda la vista. En su lugar, se muestra un mensaje de error genérico, las tarjetas de estadísticas muestran un estado de error ("--"), y la aplicación procede a cargar los gráficos de forma independiente. Esto hace que el panel sea más resiliente a fallos parciales de datos.

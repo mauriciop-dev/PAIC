@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -79,53 +78,58 @@ const App: React.FC = () => {
     }
 
     setIsLoadingSession(true);
-    // FIX: `getSession` is a v2 method. The error suggests it doesn't exist. Reverting to the v1 synchronous method `session()`.
-    // The error `Property 'session' does not exist on type 'SupabaseAuthClient'` indicates v2 types are in use.
-    // The `onAuthStateChange` listener handles the initial session, so the explicit `session()` call is removed.
-
-    // FIX: `onAuthStateChange` subscription in v1 returns `{ data: subscription }`, not `{ data: { subscription } }`.
-    // The error on unsubscribe suggests the structure is `{ data: { subscription } }` which is Supabase v2.
+    
     const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        setLoginError(null); // Clear any previous error on a new auth event
-        setSession(session);
-        if (session?.user) {
-            let profile = null;
-            // Retry fetching the profile to account for potential replication delay or trigger latency.
-            // Increased retry count and delay for more robustness against severe DB lag.
-            for (let i = 0; i < 5; i++) {
-                profile = await apiService.fetchUserProfile(session.user.id);
-                if (profile) break;
-                console.warn(`Profile not found, likely due to DB replication lag. Retrying... Attempt ${i + 1}`);
-                await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds
-            }
+        try {
+            setLoginError(null); // Clear any previous error on a new auth event
+            setSession(session);
+            if (session?.user) {
+                let profile = null;
+                // Retry fetching the profile to account for potential replication delay or trigger latency.
+                // Increased retry count and delay for more robustness against severe DB lag.
+                for (let i = 0; i < 5; i++) {
+                    profile = await apiService.fetchUserProfile(session.user.id);
+                    if (profile) break;
+                    console.warn(`Profile not found, likely due to DB replication lag. Retrying... Attempt ${i + 1}`);
+                    await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds
+                }
 
-            if (profile) {
-                setUserProfile(profile);
-                if (profile.conjuntoId) {
-                    const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
-                    if (info) {
-                        setConjuntoInfo(info);
+                if (profile) {
+                    setUserProfile(profile);
+                    if (profile.conjuntoId) {
+                        const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+                        if (info) {
+                            setConjuntoInfo(info);
+                        } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                            setIsInitialSetupModalOpen(true);
+                        }
                     } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                         setIsInitialSetupModalOpen(true);
                     }
-                } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                    setIsInitialSetupModalOpen(true);
+                } else {
+                    console.error("User is logged in but profile data is missing after extensive retries.");
+                    setLoginError({
+                        title: "Error de Sincronización",
+                        message: "No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.",
+                        type: 'sync',
+                    });
+                    setUserProfile(null);
+                    setConjuntoInfo(null);
                 }
             } else {
-                console.error("User is logged in but profile data is missing after extensive retries.");
-                setLoginError({
-                    title: "Error de Sincronización",
-                    message: "No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.",
-                    type: 'sync',
-                });
                 setUserProfile(null);
                 setConjuntoInfo(null);
             }
-        } else {
-            setUserProfile(null);
-            setConjuntoInfo(null);
+        } catch (e) {
+            console.error("Unhandled error during authentication state change:", e);
+            setLoginError({
+                title: "Error Crítico de Sesión",
+                message: "Ocurrió un error inesperado al procesar tu sesión. Por favor, intenta refrescar. Si el problema no se soluciona, contacta a soporte.",
+                type: 'sync',
+            });
+        } finally {
+            setIsLoadingSession(false);
         }
-        setIsLoadingSession(false);
     });
     
     const subscription = data?.subscription;
