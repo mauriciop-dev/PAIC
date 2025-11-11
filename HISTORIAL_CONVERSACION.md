@@ -242,3 +242,16 @@
     -   **Solución (Carga Infinita):** Se modifica `DashboardView.tsx` para añadir un manejo de errores robusto. Si la carga de datos falla, ahora se muestra un mensaje de error claro al usuario en lugar de la pantalla de carga, mejorando la resiliencia de la UI.
     -   **Diagnóstico (Typo):** A pesar de que los archivos de código proporcionados parecen correctos, la aparición de "picas" sugiere un error tipográfico en la versión local del archivo `types.ts` del usuario.
     -   **Solución (Typo):** Se proporciona una versión corregida del archivo `types.ts`, asegurando que la enumeración `Tab.Archivos` esté definida correctamente como `'Archivos'`, lo que corrige el texto visible en la barra de navegación.
+
+---
+
+## Sesión 24: Resiliencia en la Carga de Datos del Dashboard
+
+-   **Usuario:** Reporta que el error en el Centro de Control persiste, y que el mensaje de "no hay datos financieros" es incorrecto porque los datos sí existen.
+-   **IA:**
+    -   **Diagnóstico:** El problema es un fallo en cascada. El dashboard intenta cargar todos los datos (estadísticas, finanzas, paquetes, visitantes) a la vez. Si una de las consultas (por ejemplo, la de visitantes, que puede no tener datos) falla, toda la operación se detiene y se muestra un mensaje de error genérico y engañoso.
+    -   **Solución (Frontend):** Se refactoriza `DashboardView.tsx` para que la carga de datos sea más resiliente.
+        1.  Se cargan primero los datos esenciales (estadísticas de las tarjetas). Si esto falla, se muestra el error principal.
+        2.  Luego, se intenta cargar los datos para los gráficos en un bloque `try/catch` separado.
+        3.  Si la carga de los gráficos falla, el panel principal sigue funcionando, pero la sección de gráficos muestra un mensaje de error nuevo y más específico, indicando que podrían faltar datos de seguridad (paquetes, visitantes). Esto aísla el error y proporciona una mejor experiencia y diagnóstico.
+---

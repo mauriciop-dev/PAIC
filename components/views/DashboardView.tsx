@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, BarChart, Bar } from 'recharts';
 import { apiService } from '../../services/apiService';
@@ -83,22 +82,41 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [chartError, setChartError] = useState<string | null>(null);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
     const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
     useEffect(() => {
-        const fetchData = async () => {
-            if (!userProfile.conjuntoId) return;
+        const fetchAllData = async () => {
+            if (!userProfile.conjuntoId) {
+                setError("No se ha seleccionado un conjunto residencial.");
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
             setError(null);
+            setChartError(null);
+
+            // Fetch summary data first, as it's critical
             try {
-                const [summaryData, chartDataResult] = await Promise.all([
-                    apiService.fetchDashboardSummary(userProfile.conjuntoId),
-                    apiService.fetchFinancialChartData(userProfile.conjuntoId),
-                ]);
-                
-                if (summaryData && chartDataResult) {
+                const summaryData = await apiService.fetchDashboardSummary(userProfile.conjuntoId);
+                if (summaryData) {
                     setSummary(summaryData);
+                } else {
+                    throw new Error("No se pudieron cargar las estadísticas principales.");
+                }
+            } catch (err) {
+                console.error("Failed to fetch dashboard summary:", err);
+                setError("No se pudieron cargar los datos del centro de control. Es posible que no haya información financiera registrada todavía. Intenta agregar algunos ingresos o gastos.");
+                setIsLoading(false);
+                return; // Stop if summary fails
+            }
+
+            // Then, fetch chart data. If this fails, the dashboard can still partially render.
+            try {
+                const chartDataResult = await apiService.fetchFinancialChartData(userProfile.conjuntoId);
+                if (chartDataResult) {
                     setChartData({
                         monthlyIncomeVsExpense: chartDataResult.monthlyIncomeVsExpense,
                         expensesByCategory: chartDataResult.expensesByCategory,
@@ -106,18 +124,18 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                         visitorTraffic: chartDataResult.visitorTraffic,
                     });
                 } else {
-                    throw new Error("Los datos recibidos del servidor están incompletos.");
+                    throw new Error("Los datos para los gráficos están incompletos.");
                 }
-
-            } catch (error) {
-                console.error("Failed to fetch dashboard summary", error);
-                setError("No se pudieron cargar los datos del centro de control. Es posible que no haya información financiera registrada todavía. Intenta agregar algunos ingresos o gastos.");
+            } catch (err) {
+                 console.error("Failed to fetch chart data:", err);
+                 setChartError("No se pudieron cargar los gráficos. Es posible que falten datos de seguridad (paquetes, visitantes) para generarlos.");
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchData();
+        fetchAllData();
     }, [userProfile.conjuntoId]);
+
 
     const handleMouseEnter = (content: string[], event: React.MouseEvent) => {
         if (!content || content.length === 0) return;
@@ -137,7 +155,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
     }
 
-    if (error || !summary || !chartData) {
+    if (error || !summary) {
         return (
             <div className="text-center p-10 bg-red-50 border border-red-200 rounded-lg">
                 <Icon name="alert-triangle" className="w-12 h-12 mx-auto text-red-500"/>
@@ -151,7 +169,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     
     const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
-    const charts = [
+    const charts = chartData ? [
         {
             title: 'Ingresos vs Gastos (Últimos 6 meses)',
             component: (
@@ -217,13 +235,15 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 </LineChart>
             )
         },
-    ];
+    ] : [];
 
     const handleNextChart = () => {
+        if (charts.length === 0) return;
         setCurrentChartIndex((prevIndex) => (prevIndex + 1) % charts.length);
     };
 
     const handlePrevChart = () => {
+        if (charts.length === 0) return;
         setCurrentChartIndex((prevIndex) => (prevIndex - 1 + charts.length) % charts.length);
     };
 
@@ -261,21 +281,31 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 </div>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
-                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-700">{charts[currentChartIndex].title}</h3>
-                    <div className="flex items-center gap-2">
-                        <button onClick={handlePrevChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
-                            &lt;
-                        </button>
-                        <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
-                        <button onClick={handleNextChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
-                            &gt;
-                        </button>
+                {chartError || charts.length === 0 ? (
+                     <div className="text-center p-10 flex-grow flex flex-col justify-center items-center">
+                        <Icon name="alert-triangle" className="w-10 h-10 mx-auto text-yellow-500"/>
+                        <h3 className="mt-4 text-md font-semibold text-yellow-800">Gráficos no disponibles</h3>
+                        <p className="mt-1 text-sm text-yellow-700">{chartError || 'No hay suficientes datos para generar los gráficos.'}</p>
                     </div>
-                </div>
-                <ResponsiveContainer width="100%" height="100%">
-                    {charts[currentChartIndex].component}
-                </ResponsiveContainer>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-700">{charts[currentChartIndex].title}</h3>
+                            <div className="flex items-center gap-2">
+                                <button onClick={handlePrevChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                    &lt;
+                                </button>
+                                <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
+                                <button onClick={handleNextChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                    &gt;
+                                </button>
+                            </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height="100%">
+                            {charts[currentChartIndex].component}
+                        </ResponsiveContainer>
+                    </>
+                )}
             </div>
         </div>
 
