@@ -180,7 +180,7 @@
 
 -   **Usuario:** Reporta que el error de sincronización persiste incluso en modo incógnito y en otros navegadores, descartando problemas de caché.
 -   **IA:**
-    -   **Diagnóstico:** El problema no es una simple "condición de carrera", sino un fallo silencioso y total en la creación del perfil. El trigger de base de datos (`handle_new_user`) está fallando porque intenta insertar datos que no existen en el perfil de Google del usuario (probablemente el `full_name`) en una columna de la tabla `profiles` que está marcada como `NOT NULL`.
+    -   **Diagnóstico:** El problema no es una simple "condición de carrera", sino un fallo silencioso y total en la creación del perfil. El trigger de la base de datos (`handle_new_user`) está fallando porque intenta insertar datos que no existen en el perfil de Google del usuario (probablemente el `full_name`) en una columna de la tabla `profiles` que está marcada como `NOT NULL`.
     -   **Solución (Backend):** Proporciona un script SQL para reemplazar la función del trigger en Supabase. La nueva función utiliza `COALESCE` para proporcionar valores de respaldo (primero intenta usar `full_name`, si no existe usa `email`, y si no, un valor genérico). Esto hace que la creación del perfil sea robusta y nunca falle por datos faltantes del proveedor de OAuth.
     -   **Instrucciones:** Guía al usuario para que ejecute el script SQL directamente en el editor de Supabase, solucionando el problema en su raíz.
 
@@ -321,3 +321,12 @@
     -   **Solución (Doble):**
         1.  **Backend Robusto:** Se modificó `apiService.ts` para que las funciones `addResident` y `updateResident` usen `upsert`. Ahora, si la IA intenta "agregar" un residente a un apartamento que ya existe, la base de datos lo "actualizará" inteligentemente en lugar de fallar.
         2.  **IA Educada:** Se actualizó `system_prompt.txt` con instrucciones explícitas para que el chatbot entienda que un cambio de propietario es una operación de `edit`, no de `add`, mejorando la precisión de sus acciones y respuestas futuras.
+
+---
+
+## Sesión 32: Corrección del Formato de Respuestas del Chatbot
+
+-   **Usuario:** Reporta que el chatbot sigue utilizando asteriscos (`*`) para dar formato a sus respuestas, a pesar de tener una regla en contra.
+-   **IA:**
+    -   **Diagnóstico:** El prompt del sistema (`system_prompt.txt`) estaba violando sus propias reglas. Usaba asteriscos para enfatizar las reglas, enseñando implícitamente a la IA a usar ese formato.
+    -   **Solución:** Se reescribió el `system_prompt.txt` para eliminar todos los asteriscos de formato. El énfasis ahora se logra mediante el uso de MAYÚSCULAS. Esto alinea el estilo del prompt con sus reglas, eliminando la ambigüedad y asegurando que el chatbot genere texto plano como se le solicita.
