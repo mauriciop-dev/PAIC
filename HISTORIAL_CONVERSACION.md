@@ -204,3 +204,12 @@
 -   **IA:**
     -   **Diagnóstico:** El error es causado por un perfil de usuario "huérfano" en la tabla `public.profiles`. Cuando un usuario es eliminado de `auth.users` pero no de `profiles`, un intento de volver a registrarse con el mismo correo electrónico causa una violación de la restricción de unicidad (`UNIQUE`) en la base de datos, lo que hace que el trigger falle.
     -   **Solución (Frontend/UX):** En lugar de pedir al usuario que realice más operaciones manuales en la base de datos, se mejora la aplicación para manejar este error de forma más elegante. Se actualiza el manejador de errores en `App.tsx` para detectar este caso específico. El mensaje de error que se muestra al usuario se hace más claro y descriptivo, explicando la causa probable (cuenta eliminada previamente) y proporcionando un código de error más específico (`DB_SAVE_USER_CONFLICT`) para facilitar el soporte técnico.
+
+---
+
+## Sesión 20: Aplicación Final de la Mejora del Mensaje de Error del Servidor
+
+-   **Usuario:** Muestra el mensaje de error "Error de Configuración del Servidor" genérico, indicando que las mejoras discutidas previamente no están reflejadas en el código.
+-   **IA:**
+    -   **Diagnóstico:** Confirma que el código actual en `App.tsx` todavía contiene el mensaje de error genérico para el fallo de guardado de usuario en la base de datos.
+    -   **Solución (Frontend/UX):** Actualiza el manejador de errores en `App.tsx` para reemplazar el mensaje genérico por uno mucho más específico y útil. El nuevo mensaje informa al usuario que el problema probablemente se deba a un intento de registro de una cuenta previamente eliminada (perfil huérfano) y proporciona un código de error claro ('DB_SAVE_USER_CONFLICT') para facilitar el soporte técnico.
