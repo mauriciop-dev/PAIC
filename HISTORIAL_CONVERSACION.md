@@ -195,3 +195,12 @@
         -   Se aumenta el número de reintentos de 3 a **5**.
         -   Se aumenta el tiempo de espera entre cada intento de 1 a **2 segundos**.
         -   Esto da a la aplicación un tiempo total de espera de **10 segundos** para encontrar el perfil del usuario, lo que debería ser suficiente para manejar cualquier retraso en la base de datos.
+        
+---
+
+## Sesión 19: Diagnóstico y Mejora del Error de Configuración del Servidor
+
+-   **Usuario:** Reporta un nuevo "Error de Configuración del Servidor" con el código `Database error saving new user` después de eliminar y volver a registrar una cuenta.
+-   **IA:**
+    -   **Diagnóstico:** El error es causado por un perfil de usuario "huérfano" en la tabla `public.profiles`. Cuando un usuario es eliminado de `auth.users` pero no de `profiles`, un intento de volver a registrarse con el mismo correo electrónico causa una violación de la restricción de unicidad (`UNIQUE`) en la base de datos, lo que hace que el trigger falle.
+    -   **Solución (Frontend/UX):** En lugar de pedir al usuario que realice más operaciones manuales en la base de datos, se mejora la aplicación para manejar este error de forma más elegante. Se actualiza el manejador de errores en `App.tsx` para detectar este caso específico. El mensaje de error que se muestra al usuario se hace más claro y descriptivo, explicando la causa probable (cuenta eliminada previamente) y proporcionando un código de error más específico (`DB_SAVE_USER_CONFLICT`) para facilitar el soporte técnico.

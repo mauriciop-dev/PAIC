@@ -55,7 +55,7 @@ const App: React.FC = () => {
 
     if (errorDescription && errorDescription.includes('Database error saving new user')) {
       setLoginError(
-        "Error de Configuración del Servidor: No se pudo crear el perfil de usuario. Parece ser un problema de sincronización en la base de datos. Por favor, contacta a soporte técnico e informa del error 'Database error saving new user'."
+        "Error de Configuración del Servidor: No se pudo crear el perfil de usuario. Esto suele ocurrir si una cuenta fue eliminada y se intenta registrar de nuevo. Por favor, contacta a soporte técnico e informa del error 'DB_SAVE_USER_CONFLICT' para reactivar tu cuenta."
       );
       setIsLoadingSession(false);
       // Clean up the URL to avoid showing the error message forever
