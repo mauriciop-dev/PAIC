@@ -20,6 +20,11 @@ import { fromSupabase } from './utils/dbMappers';
 // Switched to `Session` which is the correct type for Supabase JS v2.
 import { Session } from '@supabase/supabase-js';
 
+interface LoginError {
+  title: string;
+  message: string;
+  type: 'sync' | 'config';
+}
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Dashboard);
@@ -34,7 +39,7 @@ const App: React.FC = () => {
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<LoginError | null>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -54,9 +59,11 @@ const App: React.FC = () => {
     const errorDescription = params.get('error_description');
 
     if (errorDescription && errorDescription.includes('Database error saving new user')) {
-      setLoginError(
-        "Error de Configuración del Servidor: No se pudo crear el perfil de usuario. Esto suele ocurrir si una cuenta fue eliminada y se intenta registrar de nuevo. Por favor, contacta a soporte técnico e informa del error 'DB_SAVE_USER_CONFLICT' para reactivar tu cuenta."
-      );
+      setLoginError({
+        title: "Error de Configuración del Servidor",
+        message: "No se pudo crear el perfil de usuario. Parece ser un problema de sincronización en la base de datos. Por favor, contacta a soporte técnico e informa del error 'Database error saving new user'.",
+        type: 'config',
+      });
       setIsLoadingSession(false);
       // Clean up the URL to avoid showing the error message forever
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -106,7 +113,11 @@ const App: React.FC = () => {
                 }
             } else {
                 console.error("User is logged in but profile data is missing after extensive retries.");
-                setLoginError("No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.");
+                setLoginError({
+                    title: "Error de Sincronización",
+                    message: "No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.",
+                    type: 'sync',
+                });
                 setUserProfile(null);
                 setConjuntoInfo(null);
             }
@@ -256,17 +267,16 @@ const App: React.FC = () => {
   }
   
   if (loginError) {
-      const isConfigError = loginError.includes("Configuración del Servidor");
       return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <div className="text-center p-8 bg-white shadow-lg rounded-lg max-w-md mx-4">
                 <Icon name="alert-triangle" className="w-12 h-12 text-red-500 mx-auto"/>
                 <h2 className="text-xl font-bold text-gray-800 mt-4">
-                    {isConfigError ? "Error de Configuración del Servidor" : "Error de Sincronización"}
+                    {loginError.title}
                 </h2>
-                <p className="text-gray-600 mt-2">{loginError}</p>
+                <p className="text-gray-600 mt-2">{loginError.message}</p>
                 <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-                    {!isConfigError && (
+                    {loginError.type === 'sync' && (
                          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
                             Refrescar Página
                         </button>
