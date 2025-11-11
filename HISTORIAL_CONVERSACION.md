@@ -290,3 +290,14 @@
 -   **IA:**
     -   **Diagnóstico:** Se identifica que durante el refactor de `DashboardView.tsx` en la sesión anterior, se introdujo un operador ternario incompleto. El código `const charts = chartData ? [...]` carecía de la parte `: []` (el caso "else"), lo que lo hacía sintácticamente inválido y rompía la compilación.
     -   **Solución:** Se corrige el código en `DashboardView.tsx` para completar el operador ternario: `const charts = chartData ? [...].filter(...) : []`. Esto asegura que la variable `charts` siempre se inicialice con un array, ya sea el de los gráficos o uno vacío, solucionando el error de compilación.
+
+---
+
+## Sesión 29: Corrección de Congelamiento y Mejora de UX con Recarga de Datos
+
+-   **Usuario:** Reporta un congelamiento crítico en la pantalla "Cargando PAIC..." al refrescar la página. Sugiere añadir botones para refrescar tablas individualmente. Cuestiona si la nueva lógica del dashboard es "scraping".
+-   **IA:**
+    -   **Diagnóstico (Congelamiento):** El problema es un error no manejado dentro del callback de `onAuthStateChange` en `App.tsx`. Si alguna promesa dentro del `try` falla, el `finally` no se ejecuta y la pantalla de carga se congela.
+    -   **Solución (Congelamiento):** Se blinda el callback envolviendo toda la lógica en un `try/catch/finally` para garantizar que `setIsLoadingSession(false)` se ejecute siempre, eliminando la posibilidad de congelamiento.
+    -   **Mejora UX:** Se acoge la sugerencia del usuario y se añaden botones de recarga (`refresh-cw`) a todas las vistas con tablas (`DatabaseView`, `FinanzasView`, `SeguridadView`, `DueDatesView`, `PendingTasksView`) para permitir la actualización de datos sin recargar la página completa.
+    -   **Aclaración Técnica:** Se explica de forma clara y con una analogía que la nueva lógica del dashboard no es "scraping", sino que obtiene los datos en bruto directamente de la base de datos y realiza los cálculos en el frontend para ser más resiliente a fallos, lo cual es una práctica robusta y estándar.

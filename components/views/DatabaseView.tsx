@@ -55,6 +55,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [activeDbTab, setActiveDbTab] = useState<DbTab>(DbTab.Residents);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -420,6 +421,12 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       XLSX.utils.book_append_sheet(wb, ws, activeDbTab);
       XLSX.writeFile(wb, templateConfig.filename);
   };
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchData();
+        setIsRefreshing(false);
+    };
   
     const renderTableActions = () => {
         const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
@@ -444,6 +451,9 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+                        <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
                     {activeDbTab === DbTab.Users && isUserManagement && (
                         <button 
                             onClick={() => handleUserModalOpen(null)}

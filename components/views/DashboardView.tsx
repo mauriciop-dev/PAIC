@@ -205,26 +205,26 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                 fill: ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'][i % 5],
             })).filter(d => d.value > 0);
 
-            // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
-            // FIX: The reduce function was not picking the correct overload. By providing a generic type argument, we ensure correct type inference for the accumulator and item.
-            const packageVolume = packagesData.reduce<Map<string, number>>((acc, pkg) => {
+            // FIX: The generic type argument on .reduce is not supported in this environment, causing type inference issues.
+            // Explicitly typing the accumulator in the callback and the initial value Map resolves this.
+            const packageVolume = packagesData.reduce((acc: Map<string, number>, pkg) => {
                 const date = new Date(pkg.receivedDate);
                 const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
                 acc.set(key, (acc.get(key) || 0) + 1);
                 return acc;
-            }, new Map());
+            }, new Map<string, number>());
             const packageVolumeChartData = Array.from(packageVolume.entries()).sort((a,b) => a[0].localeCompare(b[0])).map(([key, value]) => ({ name: `${monthNames[parseInt(key.split('-')[1])]} ${key.split('-')[0].slice(2)}`, value }));
             
             // FIX: Add explicit type to map callback parameter to help TS infer types correctly.
             // FIX: Explicitly setting the return type of the map callback to a tuple `[number, string]` ensures that the Map constructor correctly infers its generic types as `Map<number, string>`.
             const accessPointMap = new Map(accessPointsData.map((ap: AccessPoint): [number, string] => [ap.id, ap.name]));
-            // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
-            // FIX: The reduce function was not picking the correct overload. By providing a generic type argument, we ensure correct type inference for the accumulator and item.
-            const visitorTraffic = visitorsData.reduce<Map<string, number>>((acc, visitor) => {
+            // FIX: The generic type argument on .reduce is not supported in this environment, causing type inference issues.
+            // Explicitly typing the accumulator in the callback and the initial value Map resolves this.
+            const visitorTraffic = visitorsData.reduce((acc: Map<string, number>, visitor) => {
                 const pointName = accessPointMap.get(visitor.accessPointId!) || 'Portería Desconocida';
                 acc.set(pointName, (acc.get(pointName) || 0) + 1);
                 return acc;
-            }, new Map());
+            }, new Map<string, number>());
             const visitorTrafficChartData = Array.from(visitorTraffic.entries()).map(([name, value]) => ({ name, value }));
 
             setChartData({

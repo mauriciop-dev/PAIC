@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { DueDate, UserProfile } from '../../types';
 import DueDateModal from '../DueDateModal';
+import { Icon } from '../ui/Icon';
 
 type StatusFilter = 'Todos' | 'Pendiente' | 'Vencido' | 'Pagado';
 
@@ -12,6 +13,7 @@ interface DueDatesViewProps {
 const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   const [allDueDates, setAllDueDates] = useState<DueDate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<StatusFilter>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDueDate, setEditingDueDate] = useState<DueDate | null>(null);
@@ -33,6 +35,12 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   useEffect(() => {
     fetchData();
   }, [userProfile.conjuntoId]);
+  
+  const handleRefresh = async () => {
+      setIsRefreshing(true);
+      await fetchData();
+      setIsRefreshing(false);
+  };
   
   const handleOpenAddModal = () => {
       setEditingDueDate(null);
@@ -97,12 +105,17 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
             <p className="text-gray-600">
                 Gestiona las obligaciones de pago de la administración.
             </p>
-            <button 
-                onClick={handleOpenAddModal}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-            >
-                Agregar Vencimiento
-            </button>
+            <div className="flex items-center gap-2">
+                <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+                    <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+                <button 
+                    onClick={handleOpenAddModal}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                    Agregar Vencimiento
+                </button>
+            </div>
         </div>
 
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">

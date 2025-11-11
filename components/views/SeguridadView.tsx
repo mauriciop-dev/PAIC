@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint, UserRole } from '../../types';
+import { Icon } from '../ui/Icon';
 
 type SeguridadTab = 'Visitantes' | 'Paquetes';
 
@@ -23,6 +24,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     const [residents, setResidents] = useState<Resident[]>([]);
     const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [updatingLogId, setUpdatingLogId] = useState<number | null>(null);
 
     // Package Form State
@@ -71,6 +73,12 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     useEffect(() => {
         fetchData();
     }, [userProfile.conjuntoId]);
+    
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchData();
+        setIsRefreshing(false);
+    };
     
     const getStatusChipStyle = (status: VisitorLog['status'] | PackageLog['status']) => {
         switch (status) {
@@ -361,20 +369,25 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     return (
         <div>
             <div className="mb-4 border-b border-gray-200">
-                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    {(['Visitantes', 'Paquetes'] as SeguridadTab[]).map(tab => (
-                        <button
-                          key={tab}
-                          onClick={() => setActiveTab(tab)}
-                          className={`${
-                            activeTab === tab
-                              ? 'border-blue-500 text-blue-600'
-                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                          } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
-                        >
-                          {tab}
-                        </button>
-                    ))}
+                <nav className="-mb-px flex justify-between items-center" aria-label="Tabs">
+                    <div className="flex space-x-6">
+                        {(['Visitantes', 'Paquetes'] as SeguridadTab[]).map(tab => (
+                            <button
+                              key={tab}
+                              onClick={() => setActiveTab(tab)}
+                              className={`${
+                                activeTab === tab
+                                  ? 'border-blue-500 text-blue-600'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                              } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
+                            >
+                              {tab}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+                        <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
                 </nav>
             </div>
 

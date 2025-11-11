@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { Task, UserProfile } from '../../types';
+import { Icon } from '../ui/Icon';
 
 interface PendingTasksViewProps {
     userProfile: UserProfile;
@@ -9,6 +10,7 @@ interface PendingTasksViewProps {
 const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
     const [newTaskDate, setNewTaskDate] = useState('');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -30,6 +32,12 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     useEffect(() => {
         fetchData();
     }, [userProfile.conjuntoId]);
+    
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchData();
+        setIsRefreshing(false);
+    };
 
     const handleAddTask = async () => {
         if (!newTaskText.trim() || !userProfile.conjuntoId) return;
@@ -89,9 +97,14 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-6">
-        <p className="text-gray-600">
-            Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
-        </p>
+        <div className="flex justify-between items-start">
+            <p className="text-gray-600 max-w-2xl">
+                Agrega y gestiona tus tareas. También puedes usar el asistente de IA para añadir recordatorios.
+            </p>
+            <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar tareas">
+                <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+        </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Agregar Nueva Tarea</h3>
             <div className="flex flex-col sm:flex-row items-center gap-4">

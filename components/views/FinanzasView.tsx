@@ -160,6 +160,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [editingIncome, setEditingIncome] = useState<Income | null>(null);
@@ -246,6 +247,12 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
             await apiService.deleteAllExpenses(userProfile.conjuntoId);
             fetchData();
         }
+    };
+    
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchData();
+        setIsRefreshing(false);
     };
 
     // --- FILE UPLOAD LOGIC ---
@@ -465,6 +472,9 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                         {feedbackMessage && <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{feedbackMessage.text}</p>}
                     </div>
                     <div className="flex items-center gap-2">
+                        <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+                            <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </button>
                         <button onClick={() => type === 'income' ? handleDeleteAllIncomes() : handleDeleteAllExpenses()} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md font-semibold text-xs hover:bg-red-200">Eliminar Todos</button>
                         <button onClick={() => type === 'income' ? handleOpenIncomeModal(null) : handleOpenExpenseModal(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1">
                             Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
