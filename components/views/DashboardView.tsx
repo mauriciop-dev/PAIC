@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, BarChart, Bar } from 'recharts';
 import { apiService } from '../../services/apiService';
@@ -81,6 +82,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         visitorTraffic: ChartData[]
     } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
     const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
@@ -88,22 +90,28 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         const fetchData = async () => {
             if (!userProfile.conjuntoId) return;
             setIsLoading(true);
+            setError(null);
             try {
                 const [summaryData, chartDataResult] = await Promise.all([
                     apiService.fetchDashboardSummary(userProfile.conjuntoId),
                     apiService.fetchFinancialChartData(userProfile.conjuntoId),
                 ]);
-                setSummary(summaryData);
-                if (chartDataResult) {
+                
+                if (summaryData && chartDataResult) {
+                    setSummary(summaryData);
                     setChartData({
                         monthlyIncomeVsExpense: chartDataResult.monthlyIncomeVsExpense,
                         expensesByCategory: chartDataResult.expensesByCategory,
                         packageVolume: chartDataResult.packageVolume,
                         visitorTraffic: chartDataResult.visitorTraffic,
                     });
+                } else {
+                    throw new Error("Los datos recibidos del servidor están incompletos.");
                 }
+
             } catch (error) {
                 console.error("Failed to fetch dashboard summary", error);
+                setError("No se pudieron cargar los datos del centro de control. Es posible que no haya información financiera registrada todavía. Intenta agregar algunos ingresos o gastos.");
             } finally {
                 setIsLoading(false);
             }
@@ -125,8 +133,18 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         setTooltip(null);
     };
 
-    if (isLoading || !summary || !chartData) {
+    if (isLoading) {
         return <div className="text-center p-10 text-gray-500">Cargando centro de control...</div>;
+    }
+
+    if (error || !summary || !chartData) {
+        return (
+            <div className="text-center p-10 bg-red-50 border border-red-200 rounded-lg">
+                <Icon name="alert-triangle" className="w-12 h-12 mx-auto text-red-500"/>
+                <h3 className="mt-4 text-lg font-semibold text-red-800">Error al Cargar el Centro de Control</h3>
+                <p className="mt-2 text-red-700">{error || 'Los datos del dashboard no se pudieron cargar.'}</p>
+            </div>
+        );
     }
     
     const { stats, notifications } = summary;

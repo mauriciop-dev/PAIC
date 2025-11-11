@@ -232,3 +232,13 @@
     -   **Acción:** Crea un nuevo archivo `SCHEMA_REFERENCE.md` en la raíz del proyecto.
     -   **Contenido:** Formatea la información proporcionada por el usuario en una tabla Markdown clara y legible, documentando el propósito, tamaño y estado de cada tabla de la base de datos.
     -   **Beneficio:** Proporciona una referencia rápida y centralizada del esquema de la base de datos para facilitar el desarrollo y mantenimiento futuro.
+---
+
+## Sesión 23: Corrección de Carga Infinita y Typo en la UI
+
+-   **Usuario:** Reporta dos problemas: 1) El "Centro de Control" se queda en "Cargando..." indefinidamente después de iniciar sesión. 2) Una pestaña en la barra de navegación aparece con el nombre "picas" en lugar de "Archivos".
+-   **IA:**
+    -   **Diagnóstico (Carga Infinita):** El problema se debe a que las funciones de la base de datos (`RPC`) para obtener los datos del dashboard fallan (probablemente porque no hay datos financieros para un usuario nuevo), y el frontend no maneja este error, resultando en un estado de carga perpetuo.
+    -   **Solución (Carga Infinita):** Se modifica `DashboardView.tsx` para añadir un manejo de errores robusto. Si la carga de datos falla, ahora se muestra un mensaje de error claro al usuario en lugar de la pantalla de carga, mejorando la resiliencia de la UI.
+    -   **Diagnóstico (Typo):** A pesar de que los archivos de código proporcionados parecen correctos, la aparición de "picas" sugiere un error tipográfico en la versión local del archivo `types.ts` del usuario.
+    -   **Solución (Typo):** Se proporciona una versión corregida del archivo `types.ts`, asegurando que la enumeración `Tab.Archivos` esté definida correctamente como `'Archivos'`, lo que corrige el texto visible en la barra de navegación.
