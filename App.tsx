@@ -85,7 +85,7 @@ const App: React.FC = () => {
 
     // FIX: `onAuthStateChange` subscription in v1 returns `{ data: subscription }`, not `{ data: { subscription } }`.
     // The error on unsubscribe suggests the structure is `{ data: { subscription } }` which is Supabase v2.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setLoginError(null); // Clear any previous error on a new auth event
         setSession(session);
         if (session?.user) {
@@ -127,6 +127,8 @@ const App: React.FC = () => {
         }
         setIsLoadingSession(false);
     });
+    
+    const subscription = data?.subscription;
     
     return () => subscription?.unsubscribe();
   }, [handleLogout, loginError]); // Add loginError dependency to prevent this from running if an error is already set

@@ -254,4 +254,12 @@
         1.  Se cargan primero los datos esenciales (estadísticas de las tarjetas). Si esto falla, se muestra el error principal.
         2.  Luego, se intenta cargar los datos para los gráficos en un bloque `try/catch` separado.
         3.  Si la carga de los gráficos falla, el panel principal sigue funcionando, pero la sección de gráficos muestra un mensaje de error nuevo y más específico, indicando que podrían faltar datos de seguridad (paquetes, visitantes). Esto aísla el error y proporciona una mejor experiencia y diagnóstico.
+
 ---
+
+## Sesión 25: Corrección de Carga Infinita en el Inicio de la Aplicación
+
+-   **Usuario:** Reporta que la aplicación se queda atascada en la pantalla inicial "Cargando PAIC..." al refrescar la página.
+-   **IA:**
+    -   **Diagnóstico:** El problema se debe a una desestructuración insegura en `App.tsx` al suscribirse a los cambios de estado de autenticación (`onAuthStateChange`). Si la API de Supabase devuelve una respuesta inesperada (ej. con `data: null`), el código genera un `TypeError` no capturado, lo que impide que el estado `isLoadingSession` se actualice a `false`.
+    -   **Solución (Frontend):** Se modifica el `useEffect` en `App.tsx` para manejar de forma segura la respuesta de `onAuthStateChange`. Se desestructura `data` primero y luego se accede a `data?.subscription`, evitando el fallo y asegurando que el estado de carga se resuelva siempre, ya sea para mostrar la aplicación o una pantalla de error.
