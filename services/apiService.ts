@@ -10,7 +10,7 @@ import * as T from '../types';
 export const apiService = {
   // --- User & Profile Management ---
   async fetchUserProfile(userId: string): Promise<T.UserProfile | null> {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
     if (error) {
       console.error('Error fetching user profile:', error);
       return null;
@@ -18,7 +18,7 @@ export const apiService = {
     return fromSupabase(data) as T.UserProfile;
   },
   async updateUserProfile(profile: T.UserProfile): Promise<void> {
-    const { error } = await supabase.from('profiles').update(toSupabase(profile)).eq('id', profile.id);
+    const { error } = await supabase.from('user_profiles').update(toSupabase(profile)).eq('id', profile.id);
     if (error) {
       console.error('Error updating user profile:', error);
       throw error;

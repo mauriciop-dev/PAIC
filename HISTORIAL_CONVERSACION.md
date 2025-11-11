@@ -213,3 +213,12 @@
 -   **IA:**
     -   **Diagnóstico:** Confirma que el código actual en `App.tsx` todavía contiene el mensaje de error genérico para el fallo de guardado de usuario en la base de datos.
     -   **Solución (Frontend/UX):** Actualiza el manejador de errores en `App.tsx` para reemplazar el mensaje genérico por uno mucho más específico y útil. El nuevo mensaje informa al usuario que el problema probablemente se deba a un intento de registro de una cuenta previamente eliminada (perfil huérfano) y proporciona un código de error claro ('DB_SAVE_USER_CONFLICT') para facilitar el soporte técnico.
+    
+---
+
+## Sesión 21: Corrección de Nombre de Tabla de Perfiles
+
+-   **Usuario:** Señala que la tabla de perfiles se llama `user_profiles`, no `profiles` como se asumía en el código.
+-   **IA:**
+    -   **Diagnóstico:** Se confirma que el código en `apiService.ts` está intentando acceder a una tabla llamada `profiles` que no existe. Esta es la causa raíz del "Error de Sincronización".
+    -   **Solución (Frontend):** Se actualiza el archivo `apiService.ts` para que todas las llamadas a la base de datos (específicamente `fetchUserProfile` y `updateUserProfile`) apunten al nombre de tabla correcto: `user_profiles`. Esta corrección soluciona definitivamente el problema de no poder encontrar el perfil del usuario después de iniciar sesión.
