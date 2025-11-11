@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
@@ -14,6 +15,7 @@ const allTabs = [
   { id: Tab.Database, label: 'Base de datos', icon: 'database', roles: [UserRole.Trial, UserRole.Subscriber] },
   { id: Tab.CommonAreas, label: 'Áreas comunes', icon: 'calendar', roles: [UserRole.Trial, UserRole.Subscriber] },
   { id: Tab.Comunicaciones, label: 'Comunicaciones', icon: 'mail', roles: [UserRole.Trial, UserRole.Subscriber] },
+  { id: Tab.Archivos, label: 'Archivos', icon: 'file-text', roles: [UserRole.Trial, UserRole.Subscriber] },
   { id: Tab.Finanzas, label: 'Finanzas', icon: 'dollarSign', roles: [UserRole.Trial, UserRole.Subscriber, UserRole.Internal] }, // Example: Internal could be an accountant
   { id: Tab.Seguridad, label: 'Seguridad', icon: 'shield', roles: [UserRole.Trial, UserRole.Subscriber, UserRole.Internal] },
   { id: Tab.DueDates, label: 'Vencimientos', icon: 'clock', roles: [UserRole.Trial, UserRole.Subscriber] },

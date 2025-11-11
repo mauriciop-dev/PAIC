@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Tab, UserProfile, ConjuntoInfo } from '../types';
 import DashboardView from './views/DashboardView';
@@ -6,6 +7,7 @@ import CommonAreasView from './views/CommonAreasView';
 import DueDatesView from './views/DueDatesView';
 import PendingTasksView from './views/PendingTasksView';
 import ComunicacionesView from './views/ComunicacionesView';
+import ArchivosView from './views/ArchivosView';
 import FinanzasView from './views/FinanzasView';
 import SeguridadView from './views/SeguridadView';
 
@@ -39,6 +41,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
           return <PendingTasksView userProfile={userProfile} />;
       case Tab.Comunicaciones:
           return <ComunicacionesView userProfile={userProfile} conjuntoInfo={conjuntoInfo} />;
+      case Tab.Archivos:
+          return <ArchivosView userProfile={userProfile} conjuntoInfo={conjuntoInfo} />;
       case Tab.Finanzas:
           return <FinanzasView userProfile={userProfile} />;
       case Tab.Seguridad:

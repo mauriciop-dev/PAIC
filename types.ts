@@ -5,6 +5,7 @@ export enum Tab {
   Database = 'Base de datos',
   CommonAreas = 'Áreas comunes',
   Comunicaciones = 'Comunicaciones',
+  Archivos = 'Archivos',
   Finanzas = 'Finanzas',
   Seguridad = 'Seguridad',
   DueDates = 'Vencimientos',

@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { ConjuntoInfo, UserProfile } from '../../types';
+
+import React, { useState } from 'react';
+import { ConjuntoInfo, UserProfile, StoredFile } from '../../types';
 import { Icon } from '../ui/Icon';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
+import FileSelectorModal from '../FileSelectorModal';
 
 interface ComunicacionesViewProps {
     userProfile: UserProfile;
@@ -14,12 +16,11 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
     const [currentRecipient, setCurrentRecipient] = useState('');
-    const [files, setFiles] = useState<File[]>([]);
+    const [attachments, setAttachments] = useState<StoredFile[]>([]);
     const [isSending, setIsSending] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isFileSelectorOpen, setIsFileSelectorOpen] = useState(false);
     const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     
 
     const handleGenerateSubject = async () => {
@@ -92,15 +93,14 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
     const handleRemoveRecipient = (recipientToRemove: string) => {
         setRecipients(recipients.filter(r => r !== recipientToRemove));
     };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files) {
-            setFiles(prev => [...prev, ...Array.from(event.target.files!)]);
-        }
+    
+    const handleSelectFiles = (selectedFiles: StoredFile[]) => {
+        setAttachments(selectedFiles);
+        setIsFileSelectorOpen(false);
     };
 
-    const removeFile = (fileToRemove: File) => {
-        setFiles(prev => prev.filter(file => file !== fileToRemove));
+    const removeAttachment = (fileToRemove: StoredFile) => {
+        setAttachments(prev => prev.filter(file => file.id !== fileToRemove.id));
     };
 
 
@@ -111,30 +111,19 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
             return;
         }
         setIsSending(true);
-        setIsUploading(files.length > 0);
         setFeedback(null);
         
         try {
-            let uploadedAttachments: { name: string; url: string }[] = [];
-            if (files.length > 0 && userProfile.conjuntoId) {
-                const uploadPromises = files.map(file => apiService.uploadCommunicationAttachment(userProfile.conjuntoId!, file));
-                const results = await Promise.all(uploadPromises);
-                const successfulUploads = results.filter(res => res !== null) as { name: string; url: string }[];
-                if (successfulUploads.length !== files.length) {
-                    throw new Error("Algunos archivos no se pudieron subir.");
-                }
-                uploadedAttachments = successfulUploads;
-            }
-            setIsUploading(false);
+            const attachmentLinks = attachments.map(file => ({ name: file.name, url: file.url }));
 
-            const result = await apiService.sendCommunicationEmail(recipients, subject, body, uploadedAttachments, conjuntoInfo.adminName, conjuntoInfo.adminEmail);
+            const result = await apiService.sendCommunicationEmail(recipients, subject, body, attachmentLinks, conjuntoInfo.adminName, conjuntoInfo.adminEmail);
             
             if (result.success) {
                 setFeedback({type: 'success', text: `¡Correo enviado exitosamente a ${recipients.length} destinatario(s)!`});
                 setSubject('');
                 setBody('');
                 setRecipients([]);
-                setFiles([]);
+                setAttachments([]);
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
             }
@@ -144,134 +133,131 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
             setFeedback({type: 'error', text: `Error al enviar: ${error.message}`});
         } finally {
             setIsSending(false);
-            setIsUploading(false);
             setTimeout(() => setFeedback(null), 7000);
         }
     };
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                    <form onSubmit={handleSend} className="space-y-4">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <form onSubmit={handleSend} className="space-y-4">
+                    <div>
+                        <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
+                         <div className="flex flex-wrap gap-2 mb-2">
+                            <button type="button" onClick={() => addRecipientGroup('all')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Todos los residentes</button>
+                            <button type="button" onClick={() => addRecipientGroup('debtors')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Residentes en mora</button>
+                            <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
+                            <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                            {recipients.map(recipient => (
+                                <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
+                                    {recipient}
+                                    <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
+                                        <Icon name="x" className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                            <input
+                                type="email"
+                                value={currentRecipient}
+                                onChange={(e) => setCurrentRecipient(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ',') {
+                                        e.preventDefault();
+                                        handleAddRecipient();
+                                    }
+                                }}
+                                placeholder={recipients.length === 0 ? "Añadir correos y presionar Enter..." : ""}
+                                className="flex-1 bg-transparent focus:outline-none p-1 text-sm"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-1">
+                            <label htmlFor="subject" className="block text-sm font-medium text-gray-700">Asunto</label>
+                            <button type="button" onClick={handleGenerateSubject} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
+                                <Icon name="bot" className="w-4 h-4" /> Re-escribir con IA
+                            </button>
+                        </div>
+                        <input
+                            type="text"
+                            id="subject"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            placeholder="Asunto del comunicado"
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            required
+                        />
+                    </div>
+                    <div>
+                         <div className="flex justify-between items-center mb-1">
+                            <label htmlFor="body" className="block text-sm font-medium text-gray-700">Cuerpo del Mensaje</label>
+                             <button type="button" onClick={handleImproveWriting} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
+                                <Icon name="bot" className="w-4 h-4" /> Mejorar redacción
+                            </button>
+                        </div>
+                        <textarea
+                            id="body"
+                            value={body}
+                            onChange={(e) => setBody(e.target.value)}
+                            placeholder="Escribe tu mensaje aquí..."
+                            className="w-full p-2 border border-gray-300 rounded-md h-64 resize-none"
+                            required
+                        />
+                    </div>
+                     {attachments.length > 0 && (
                         <div>
-                            <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
-                             <div className="flex flex-wrap gap-2 mb-2">
-                                <button type="button" onClick={() => addRecipientGroup('all')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Todos los residentes</button>
-                                <button type="button" onClick={() => addRecipientGroup('debtors')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Residentes en mora</button>
-                                <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
-                                <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
-                            </div>
-                            
-                            <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                                {recipients.map(recipient => (
-                                    <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
-                                        {recipient}
-                                        <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Archivos Adjuntos</label>
+                            <div className="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-md bg-gray-50">
+                                {attachments.map(file => (
+                                     <div key={file.id} className="flex items-center gap-2 bg-indigo-100 text-indigo-800 text-sm font-medium px-2 py-1 rounded-full">
+                                        <Icon name="file-text" className="w-4 h-4"/>
+                                        {file.name}
+                                        <button type="button" onClick={() => removeAttachment(file)} className="text-indigo-600 hover:text-indigo-800">
                                             <Icon name="x" className="w-3 h-3" />
                                         </button>
                                     </div>
                                 ))}
-                                <input
-                                    type="email"
-                                    value={currentRecipient}
-                                    onChange={(e) => setCurrentRecipient(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ',') {
-                                            e.preventDefault();
-                                            handleAddRecipient();
-                                        }
-                                    }}
-                                    placeholder={recipients.length === 0 ? "Añadir correos y presionar Enter..." : ""}
-                                    className="flex-1 bg-transparent focus:outline-none p-1 text-sm"
-                                />
                             </div>
                         </div>
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label htmlFor="subject" className="block text-sm font-medium text-gray-700">Asunto</label>
-                                <button type="button" onClick={handleGenerateSubject} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
-                                    <Icon name="bot" className="w-4 h-4" /> Re-escribir con IA
-                                </button>
-                            </div>
-                            <input
-                                type="text"
-                                id="subject"
-                                value={subject}
-                                onChange={(e) => setSubject(e.target.value)}
-                                placeholder="Asunto del comunicado"
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                                required
-                            />
-                        </div>
-                        <div>
-                             <div className="flex justify-between items-center mb-1">
-                                <label htmlFor="body" className="block text-sm font-medium text-gray-700">Cuerpo del Mensaje</label>
-                                 <button type="button" onClick={handleImproveWriting} disabled={isGenerating || !body.trim()} className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-50">
-                                    <Icon name="bot" className="w-4 h-4" /> Mejorar redacción
-                                </button>
-                            </div>
-                            <textarea
-                                id="body"
-                                value={body}
-                                onChange={(e) => setBody(e.target.value)}
-                                placeholder="Escribe tu mensaje aquí..."
-                                className="w-full p-2 border border-gray-300 rounded-md h-64 resize-none"
-                                required
-                            />
-                        </div>
-                        <div className="flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={isSending || isGenerating}
-                                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
-                            >
-                                <Icon name="send" className="w-5 h-5" />
-                                {isUploading ? 'Subiendo archivos...' : isSending ? 'Enviando...' : `Enviar a ${recipients.length} destinatarios`}
-                            </button>
-                        </div>
-                         {feedback && (
-                            <p className={`text-sm mt-4 text-center ${feedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                                {feedback.text}
-                            </p>
-                        )}
-                    </form>
-                </div>
-                <div className="lg:col-span-1">
-                    <div className="bg-white p-6 rounded-lg shadow-md sticky top-24">
-                        <h3 className="text-lg font-semibold text-gray-700 mb-4">Gestor de Archivos</h3>
-                        <div 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
+                    )}
+                    <div className="flex justify-end items-center gap-4">
+                        <button
+                            type="button"
+                            onClick={() => setIsFileSelectorOpen(true)}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 flex items-center gap-2"
                         >
-                          <Icon name="package" className="mx-auto h-10 w-10 text-gray-400" />
-                          <p className="mt-2 text-sm text-gray-600">
-                            Arrastra archivos aquí o haz clic para seleccionar.
-                          </p>
-                          <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                className="hidden"
-                                multiple
-                            />
-                        </div>
-                        {files.length > 0 && (
-                            <div className="mt-4 space-y-2">
-                                <h4 className="text-sm font-medium text-gray-600">Archivos adjuntos:</h4>
-                                {files.map((file, index) => (
-                                    <div key={index} className="flex items-center justify-between text-sm bg-gray-100 p-2 rounded-md">
-                                        <span className="truncate">{file.name}</span>
-                                        <button onClick={() => removeFile(file)} className="text-red-500 hover:text-red-700">
-                                            <Icon name="x" className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                            <Icon name="file-text" className="w-5 h-5" />
+                            Adjuntar desde Archivos
+                        </button>
+
+                        <button
+                            type="submit"
+                            disabled={isSending || isGenerating}
+                            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
+                        >
+                            <Icon name="send" className="w-5 h-5" />
+                            {isSending ? 'Enviando...' : `Enviar a ${recipients.length} destinatarios`}
+                        </button>
                     </div>
-                </div>
+                     {feedback && (
+                        <p className={`text-sm mt-4 text-center ${feedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                            {feedback.text}
+                        </p>
+                    )}
+                </form>
             </div>
+             {isFileSelectorOpen && (
+                <FileSelectorModal
+                    isOpen={isFileSelectorOpen}
+                    onClose={() => setIsFileSelectorOpen(false)}
+                    conjuntoId={userProfile.conjuntoId!}
+                    onSelectFiles={handleSelectFiles}
+                    currentSelection={attachments}
+                />
+            )}
         </div>
     );
 };
