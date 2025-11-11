@@ -281,3 +281,12 @@
 -   **IA:**
     -   **Diagnóstico:** Las funciones RPC de la base de datos (`get_dashboard_summary` y `get_financial_chart_data`) son la causa del problema. Son frágiles y fallan por completo si encuentran cualquier dato inesperado, incluso si el 99% de los datos son correctos.
     -   **Solución (Frontend/Refactor):** Se refactoriza completamente `DashboardView.tsx` para abandonar el uso de las funciones RPC. La nueva lógica obtiene los datos "en bruto" de cada tabla necesaria (`incomes`, `expenses`, `tasks`, etc.) de forma individual y realiza todos los cálculos, agrupaciones y resúmenes directamente en el frontend. Esto hace que el dashboard sea extremadamente robusto: si falta un tipo de dato (ej. no hay visitantes), solo el gráfico correspondiente no se mostrará, pero el resto del panel funcionará perfectamente. Esto soluciona el problema de raíz al eliminar la dependencia del código frágil del backend.
+
+---
+
+## Sesión 28: Corrección de Error de Compilación (Build)
+
+-   **Usuario:** Reporta que el despliegue falló con un error de sintaxis: `Expected ":" but found ";"`.
+-   **IA:**
+    -   **Diagnóstico:** Se identifica que durante el refactor de `DashboardView.tsx` en la sesión anterior, se introdujo un operador ternario incompleto. El código `const charts = chartData ? [...]` carecía de la parte `: []` (el caso "else"), lo que lo hacía sintácticamente inválido y rompía la compilación.
+    -   **Solución:** Se corrige el código en `DashboardView.tsx` para completar el operador ternario: `const charts = chartData ? [...].filter(...) : []`. Esto asegura que la variable `charts` siempre se inicialice con un array, ya sea el de los gráficos o uno vacío, solucionando el error de compilación.

@@ -206,22 +206,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
             })).filter(d => d.value > 0);
 
             // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
-            const packageVolume = packagesData.reduce((acc: Map<string, number>, pkg: PackageLog) => {
+            // FIX: The reduce function was not picking the correct overload. By providing a generic type argument, we ensure correct type inference for the accumulator and item.
+            const packageVolume = packagesData.reduce<Map<string, number>>((acc, pkg) => {
                 const date = new Date(pkg.receivedDate);
                 const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
                 acc.set(key, (acc.get(key) || 0) + 1);
                 return acc;
-            }, new Map<string, number>());
+            }, new Map());
             const packageVolumeChartData = Array.from(packageVolume.entries()).sort((a,b) => a[0].localeCompare(b[0])).map(([key, value]) => ({ name: `${monthNames[parseInt(key.split('-')[1])]} ${key.split('-')[0].slice(2)}`, value }));
             
             // FIX: Add explicit type to map callback parameter to help TS infer types correctly.
-            const accessPointMap = new Map(accessPointsData.map((ap: AccessPoint) => [ap.id, ap.name]));
+            // FIX: Explicitly setting the return type of the map callback to a tuple `[number, string]` ensures that the Map constructor correctly infers its generic types as `Map<number, string>`.
+            const accessPointMap = new Map(accessPointsData.map((ap: AccessPoint): [number, string] => [ap.id, ap.name]));
             // FIX: Explicitly type accumulator and item in reduce to ensure correct type inference.
-            const visitorTraffic = visitorsData.reduce((acc: Map<string, number>, visitor: VisitorLog) => {
+            // FIX: The reduce function was not picking the correct overload. By providing a generic type argument, we ensure correct type inference for the accumulator and item.
+            const visitorTraffic = visitorsData.reduce<Map<string, number>>((acc, visitor) => {
                 const pointName = accessPointMap.get(visitor.accessPointId!) || 'Portería Desconocida';
                 acc.set(pointName, (acc.get(pointName) || 0) + 1);
                 return acc;
-            }, new Map<string, number>());
+            }, new Map());
             const visitorTrafficChartData = Array.from(visitorTraffic.entries()).map(([name, value]) => ({ name, value }));
 
             setChartData({
@@ -341,7 +344,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         if (chart.title.includes('Visitantes') && chartData.visitorTraffic.length === 0) return false;
         if (chart.title.includes('Ingresos') && chartData.monthlyIncomeVsExpense.length === 0) return false;
         return true;
-    });
+    }) : [];
 
     const handleNextChart = () => {
         if (charts.length === 0) return;
