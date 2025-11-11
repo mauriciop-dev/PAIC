@@ -352,16 +352,18 @@ export const apiService = {
       return { message: `Simulación: Correo enviado al grupo ${group}.` };
   },
   async sendCommunicationEmail(to: string[], subject: string, body: string, attachments: {name: string, url: string}[], fromName: string, fromEmail: string): Promise<{success: boolean, error?: string}> {
-    const supabaseUrl = new URL(supabase.functions.getURL('send-email'));
-    const response = await fetch(supabaseUrl.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-      },
-      body: JSON.stringify({ to, subject, html: body, fromName }), // attachments would be handled by function if supported
+    // FIX: Replaced manual fetch with supabase.functions.invoke, which is the correct method for Supabase JS v2.
+    // The 'getURL' method does not exist on the FunctionsClient in this version.
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: { to, subject, html: body, fromName }, // attachments would be handled by function if supported
     });
-    return response.json();
+
+    if (error) {
+      console.error("Error invoking send-email function:", error);
+      return { success: false, error: error.message };
+    }
+    
+    return data;
   },
 
   // --- Super Admin ---

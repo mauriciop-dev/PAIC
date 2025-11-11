@@ -45,15 +45,36 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !conjunto.id) return;
+    
+    setFeedback(null);
+
+    // Frontend validation for file type and size
+    const MAX_FILE_SIZE_MB = 5;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+    if (file.type !== 'application/pdf') {
+        setFeedback({ type: 'error', text: 'Error: Solo se permiten archivos PDF.' });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        setFeedback({ type: 'error', text: `Error: El archivo no debe superar los ${MAX_FILE_SIZE_MB}MB.` });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+    }
 
     setIsUploading(true);
-    setFeedback(null);
     try {
       await apiService.uploadFileForConjunto(conjunto.id, file);
       setFeedback({ type: 'success', text: `Archivo "${file.name}" subido exitosamente.` });
       fetchFiles();
     } catch (error: any) {
-      setFeedback({ type: 'error', text: `Error al subir: ${error.message}` });
+      let errorMessage = `Error al subir: ${error.message}`;
+      if (error.message.includes('JSON.parse')) {
+          errorMessage = 'Error del servidor al subir. Asegúrate que el archivo sea un PDF válido y no supere el límite de tamaño.';
+      }
+      setFeedback({ type: 'error', text: errorMessage });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -87,7 +108,7 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
             <Icon name="x" className="w-6 h-6" />
           </button>
           <h2 className="text-2xl font-bold text-gray-800">Archivos de {conjunto.name}</h2>
-          <p className="text-sm text-gray-600">Gestiona los documentos y archivos de este conjunto.</p>
+          <p className="text-sm text-gray-600">Gestiona los documentos de este conjunto. (Solo PDF, máx. 5MB)</p>
         </header>
 
         <div className="p-6 flex-1 overflow-y-auto">
@@ -129,7 +150,7 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
                 </p>
             )}
            <div className="flex-grow flex justify-end">
-                <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} />
+                <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} accept="application/pdf" />
                 <button
                     type="button"
                     onClick={handleUploadClick}

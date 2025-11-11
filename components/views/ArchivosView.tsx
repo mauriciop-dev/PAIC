@@ -41,17 +41,37 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
     const file = event.target.files?.[0];
     if (!file || !userProfile.conjuntoId) return;
 
-    setIsUploading(true);
     setFeedback(null);
+
+    // Frontend validation for file type and size
+    const MAX_FILE_SIZE_MB = 5;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+    if (file.type !== 'application/pdf') {
+      setFeedback({ type: 'error', text: 'Error: Solo se permiten archivos PDF.' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setFeedback({ type: 'error', text: `Error: El archivo no debe superar los ${MAX_FILE_SIZE_MB}MB.` });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploading(true);
     try {
       await apiService.uploadFileForConjunto(userProfile.conjuntoId, file);
       setFeedback({ type: 'success', text: `Archivo "${file.name}" subido exitosamente.` });
       fetchFiles(); // Refresh the list
     } catch (error: any) {
-      setFeedback({ type: 'error', text: `Error al subir: ${error.message}` });
+      let errorMessage = `Error al subir: ${error.message}`;
+      if (error.message.includes('JSON.parse')) {
+          errorMessage = 'Error del servidor al subir. Asegúrate que el archivo sea un PDF válido y no supere el límite de tamaño.';
+      }
+      setFeedback({ type: 'error', text: errorMessage });
     } finally {
       setIsUploading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -81,9 +101,9 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <p className="text-gray-600">
-          Gestiona los documentos importantes de tu conjunto, como reglamentos, actas y más.
+          Administra los archivos y documentos importantes de tu conjunto. (Solo PDF, máx. 5MB)
         </p>
-        <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} accept="application/pdf" />
         <button
           onClick={handleUploadClick}
           disabled={isUploading}
@@ -117,7 +137,10 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
               <tbody>
                 {files.length > 0 ? files.map(file => (
                   <tr key={file.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">{file.name}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-2">
+                        <Icon name="file-text" className="w-4 h-4 text-gray-400" />
+                        {file.name}
+                    </td>
                     <td className="px-6 py-4">{bytesToSize(file.size)}</td>
                     <td className="px-6 py-4">{new Date(file.createdAt).toLocaleDateString('es-CO')}</td>
                     <td className="px-6 py-4 text-right space-x-4">
