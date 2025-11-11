@@ -84,11 +84,12 @@ const App: React.FC = () => {
         if (session?.user) {
             let profile = null;
             // Retry fetching the profile to account for potential replication delay or trigger latency.
-            for (let i = 0; i < 3; i++) {
+            // Increased retry count and delay for more robustness against severe DB lag.
+            for (let i = 0; i < 5; i++) {
                 profile = await apiService.fetchUserProfile(session.user.id);
                 if (profile) break;
-                console.warn(`Profile not found for new user, retrying... Attempt ${i + 1}`);
-                await new Promise(res => setTimeout(res, 1000)); // Wait 1 second
+                console.warn(`Profile not found, likely due to DB replication lag. Retrying... Attempt ${i + 1}`);
+                await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds
             }
 
             if (profile) {
@@ -104,7 +105,7 @@ const App: React.FC = () => {
                     setIsInitialSetupModalOpen(true);
                 }
             } else {
-                console.error("User is logged in but profile data is missing after retries.");
+                console.error("User is logged in but profile data is missing after extensive retries.");
                 setLoginError("No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.");
                 setUserProfile(null);
                 setConjuntoInfo(null);

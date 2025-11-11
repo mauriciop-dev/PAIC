@@ -50,8 +50,8 @@
 
 -   **Usuario:** Reporta que el `geminiService` no funciona por falta de API Key.
 -   **IA:**
-    -   Diagnostica el problema: La API Key de Gemini no estaba siendo cargada correctamente desde las variables de entorno.
-    -   Modifica `geminiService.ts` para leer la clave de forma robusta desde `process.env.VITE_GEMINI_API_KEY` o `import.meta.env.VITE_GEMINI_API_KEY`, asegurando compatibilidad con diferentes entornos de ejecución.
+    -   **Diagnóstico:** La API Key de Gemini no estaba siendo cargada correctamente desde las variables de entorno.
+    -   **Solución:** Modifica `geminiService.ts` para leer la clave de forma robusta desde `process.env.VITE_GEMINI_API_KEY` o `import.meta.env.VITE_GEMINI_API_KEY`, asegurando compatibilidad con diferentes entornos de ejecución.
     -   Añade un mensaje de error claro si la clave no se encuentra.
 
 ---
@@ -173,3 +173,25 @@
 -   **IA:**
     -   **Diagnóstico:** Se identifica una condición de carrera (race condition). El frontend intenta leer el perfil del usuario desde la tabla `profiles` inmediatamente después de que Supabase Auth confirma el login, pero antes de que el trigger de la base de datos haya tenido tiempo de crear dicho perfil.
     -   **Solución:** Se modifica el listener `onAuthStateChange` en `App.tsx`. Se implementa un mecanismo de reintento que busca el perfil del usuario hasta 3 veces, con una pausa de 1 segundo entre cada intento. Esto le da a la base de datos tiempo suficiente para sincronizarse y asegura que el perfil se cargue correctamente, eliminando el error para los nuevos usuarios.
+
+---
+
+## Sesión 17: Solución Definitiva al Error de Sincronización
+
+-   **Usuario:** Reporta que el error de sincronización persiste incluso en modo incógnito y en otros navegadores, descartando problemas de caché.
+-   **IA:**
+    -   **Diagnóstico:** El problema no es una simple "condición de carrera", sino un fallo silencioso y total en la creación del perfil. El trigger de base de datos (`handle_new_user`) está fallando porque intenta insertar datos que no existen en el perfil de Google del usuario (probablemente el `full_name`) en una columna de la tabla `profiles` que está marcada como `NOT NULL`.
+    -   **Solución (Backend):** Proporciona un script SQL para reemplazar la función del trigger en Supabase. La nueva función utiliza `COALESCE` para proporcionar valores de respaldo (primero intenta usar `full_name`, si no existe usa `email`, y si no, un valor genérico). Esto hace que la creación del perfil sea robusta y nunca falle por datos faltantes del proveedor de OAuth.
+    -   **Instrucciones:** Guía al usuario para que ejecute el script SQL directamente en el editor de Supabase, solucionando el problema en su raíz.
+
+---
+
+## Sesión 18: Fortalecimiento del Mecanismo de Reintento de Sincronización
+
+-   **Usuario:** Reporta que el "Error de Sincronización" persiste incluso después de haber aplicado la corrección del trigger en la base de datos.
+-   **IA:**
+    -   **Diagnóstico:** El problema se reclasifica como una latencia de replicación de base de datos extremadamente alta, en lugar de un fallo del trigger. La corrección anterior del trigger era válida, pero la aplicación no espera lo suficiente para que los cambios se propaguen antes de rendirse.
+    -   **Solución (Frontend):** Se modifica de nuevo el listener `onAuthStateChange` en `App.tsx`. El mecanismo de reintento se hace mucho más robusto:
+        -   Se aumenta el número de reintentos de 3 a **5**.
+        -   Se aumenta el tiempo de espera entre cada intento de 1 a **2 segundos**.
+        -   Esto da a la aplicación un tiempo total de espera de **10 segundos** para encontrar el perfil del usuario, lo que debería ser suficiente para manejar cualquier retraso en la base de datos.
