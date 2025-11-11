@@ -310,3 +310,14 @@
 -   **IA:**
     -   **Diagnóstico:** El problema se debe a "canales zombie" de Supabase Realtime. Al cerrar una pestaña, la conexión no se termina limpiamente. Al abrir una nueva, el cliente de Supabase intenta reanudar esta conexión rota, causando un error interno no capturable que detiene la ejecución.
     -   **Solución:** Se modifica `App.tsx` para añadir `supabase.removeAllChannels()` al inicio del callback de `onAuthStateChange`. Esto fuerza una limpieza completa de todas las conexiones al cargar la sesión, asegurando un estado limpio y previniendo el error, solucionando así el congelamiento.
+
+---
+
+## Sesión 31: Corrección de "Alucinación" del Chatbot en Actualizaciones de BD
+
+-   **Usuario:** Reporta que el chatbot confirma una actualización de un residente, pero el cambio no se refleja en la plataforma, incluso al refrescar.
+-   **IA:**
+    -   **Diagnóstico:** El chatbot estaba "alucinando" un proceso. Para cambiar un propietario, intentaba "agregar" un nuevo residente en lugar de "editar" el existente. Esto causaba un error de clave duplicada en la base de datos que era manejado incorrectamente, resultando en una confirmación falsa al usuario sin que la operación se realizara.
+    -   **Solución (Doble):**
+        1.  **Backend Robusto:** Se modificó `apiService.ts` para que las funciones `addResident` y `updateResident` usen `upsert`. Ahora, si la IA intenta "agregar" un residente a un apartamento que ya existe, la base de datos lo "actualizará" inteligentemente en lugar de fallar.
+        2.  **IA Educada:** Se actualizó `system_prompt.txt` con instrucciones explícitas para que el chatbot entienda que un cambio de propietario es una operación de `edit`, no de `add`, mejorando la precisión de sus acciones y respuestas futuras.
