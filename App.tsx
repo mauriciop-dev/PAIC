@@ -80,10 +80,11 @@ const App: React.FC = () => {
     setIsLoadingSession(true);
     
     const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        // Force cleanup of any lingering "zombie" channels from previous tabs/sessions.
-        // This prevents an un-catchable error within the Supabase client that freezes the app.
-        supabase.removeAllChannels();
         try {
+            // Force cleanup of any lingering "zombie" channels from previous tabs/sessions.
+            // This prevents an un-catchable error within the Supabase client that freezes the app.
+            supabase.removeAllChannels();
+        
             setLoginError(null); // Clear any previous error on a new auth event
             setSession(session);
             if (session?.user) {

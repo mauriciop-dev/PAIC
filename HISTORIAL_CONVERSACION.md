@@ -330,3 +330,12 @@
 -   **IA:**
     -   **Diagnóstico:** El prompt del sistema (`system_prompt.txt`) estaba violando sus propias reglas. Usaba asteriscos para enfatizar las reglas, enseñando implícitamente a la IA a usar ese formato.
     -   **Solución:** Se reescribió el `system_prompt.txt` para eliminar todos los asteriscos de formato. El énfasis ahora se logra mediante el uso de MAYÚSCULAS. Esto alinea el estilo del prompt con sus reglas, eliminando la ambigüedad y asegurando que el chatbot genere texto plano como se le solicita.
+
+---
+
+## Sesión 33: Solución a Congelamiento en Recarga por 'Canales Zombie' de Supabase
+
+-   **Usuario:** Reporta que la aplicación se congela en "Cargando..." al refrescar una pestaña después de haber cerrado otra.
+-   **IA:**
+    -   **Diagnóstico:** El problema se debe a "canales zombie" de Supabase Realtime. Al cerrar una pestaña, la conexión no se termina limpiamente, y al recargar, el cliente de Supabase intenta reanudar esta conexión rota, causando un error interno no capturable que detiene la ejecución del callback de autenticación.
+    -   **Solución:** Se modifica `App.tsx` para añadir `supabase.removeAllChannels()` al inicio del callback de `onAuthStateChange`. Esto fuerza una limpieza completa de todas las conexiones al cargar la sesión, asegurando un estado limpio y previniendo el error, solucionando así el congelamiento.
