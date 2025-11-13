@@ -351,3 +351,15 @@
         -   Si el parámetro está presente, la página muestra un título y texto orientados a la creación de una cuenta de prueba gratuita ("Empieza tu prueba gratuita de 14 días").
         -   Si el parámetro no está, muestra el mensaje estándar de "Acceso para Administradores".
     -   **Beneficio:** Esta mejora alinea el mensaje con la intención del usuario, eliminando la confusión y optimizando la tasa de conversión de nuevos registros.
+
+---
+
+## Sesión 35: Solución Definitiva al Congelamiento de la Aplicación al Recargar
+
+-   **Usuario:** Reporta un congelamiento persistente en la pantalla "Cargando PAIC..." al refrescar la página, y cierres de sesión inesperados al navegar.
+-   **IA:**
+    -   **Diagnóstico:** Se identifica la causa raíz como un error no capturado durante la inicialización del listener de autenticación de Supabase (`onAuthStateChange`), probablemente debido a un estado corrupto del cliente ("canales zombie"). Este error impedía que el estado de carga se resolviera, congelando la aplicación. El cierre de sesión era un síntoma del mismo problema, donde el token de autenticación inválido causaba fallos en las llamadas a la API.
+    -   **Solución:** Se refactoriza por completo el `useEffect` de autenticación en `App.tsx`.
+        1.  Se implementa un bloque `try/catch` alrededor de la configuración del listener para capturar cualquier error de inicialización.
+        2.  Se asegura que la lógica principal de la sesión (incluida la limpieza de canales) esté dentro de un `try/catch/finally` anidado, garantizando que `setIsLoadingSession(false)` se ejecute **siempre**, eliminando así el congelamiento.
+    -   **Resultado:** La aplicación ahora es resiliente a los estados corruptos del cliente, cargando correctamente o mostrando un error claro en lugar de congelarse, lo que soluciona ambos problemas reportados.

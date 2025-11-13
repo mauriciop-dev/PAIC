@@ -17,7 +17,7 @@ import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 // FIX: The `Session` type is not exported in older versions of `@supabase/supabase-js`. Using `AuthSession` which was the predecessor.
 // Switched to `Session` which is the correct type for Supabase JS v2.
-import { Session } from '@supabase/supabase-js';
+import { Session, Subscription } from '@supabase/supabase-js';
 
 interface LoginError {
   title: string;
@@ -78,67 +78,83 @@ const App: React.FC = () => {
     }
 
     setIsLoadingSession(true);
+    let subscription: Subscription | null = null;
     
-    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        try {
-            // Force cleanup of any lingering "zombie" channels from previous tabs/sessions.
-            // This prevents an un-catchable error within the Supabase client that freezes the app.
-            supabase.removeAllChannels();
-        
-            setLoginError(null); // Clear any previous error on a new auth event
-            setSession(session);
-            if (session?.user) {
-                let profile = null;
-                // Retry fetching the profile to account for potential replication delay or trigger latency.
-                // Increased retry count and delay for more robustness against severe DB lag.
-                for (let i = 0; i < 5; i++) {
-                    profile = await apiService.fetchUserProfile(session.user.id);
-                    if (profile) break;
-                    console.warn(`Profile not found, likely due to DB replication lag. Retrying... Attempt ${i + 1}`);
-                    await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds
-                }
+    try {
+        const authListener = supabase.auth.onAuthStateChange(async (_event, session) => {
+            try {
+                // Force cleanup of any lingering "zombie" channels from previous tabs/sessions.
+                // This prevents an un-catchable error within the Supabase client that freezes the app.
+                supabase.removeAllChannels();
+            
+                setLoginError(null); // Clear any previous error on a new auth event
+                setSession(session);
+                if (session?.user) {
+                    let profile = null;
+                    // Retry fetching the profile to account for potential replication delay or trigger latency.
+                    // Increased retry count and delay for more robustness against severe DB lag.
+                    for (let i = 0; i < 5; i++) {
+                        profile = await apiService.fetchUserProfile(session.user.id);
+                        if (profile) break;
+                        console.warn(`Profile not found, likely due to DB replication lag. Retrying... Attempt ${i + 1}`);
+                        await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds
+                    }
 
-                if (profile) {
-                    setUserProfile(profile);
-                    if (profile.conjuntoId) {
-                        const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
-                        if (info) {
-                            setConjuntoInfo(info);
+                    if (profile) {
+                        setUserProfile(profile);
+                        if (profile.conjuntoId) {
+                            const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+                            if (info) {
+                                setConjuntoInfo(info);
+                            } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                                setIsInitialSetupModalOpen(true);
+                            }
                         } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                             setIsInitialSetupModalOpen(true);
                         }
-                    } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                        setIsInitialSetupModalOpen(true);
+                    } else {
+                        console.error("User is logged in but profile data is missing after extensive retries.");
+                        setLoginError({
+                            title: "Error de Sincronización",
+                            message: "No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.",
+                            type: 'sync',
+                        });
+                        setUserProfile(null);
+                        setConjuntoInfo(null);
                     }
                 } else {
-                    console.error("User is logged in but profile data is missing after extensive retries.");
-                    setLoginError({
-                        title: "Error de Sincronización",
-                        message: "No pudimos encontrar tu perfil de usuario después de iniciar sesión. Esto puede ocurrir si es tu primera vez y la base de datos está tardando en sincronizarse. Por favor, intenta refrescar la página. Si el problema persiste, contacta a soporte.",
-                        type: 'sync',
-                    });
                     setUserProfile(null);
                     setConjuntoInfo(null);
                 }
-            } else {
-                setUserProfile(null);
-                setConjuntoInfo(null);
+            } catch (e) {
+                console.error("Unhandled error during authentication state change:", e);
+                setLoginError({
+                    title: "Error Crítico de Sesión",
+                    message: "Ocurrió un error inesperado al procesar tu sesión. Por favor, intenta refrescar. Si el problema no se soluciona, contacta a soporte.",
+                    type: 'sync',
+                });
+            } finally {
+                setIsLoadingSession(false);
             }
-        } catch (e) {
-            console.error("Unhandled error during authentication state change:", e);
-            setLoginError({
-                title: "Error Crítico de Sesión",
-                message: "Ocurrió un error inesperado al procesar tu sesión. Por favor, intenta refrescar. Si el problema no se soluciona, contacta a soporte.",
-                type: 'sync',
-            });
-        } finally {
-            setIsLoadingSession(false);
+        });
+        
+        subscription = authListener?.data?.subscription ?? null;
+
+    } catch (error) {
+        console.error("Critical error setting up auth listener:", error);
+        setLoginError({
+            title: "Error de Inicialización",
+            message: "La aplicación no pudo iniciarse correctamente. Esto puede deberse a un problema de conexión o configuración. Por favor, refresca la página.",
+            type: 'config',
+        });
+        setIsLoadingSession(false);
+    }
+    
+    return () => {
+        if (subscription) {
+            subscription.unsubscribe();
         }
-    });
-    
-    const subscription = data?.subscription;
-    
-    return () => subscription?.unsubscribe();
+    };
   }, [handleLogout, loginError]); // Add loginError dependency to prevent this from running if an error is already set
   
   // Effect to handle post-payment redirection
