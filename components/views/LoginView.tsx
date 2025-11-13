@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { Icon } from '../ui/Icon';
 import LoginForm from '../LoginForm';
@@ -14,6 +14,14 @@ interface LoginViewProps {
 const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
   const [view, setView] = useState<'admin' | 'internal'>('admin');
   const [error, setError] = useState<string | null>(null);
+  const [isMarketingFlow, setIsMarketingFlow] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('source') === 'marketing') {
+      setIsMarketingFlow(true);
+    }
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setError(null);
@@ -48,7 +56,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
         <span className="text-sm font-medium text-gray-700">Continuar con Google</span>
       </button>
       <p className="text-center text-xs text-gray-500 mt-4">
-        Usa tu cuenta de Google para registrarte o iniciar sesión de forma segura.
+        {isMarketingFlow
+          ? "Crea tu cuenta de prueba o inicia sesión con un solo clic."
+          : "Usa tu cuenta de Google para registrarte o iniciar sesión de forma segura."
+        }
       </p>
     </div>
   );
@@ -73,9 +84,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
         <div className="py-8 px-12">
             <div className="flex flex-col items-center">
                 <Icon name="bot" className="w-10 h-10 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-800 mt-3">
+                <h1 className="text-xl font-bold text-gray-800 mt-3 text-center">
                     {view === 'admin' 
-                        ? 'Acceso para Administradores'
+                        ? (isMarketingFlow ? 'Empieza tu prueba gratuita de 14 días' : 'Acceso para Administradores')
                         : 'Acceso para Personal'
                     }
                 </h1>

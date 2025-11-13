@@ -339,3 +339,15 @@
 -   **IA:**
     -   **Diagnóstico:** El problema se debe a "canales zombie" de Supabase Realtime. Al cerrar una pestaña, la conexión no se termina limpiamente, y al recargar, el cliente de Supabase intenta reanudar esta conexión rota, causando un error interno no capturable que detiene la ejecución del callback de autenticación.
     -   **Solución:** Se modifica `App.tsx` para añadir `supabase.removeAllChannels()` al inicio del callback de `onAuthStateChange`. Esto fuerza una limpieza completa de todas las conexiones al cargar la sesión, asegurando un estado limpio y previniendo el error, solucionando así el congelamiento.
+
+---
+
+## Sesión 34: Optimización del Flujo de Conversión de Marketing
+
+-   **Usuario:** Pide implementar la optimización del flujo de marketing discutida previamente para reducir la fricción en el registro.
+-   **IA:**
+    -   **Diagnóstico:** La página de `LoginView` presentaba un mensaje de "Acceso" a todos los usuarios, lo que podía confundir a los nuevos visitantes provenientes de campañas de marketing que esperaban un flujo de "Registro".
+    -   **Solución:** Se modifica `LoginView.tsx` para ser contextual. Ahora detecta un parámetro de URL (`?source=marketing`).
+        -   Si el parámetro está presente, la página muestra un título y texto orientados a la creación de una cuenta de prueba gratuita ("Empieza tu prueba gratuita de 14 días").
+        -   Si el parámetro no está, muestra el mensaje estándar de "Acceso para Administradores".
+    -   **Beneficio:** Esta mejora alinea el mensaje con la intención del usuario, eliminando la confusión y optimizando la tasa de conversión de nuevos registros.
