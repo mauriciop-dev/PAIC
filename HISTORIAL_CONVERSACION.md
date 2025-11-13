@@ -363,3 +363,15 @@
         1.  Se implementa un bloque `try/catch` alrededor de la configuración del listener para capturar cualquier error de inicialización.
         2.  Se asegura que la lógica principal de la sesión (incluida la limpieza de canales) esté dentro de un `try/catch/finally` anidado, garantizando que `setIsLoadingSession(false)` se ejecute **siempre**, eliminando así el congelamiento.
     -   **Resultado:** La aplicación ahora es resiliente a los estados corruptos del cliente, cargando correctamente o mostrando un error claro en lugar de congelarse, lo que soluciona ambos problemas reportados.
+---
+
+## Sesión 36: Solución Definitiva al Congelamiento de la Aplicación y Cierres de Sesión
+
+-   **Usuario:** Reporta que el congelamiento en "Cargando..." y los cierres de sesión inesperados persisten a pesar de los cambios anteriores.
+-   **IA:**
+    -   **Diagnóstico Definitivo:** Se concluye que el problema es un fallo fundamental en la inicialización de la sesión de Supabase. El cliente entra en un estado corrupto por "canales zombie" de pestañas cerradas, y la aplicación no limpia este estado ni verifica activamente la sesión al recargar, lo que causa un error interno no capturable que congela la aplicación.
+    -   **Solución (Refactor Robusto):** Se reescribe por completo la lógica de manejo de sesión en `App.tsx` para ser inmune a estos fallos:
+        1.  **Limpieza Agresiva:** La aplicación ahora ejecuta `supabase.removeAllChannels()` como primer paso absoluto en cada carga para eliminar cualquier conexión "zombie".
+        2.  **Inicialización Activa:** En lugar de esperar pasivamente un evento, la aplicación ahora usa `supabase.auth.getSession()` para solicitar y validar activamente la sesión al inicio.
+        3.  **Garantía Anti-Congelamiento:** Toda esta nueva lógica se envuelve en un bloque `try/catch/finally` para garantizar que el estado de carga (`isLoadingSession`) **siempre** se resuelva, pase lo que pase, eliminando el congelamiento de forma definitiva.
+    -   **Resultado:** La aplicación ahora maneja correctamente los refrescos de página y las sesiones corruptas, cargando la aplicación o mostrando una pantalla de error clara en lugar de congelarse.

@@ -3,11 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { Icon } from '../ui/Icon';
 import LoginForm from '../LoginForm';
-// FIX: Import PlatformUser to use in props.
-import { PlatformUser, UserProfile } from '../../types';
+import { PlatformUser } from '../../types';
 
 interface LoginViewProps {
-  // FIX: Changed prop to accept PlatformUser to align with handler in App.tsx.
   onInternalAuthSuccess: (user: PlatformUser) => void;
 }
 
@@ -25,8 +23,6 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
 
   const handleGoogleSignIn = async () => {
     setError(null);
-    // FIX: `signInWithOAuth` is a v2 method. The error suggests it doesn't exist. Reverting to the v1 method `signIn` with the corresponding options structure.
-    // The error indicates Supabase JS v2 is used, where `signInWithOAuth` is the correct method for OAuth.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
