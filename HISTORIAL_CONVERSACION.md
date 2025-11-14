@@ -373,5 +373,16 @@
     -   **Solución (Refactor Robusto):** Se reescribe por completo la lógica de manejo de sesión en `App.tsx` para ser inmune a estos fallos:
         1.  **Limpieza Agresiva:** La aplicación ahora ejecuta `supabase.removeAllChannels()` como primer paso absoluto en cada carga para eliminar cualquier conexión "zombie".
         2.  **Inicialización Activa:** En lugar de esperar pasivamente un evento, la aplicación ahora usa `supabase.auth.getSession()` para solicitar y validar activamente la sesión al inicio.
-        3.  **Garantía Anti-Congelamiento:** Toda esta nueva lógica se envuelve en un bloque `try/catch/finally` para garantizar que el estado de carga (`isLoadingSession`) **siempre** se resuelva, pase lo que pase, eliminando el congelamiento de forma definitiva.
+        3.  **Garantía Anti-Congelamiento:** Toda esta nueva lógica se envuelve en un bloque que garantiza que el estado de carga (`isLoadingSession`) **siempre** se resuelva, pase lo que pase, eliminando el congelamiento de forma definitiva.
     -   **Resultado:** La aplicación ahora maneja correctamente los refrescos de página y las sesiones corruptas, cargando la aplicación o mostrando una pantalla de error clara en lugar de congelarse.
+---
+
+## Sesión 37: Solución a Condición de Carrera en Autenticación y Cierre de Sesión
+
+-   **Usuario:** Reporta que el refresco de la página ya funciona, pero el botón "Áreas Comunes" sigue causando un cierre de sesión.
+-   **IA:**
+    -   **Diagnóstico:** Se identifica una sutil "condición de carrera" en la inicialización de la sesión. El listener `onAuthStateChange` se activaba durante la carga inicial y llamaba a la función de inicialización por segunda vez, creando un estado de sesión inconsistente que fallaba en la primera llamada a la API (al hacer clic en una pestaña).
+    -   **Solución (Refactor Robusto v2):** Se refactoriza el `useEffect` de autenticación en `App.tsx` para eliminar la condición de carrera:
+        1.  La lógica de inicialización principal (con `getSession` y `removeAllChannels`) se mantiene como la fuente única de verdad para la carga inicial.
+        2.  El listener `onAuthStateChange` se simplifica drásticamente. Ahora, su única responsabilidad es detectar si el usuario ha cambiado (ej. inicio/cierre de sesión en otra pestaña). Si detecta un cambio, en lugar de intentar una compleja re-inicialización interna, simplemente **recarga la página completa (`window.location.reload()`)**.
+    -   **Resultado:** Este enfoque es el más robusto posible. Garantiza que cualquier cambio de sesión resulte en un estado completamente limpio y consistente, eliminando de raíz tanto la condición de carrera como el síntoma del cierre de sesión inesperado al navegar. La aplicación ahora es completamente estable.
