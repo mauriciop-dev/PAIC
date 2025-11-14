@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -16,12 +17,15 @@ import { supabase } from './services/supabaseClient';
 import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
+import OnboardingGuide from './components/OnboardingGuide';
 
 interface LoginError {
   title: string;
   message: string;
   type: 'sync' | 'config';
 }
+
+type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Dashboard);
@@ -37,8 +41,9 @@ const App: React.FC = () => {
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [loginError, setLoginError] = useState<LoginError | null>(null);
-
   const [notification, setNotification] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [initialSettingsTab, setInitialSettingsTab] = useState<SettingsTab>('Perfil');
 
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
@@ -222,7 +227,26 @@ const App: React.FC = () => {
       }
   }, [userProfile]);
   
+  // Effect for onboarding
+  useEffect(() => {
+    if (userProfile && !isLoadingSession) {
+      const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
+      if (isConjuntoAdmin) {
+        const onboardingCompleted = localStorage.getItem(`onboardingCompleted-${userProfile.id}`);
+        if (!onboardingCompleted) {
+            setShowOnboarding(true);
+        }
+      }
+    }
+  }, [userProfile, isLoadingSession]);
 
+  const handleOnboardingComplete = () => {
+    if (userProfile) {
+      localStorage.setItem(`onboardingCompleted-${userProfile.id}`, 'true');
+    }
+    setShowOnboarding(false);
+  };
+  
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     if (!userProfile) return;
     
@@ -245,6 +269,10 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSettingsClick = (tab: SettingsTab = 'Perfil') => {
+    setInitialSettingsTab(tab);
+    setIsSettingsModalOpen(true);
+  };
 
   const handleSaveSettings = async (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => {
     await apiService.updateUserProfile(updatedProfile);
@@ -347,7 +375,7 @@ const App: React.FC = () => {
       
       {isConjuntoAdmin && (
         <div className={`fixed top-0 left-0 h-full z-20 transition-opacity duration-300 ease-in-out ${isChatbotOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <button onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
+          <button id="chatbot-toggle-button" onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
             <Icon name="bot" className="w-6 h-6" />
             <span style={{ writingMode: 'vertical-rl' }} className="font-semibold text-xs tracking-wider">ASISTENTE</span>
           </button>
@@ -357,9 +385,10 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
-            userProfile={userProfile} 
+            userProfile={userProfile}
+            conjuntoInfo={conjuntoInfo} 
             onLogout={handleLogout} 
-            onSettingsClick={() => setIsSettingsModalOpen(true)} 
+            onSettingsClick={handleSettingsClick} 
             activeTabName={activeTab}
         />
         {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
@@ -378,7 +407,8 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} />}
+      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { setIsHelpModalOpen(false); setShowOnboarding(true); }} />}
+      
       {isInitialSetupModalOpen && (
         <InitialSetupModal 
             onClose={() => setIsInitialSetupModalOpen(false)} 
@@ -386,12 +416,23 @@ const App: React.FC = () => {
             userProfile={userProfile}
         />
       )}
+      
       {isSettingsModalOpen && isConjuntoAdmin && conjuntoInfo && (
-          <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} onSave={handleSaveSettings} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+          <SettingsModal 
+            isOpen={isSettingsModalOpen} 
+            onClose={() => setIsSettingsModalOpen(false)} 
+            onSave={handleSaveSettings} 
+            userProfile={userProfile} 
+            conjuntoInfo={conjuntoInfo} 
+            initialTab={initialSettingsTab}
+          />
       )}
+      
        {isAccessPointModalOpen && userProfile.conjuntoId && (
         <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
       )}
+      
+      <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} />
     </div>
   );
 };

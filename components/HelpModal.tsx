@@ -4,9 +4,10 @@ import { Icon } from './ui/Icon';
 
 interface HelpModalProps {
   onClose: () => void;
+  onStartTour: () => void;
 }
 
-const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+const HelpModal: React.FC<HelpModalProps> = ({ onClose, onStartTour }) => {
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center"
@@ -19,7 +20,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
           <Icon name="x" className="w-6 h-6"/>
         </button>
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Centro de Ayuda</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Centro de Soporte</h2>
         <p className="text-gray-600 mb-6">Encuentra recursos útiles para sacar el máximo provecho de PAIC.</p>
         
         <div className="space-y-4">
@@ -30,6 +31,14 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
             <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Gestionando áreas comunes con el Chatbot</a></li>
             <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Enviando comunicaciones a residentes</a></li>
           </ul>
+        </div>
+        
+        <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-700">¿Necesitas un recorrido?</h3>
+            <button onClick={onStartTour} className="mt-2 w-full text-left px-4 py-2 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md flex items-center gap-3 font-semibold">
+                <Icon name="send" className="w-4 h-4" />
+                Hacer el Tour Guiado de la Plataforma
+            </button>
         </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200">

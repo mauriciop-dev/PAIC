@@ -6,15 +6,16 @@ import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 import { mercadoPagoService } from '../services/mercadoPagoService';
 
+type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => void;
   userProfile: UserProfile;
   conjuntoInfo: ConjuntoInfo;
+  initialTab?: SettingsTab;
 }
-
-type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -22,8 +23,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
   userProfile,
   conjuntoInfo,
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('Perfil');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'Perfil');
   const [profileData, setProfileData] = useState<UserProfile>(userProfile);
   const [conjuntoData, setConjuntoData] = useState<ConjuntoInfo>(conjuntoInfo);
   const [hasChanges, setHasChanges] = useState(false);
@@ -33,6 +35,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Access Points state
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
   const [newAccessPointName, setNewAccessPointName] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+        setActiveTab(initialTab || 'Perfil');
+    }
+  }, [isOpen, initialTab])
 
   useEffect(() => {
     const fetchAccessPoints = async () => {

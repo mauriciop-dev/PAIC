@@ -132,7 +132,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
     : 'bg-gray-500';
 
   return (
-    <nav className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4 flex-wrap">
+    <nav id="main-navbar" className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4 flex-wrap">
       <div className="flex items-center gap-1 md:gap-2 flex-wrap">
         {visibleTabs.map((tab) => (
           <button

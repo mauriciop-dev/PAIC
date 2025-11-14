@@ -1,16 +1,20 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole, ConjuntoInfo } from '../types';
 import { Icon } from './ui/Icon';
+
+type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
 
 interface HeaderProps {
   onHelpClick: () => void;
   userProfile: UserProfile | null;
+  conjuntoInfo: ConjuntoInfo | null;
   onLogout: () => void;
-  onSettingsClick: () => void;
+  onSettingsClick: (tab?: SettingsTab) => void;
   activeTabName: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onSettingsClick, activeTabName }) => {
+const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, conjuntoInfo, onLogout, onSettingsClick, activeTabName }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -30,31 +34,54 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
   const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
   const isTrialActive = userProfile.role === UserRole.Trial && userProfile.trialExpiresAt;
 
+  let daysRemaining = 0;
+  if (isTrialActive) {
+      const trialEndDate = new Date(userProfile.trialExpiresAt!);
+      const today = new Date();
+      // Set hours to 0 to compare dates only
+      today.setHours(0, 0, 0, 0);
+      trialEndDate.setHours(0, 0, 0, 0);
+      const diffTime = trialEndDate.getTime() - today.getTime();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 24)));
+  }
 
   return (
     <header className="bg-white sticky top-0 z-20 shadow-sm">
-      {isTrialActive && (
-        <div className="bg-yellow-100 text-yellow-800 text-xs font-bold text-center p-1">
-          Tu período de prueba termina el {new Date(userProfile.trialExpiresAt!).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}.
-        </div>
-      )}
       <div className="p-4 md:px-6 md:pt-6 md:pb-2 border-b border-gray-200">
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-lg md:text-xl font-bold text-gray-800">
               PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
             </h1>
-            <p className="text-md font-semibold text-blue-600 mt-1">{activeTabName}</p>
+            <div className="flex items-center gap-2 mt-1">
+                <p className="text-md font-semibold text-blue-600">{activeTabName}</p>
+                {conjuntoInfo && (
+                    <span className="hidden sm:inline text-sm font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {conjuntoInfo.name}
+                    </span>
+                )}
+            </div>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0 pt-1">
+             {isTrialActive && daysRemaining > 0 && (
+                <div className="hidden sm:block text-center">
+                    <button
+                        onClick={() => onSettingsClick('Suscripción')}
+                        className="px-3 py-1.5 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition-colors text-xs shadow-sm"
+                    >
+                        Actualiza a Pro
+                    </button>
+                    <p className="text-xs text-gray-500 mt-0.5">{daysRemaining} días restantes</p>
+                </div>
+            )}
             <button
               onClick={onHelpClick}
               className="hidden sm:block px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
             >
-              Ayuda
+              Soporte
             </button>
             
-            <div className="relative" ref={menuRef}>
+            <div id="user-menu-dropdown" className="relative" ref={menuRef}>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center gap-2 rounded-full p-1 hover:bg-gray-100">
                 {userProfile.avatarUrl ? (
                    <img src={userProfile.avatarUrl} alt="User Avatar" className="w-8 h-8 rounded-full" />
@@ -70,8 +97,16 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
                   <div className="p-3 border-b">
                      <p className="font-semibold text-sm text-gray-800">{userProfile.fullName}</p>
                      <p className="text-xs text-gray-500">{userProfile.email}</p>
-                     <p className="text-xs font-bold text-blue-600 mt-1 capitalize">{userProfile.role}</p>
                   </div>
+                  {isConjuntoAdmin && conjuntoInfo && (
+                    <div className="p-3 border-b">
+                        <p className="text-xs font-semibold text-gray-600">
+                            Suscripción: <span className={conjuntoInfo.subscriptionPlan === 'Paid' ? 'text-green-700 font-bold' : 'text-yellow-700 font-bold'}>
+                                {conjuntoInfo.subscriptionPlan === 'Paid' ? 'Pro' : 'Trial'}
+                            </span>
+                        </p>
+                    </div>
+                   )}
                   <div className="p-1">
                     {isConjuntoAdmin && (
                       <button
@@ -84,8 +119,9 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, onLogout, onS
                     )}
                     <button
                       onClick={() => { onLogout(); setIsMenuOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md"
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md flex items-center gap-2"
                     >
+                      <Icon name="log-in" className="w-4 h-4 text-gray-500" />
                       Cerrar Sesión
                     </button>
                   </div>

@@ -164,12 +164,13 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
                                 value={currentRecipient}
                                 onChange={(e) => setCurrentRecipient(e.target.value)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ',') {
+                                    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
                                         e.preventDefault();
                                         handleAddRecipient();
                                     }
                                 }}
-                                placeholder={recipients.length === 0 ? "Añadir correos y presionar Enter..." : ""}
+                                onBlur={handleAddRecipient}
+                                placeholder={recipients.length === 0 ? "Añadir correos (separados por espacio, coma o Enter)..." : ""}
                                 className="flex-1 bg-transparent focus:outline-none p-1 text-sm"
                             />
                         </div>

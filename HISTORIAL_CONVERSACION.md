@@ -335,7 +335,7 @@
 
 ## Sesión 33: Solución a Congelamiento en Recarga por 'Canales Zombie' de Supabase
 
--   **Usuario:** Reporta que la aplicación se congela en "Cargando..." al refrescar una pestaña después de haber cerrado otra.
+-   **Usuario:** Reporta que la aplicación se congela en "Cargando..." al recargar una pestaña después de haber cerrado otra.
 -   **IA:**
     -   **Diagnóstico:** El problema se debe a "canales zombie" de Supabase Realtime. Al cerrar una pestaña, la conexión no se termina limpiamente, y al recargar, el cliente de Supabase intenta reanudar esta conexión rota, causando un error interno no capturable que detiene la ejecución del callback de autenticación.
     -   **Solución:** Se modifica `App.tsx` para añadir `supabase.removeAllChannels()` al inicio del callback de `onAuthStateChange`. Esto fuerza una limpieza completa de todas las conexiones al cargar la sesión, asegurando un estado limpio y previniendo el error, solucionando así el congelamiento.
@@ -420,3 +420,18 @@
         1.  **Backend/API (Causa Raíz):** Se modificó `apiService.ts` para que la función `addCommonArea` ahora asigne automáticamente un color de una paleta predefinida al crear una nueva área.
         2.  **Frontend/UI (Resiliencia):** Se refactorizó `CommonAreasView.tsx` para añadir una comprobación de seguridad. Si un área tiene un color nulo, se le asigna un color gris por defecto para el renderizado, evitando así la caída de la aplicación.
     -   **Resultado:** Se actualiza el historial para reflejar la solución definitiva que hizo la aplicación más robusta y corrigió la integridad de los datos.
+---
+
+## Sesión 41: Implementación de Reserva Manual con Autocompletado
+
+-   **Usuario:** Solicita la capacidad de agregar reservas de áreas comunes manualmente, a través de un formulario, como una alternativa al asistente de IA, y que este formulario sea inteligente.
+-   **IA:**
+    -   **Acción:** Se implementó un flujo completo para la creación manual de reservas.
+    -   **Componentes Nuevos:** Se creó `BookingModal.tsx`, un nuevo modal con un formulario detallado para registrar reservas.
+    -   **Inteligencia y UX:** Se añadió una función de **autocompletado**. Al escribir el número de apartamento en el modal, la aplicación busca automáticamente al residente en la base de datos y rellena los campos de nombre, correo y teléfono, agilizando el proceso.
+    -   **Backend:** Se documentó la necesidad de crear una nueva tabla `reservations` en la base de datos y se proporcionó el script SQL para ello. Se añadieron las funciones `addReservation` y `fetchReservations` a `apiService.ts`.
+    -   **Integración:** Se actualizó `CommonAreasView.tsx` para:
+        1.  Añadir el botón "Agregar Reserva" que abre el nuevo modal.
+        2.  Obtener tanto las reservas creadas por la IA como las manuales.
+        3.  Mostrar ambos tipos de reserva de forma unificada en el calendario, consolidando toda la información en una sola vista.
+    -   **Recursos:** Se añadieron nuevos tipos (`Reservation` en `types.ts`) e íconos (`home`, `phone` en `Icon.tsx`).
