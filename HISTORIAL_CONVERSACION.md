@@ -408,3 +408,15 @@
         1.  **Backend/API (Causa Raíz):** Se modifica `apiService.ts` para que la función `addCommonArea` ahora asigne automáticamente un color de una paleta predefinida al crear una nueva área. Esto previene la creación de futuros datos corruptos.
         2.  **Frontend/UI (Resiliencia):** Se refactoriza `CommonAreasView.tsx` para ser resiliente a datos nulos. Se añaden comprobaciones de seguridad (`area.color || defaultValue`) antes de intentar renderizar los colores, asegurando que la interfaz no se caiga si encuentra datos antiguos sin color.
     -   **Resultado:** La aplicación ya no se cae al entrar a "Áreas Comunes" y la creación de nuevas áreas es ahora robusta, garantizando la integridad de los datos.
+---
+
+## Sesión 40: Solución a Caída Crítica en "Áreas Comunes" por Datos Nulos (Confirmación)
+
+-   **Usuario:** Confirma que la vista de "Áreas Comunes" ya funciona correctamente y solicita que el problema y la solución sean documentados en el historial.
+-   **IA:**
+    -   **Problema Documentado:** La aplicación se caía (`white screen of death`) al hacer clic en la pestaña "Áreas Comunes", con un error `Cannot read properties of null (reading 'bg')`.
+    -   **Diagnóstico Documentado:** La causa raíz era que la función para añadir nuevas áreas (`apiService.addCommonArea`) no asignaba un color por defecto, guardando el campo `color` como `null` en la base de datos. El componente del frontend no manejaba este caso nulo y fallaba al intentar renderizar el color.
+    -   **Solución Documentada (Doble):**
+        1.  **Backend/API (Causa Raíz):** Se modificó `apiService.ts` para que la función `addCommonArea` ahora asigne automáticamente un color de una paleta predefinida al crear una nueva área.
+        2.  **Frontend/UI (Resiliencia):** Se refactorizó `CommonAreasView.tsx` para añadir una comprobación de seguridad. Si un área tiene un color nulo, se le asigna un color gris por defecto para el renderizado, evitando así la caída de la aplicación.
+    -   **Resultado:** Se actualiza el historial para reflejar la solución definitiva que hizo la aplicación más robusta y corrigió la integridad de los datos.
