@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import NavBar from './components/NavBar';
@@ -40,12 +40,6 @@ const App: React.FC = () => {
 
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Use a ref to track the current session inside the auth listener without causing re-renders.
-  const sessionRef = useRef(session);
-  useEffect(() => {
-    sessionRef.current = session;
-  }, [session]);
-
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
     await supabase.auth.signOut();
@@ -72,105 +66,105 @@ const App: React.FC = () => {
     }
   }, []);
 
-
-  // Robust session initialization and listener effect
+  // This effect runs only ONCE on mount.
+  // It's responsible for setting the initial session and subscribing to auth changes.
   useEffect(() => {
-    if (loginError) {
+    // Do not run if a config error was already detected from the URL
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.get('error_description')) return;
+      
+    setIsLoadingSession(true);
+    supabase.removeAllChannels(); // Clean up on start to prevent zombie channels
+
+    // Get initial session state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setLoginError(null); // Clear previous errors
         setIsLoadingSession(false);
-        return;
-    }
+    }).catch(e => {
+        console.error("Critical error during initial getSession:", e);
+        setLoginError({
+            title: "Error Crítico de Sesión",
+            message: "Ocurrió un error inesperado al iniciar. Por favor, refresca la página.",
+            type: 'sync',
+        });
+        setIsLoadingSession(false);
+    });
 
-    const setupSessionAndProfile = async () => {
-        try {
-            // STEP 1: Actively and safely fetch the current session state.
-            const { data, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError) throw sessionError;
-            const currentSession = data.session;
-
-            // Update state based on the fetched session.
-            setLoginError(null);
-            setSession(currentSession);
-
-            if (currentSession?.user) {
-                // User is logged in, now fetch their application profile.
-                let profile = null;
-                // Retry loop to handle DB replication lag after sign-up.
-                for (let i = 0; i < 5; i++) {
-                    profile = await apiService.fetchUserProfile(currentSession.user.id);
-                    if (profile) break;
-                    console.warn(`Profile not found, retrying... Attempt ${i + 1}`);
-                    await new Promise(res => setTimeout(res, 2000));
-                }
-
-                if (profile) {
-                    setUserProfile(profile);
-                    // After getting the profile, fetch the associated "conjunto" info.
-                    if (profile.conjuntoId) {
-                        const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
-                        if (info) {
-                            setConjuntoInfo(info);
-                        } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                            // Admin user has no conjunto, force initial setup.
-                            setIsInitialSetupModalOpen(true);
-                        }
-                    } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                        // Admin user has no conjuntoId in their profile, force initial setup.
-                        setIsInitialSetupModalOpen(true);
-                    }
-                } else {
-                    // This is a critical error state: user is authenticated but has no profile.
-                    console.error("User is logged in but profile data is missing after retries.");
-                    setLoginError({
-                        title: "Error de Sincronización",
-                        message: "No pudimos encontrar tu perfil. Esto puede ser un problema de sincronización. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
-                        type: 'sync',
-                    });
-                    setUserProfile(null);
-                    setConjuntoInfo(null);
-                }
-            } else {
-                // No session, so clear user profile and conjunto info.
-                setUserProfile(null);
-                setConjuntoInfo(null);
-            }
-        } catch (e: any) {
-            console.error("Critical error during session setup:", e);
-            setLoginError({
-                title: "Error Crítico de Sesión",
-                message: "Ocurrió un error inesperado. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
-                type: 'sync',
-            });
-        }
-    };
-    
-    // Initializer function to wrap the setup and loading state.
-    const initializeApp = async () => {
-        setIsLoadingSession(true);
-        supabase.removeAllChannels(); // Aggressively clean any lingering connections to prevent freezes.
-        await setupSessionAndProfile();
-        setIsLoadingSession(false); // This is guaranteed to run, preventing freezes.
-    };
-    
-    initializeApp();
-
-    // STEP 3: Set up a safe listener for future auth state changes.
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-        // If the user's session changes (e.g., login in another tab, or logout),
-        // the simplest and most robust way to ensure the app is in a consistent state
-        // is to perform a full page reload. This avoids race conditions with the initial load.
-        if (sessionRef.current?.user?.id !== currentSession?.user?.id) {
-            window.location.reload();
-        } else {
-            // For events like token refreshes where the user is the same, just update the session object.
-            setSession(currentSession);
-        }
+    // Set up a listener for future auth state changes.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        // The listener's only job is to update the session state.
+        // The other useEffect will then react to this change and fetch the profile.
+        setSession(session);
     });
 
     return () => {
         // Clean up the listener when the component unmounts.
-        authListener?.subscription?.unsubscribe();
+        subscription?.unsubscribe();
     };
-  }, [loginError]); // Effect dependency
+  }, []);
+
+  // This effect runs whenever the session object changes.
+  // It's responsible for fetching all the user-dependent application data.
+  useEffect(() => {
+    // If there's no session, there's nothing to do, just ensure profile is null.
+    if (!session?.user) {
+        setUserProfile(null);
+        setConjuntoInfo(null);
+        return;
+    }
+
+    // A session exists, fetch the corresponding application profile.
+    let cancelled = false;
+
+    const fetchProfileData = async () => {
+        let profile = null;
+        // Retry loop to handle DB replication lag after sign-up.
+        for (let i = 0; i < 5; i++) {
+            if (cancelled) return;
+            profile = await apiService.fetchUserProfile(session.user.id);
+            if (profile) break;
+            console.warn(`Profile not found, retrying... Attempt ${i + 1}`);
+            await new Promise(res => setTimeout(res, 2000));
+        }
+
+        if (cancelled) return;
+
+        if (profile) {
+            setUserProfile(profile);
+            // After getting the profile, fetch the associated "conjunto" info.
+            if (profile.conjuntoId) {
+                const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+                if (cancelled) return;
+                if (info) {
+                    setConjuntoInfo(info);
+                } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                    // Admin user has no conjunto, force initial setup.
+                    setIsInitialSetupModalOpen(true);
+                }
+            } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                // Admin user has no conjuntoId in their profile, force initial setup.
+                setIsInitialSetupModalOpen(true);
+            }
+        } else {
+            // This is a critical error state: user is authenticated but has no profile.
+            console.error("User is logged in but profile data is missing after retries.");
+            setLoginError({
+                title: "Error de Sincronización",
+                message: "No pudimos encontrar tu perfil. Esto puede ser un problema de sincronización. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
+                type: 'sync',
+            });
+            setUserProfile(null);
+            setConjuntoInfo(null);
+        }
+    };
+
+    fetchProfileData();
+
+    return () => {
+        cancelled = true;
+    };
+  }, [session]);
   
   // Effect to handle post-payment redirection
   useEffect(() => {

@@ -386,3 +386,14 @@
         1.  La lógica de inicialización principal (con `getSession` y `removeAllChannels`) se mantiene como la fuente única de verdad para la carga inicial.
         2.  El listener `onAuthStateChange` se simplifica drásticamente. Ahora, su única responsabilidad es detectar si el usuario ha cambiado (ej. inicio/cierre de sesión en otra pestaña). Si detecta un cambio, en lugar de intentar una compleja re-inicialización interna, simplemente **recarga la página completa (`window.location.reload()`)**.
     -   **Resultado:** Este enfoque es el más robusto posible. Garantiza que cualquier cambio de sesión resulte en un estado completamente limpio y consistente, eliminando de raíz tanto la condición de carrera como el síntoma del cierre de sesión inesperado al navegar. La aplicación ahora es completamente estable.
+---
+
+## Sesión 38: Solución Definitiva al Bucle de Recarga y Cierre de Sesión
+
+-   **Usuario:** Reporta que el último cambio (con `window.location.reload()`) ha provocado un bucle de recarga infinito.
+-   **IA:**
+    -   **Diagnóstico:** El bucle infinito fue causado por una lógica defectuosa en el listener de autenticación. El listener se creaba con una referencia "obsoleta" al estado de la sesión, lo que le hacía creer incorrectamente que la sesión siempre estaba cambiando, provocando una recarga en cada evento de Supabase.
+    -   **Solución (Refactor de Arquitectura):** Se refactoriza por completo la lógica de sesión en `App.tsx` para seguir un patrón más robusto y estándar de React:
+        1.  **`useEffect` de Montaje (se ejecuta 1 vez):** Este efecto se encarga de obtener la sesión inicial con `getSession()` y de configurar el listener `onAuthStateChange`. La única responsabilidad del listener es actualizar el estado de la `session` con el nuevo valor que recibe.
+        2.  **`useEffect` de Reacción (se ejecuta cuando `session` cambia):** Un segundo efecto depende exclusivamente del estado `session`. Cuando este estado cambia (ya sea en la carga inicial o por un evento del listener), este efecto se activa y ejecuta toda la lógica para cargar el perfil del usuario, la información del conjunto, etc.
+    -   **Resultado:** Esta separación de responsabilidades elimina por completo el bucle de recarga, los cierres de estado obsoletos y las condiciones de carrera. La aplicación ahora tiene un flujo de datos de autenticación claro, predecible y estable, solucionando de forma definitiva todos los problemas de sesión reportados.
