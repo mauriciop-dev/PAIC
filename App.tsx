@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
   
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined means "not yet determined"
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
@@ -66,56 +66,45 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // This effect runs only ONCE on mount.
-  // It's responsible for setting the initial session and subscribing to auth changes.
+  // Effect #1: Runs ONCE on mount. Its only job is to get the initial session
+  // and set up the listener. It is the single source of truth for the session state.
   useEffect(() => {
     // Do not run if a config error was already detected from the URL
     const params = new URLSearchParams(window.location.hash.slice(1));
-    if (params.get('error_description')) return;
-      
-    setIsLoadingSession(true);
-    supabase.removeAllChannels(); // Clean up on start to prevent zombie channels
-
-    // Get initial session state
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setLoginError(null); // Clear previous errors
-        // Note: setIsLoadingSession is handled in the reacting useEffect to prevent race conditions
-    }).catch(e => {
-        console.error("Critical error during initial getSession:", e);
-        setLoginError({
-            title: "Error Crítico de Sesión",
-            message: "Ocurrió un error inesperado al iniciar. Por favor, refresca la página.",
-            type: 'sync',
-        });
+    if (params.get('error_description')) {
         setIsLoadingSession(false);
-    });
+        return;
+    }
 
-    // Set up a listener for future auth state changes.
+    // Supabase's onAuthStateChange listener fires immediately with the current session.
+    // This is more reliable than calling getSession() and setting up the listener separately,
+    // as it avoids race conditions.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        // The listener's only job is to update the session state.
-        // The other useEffect will then react to this change and fetch the profile.
         setSession(session);
     });
 
     return () => {
-        // Clean up the listener when the component unmounts.
         subscription?.unsubscribe();
     };
   }, []);
 
-  // This effect runs whenever the session object changes.
-  // It's responsible for fetching all the user-dependent application data.
+  // Effect #2: Runs whenever the `session` state changes. It is responsible for
+  // fetching all user-dependent application data. This separation of concerns is key.
   useEffect(() => {
-    // If there's no session, there's nothing to do. End loading and clear user data.
-    if (!session?.user) {
-        setUserProfile(null);
-        setConjuntoInfo(null);
-        setIsLoadingSession(false); // End loading state
+    // If session is `undefined`, it means the listener hasn't fired yet. We wait.
+    if (session === undefined) {
         return;
     }
 
-    // A session exists, fetch the corresponding application profile.
+    // If session is `null`, the user is logged out. Clear all data and finish loading.
+    if (session === null) {
+        setUserProfile(null);
+        setConjuntoInfo(null);
+        setIsLoadingSession(false);
+        return;
+    }
+
+    // A session exists. Fetch the corresponding application profile and data.
     let cancelled = false;
 
     const fetchProfileData = async () => {
@@ -134,22 +123,18 @@ const App: React.FC = () => {
 
             if (profile) {
                 setUserProfile(profile);
-                // After getting the profile, fetch the associated "conjunto" info.
                 if (profile.conjuntoId) {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
                     if (cancelled) return;
                     if (info) {
                         setConjuntoInfo(info);
                     } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                        // Admin user has no conjunto, force initial setup.
                         setIsInitialSetupModalOpen(true);
                     }
                 } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                    // Admin user has no conjuntoId in their profile, force initial setup.
                     setIsInitialSetupModalOpen(true);
                 }
             } else {
-                // This is a critical error state: user is authenticated but has no profile.
                 console.error("User is logged in but profile data is missing after retries.");
                 setLoginError({
                     title: "Error de Sincronización",
@@ -168,7 +153,7 @@ const App: React.FC = () => {
             });
         } finally {
              if (!cancelled) {
-                setIsLoadingSession(false); // End loading state after all data is fetched or fails
+                setIsLoadingSession(false);
             }
         }
     };
