@@ -21,7 +21,7 @@ const steps = [
   {
     target: '#user-menu-dropdown',
     content: 'Desde este menú puedes acceder a la configuración de tu cuenta, tu suscripción y cerrar sesión de forma segura.',
-    position: 'bottom',
+    position: 'bottom-right',
   },
 ];
 
@@ -106,6 +106,12 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose }) =>
           case 'bottom':
               style.top = `${targetPosition.top + targetPosition.height + 12}px`;
               style.left = `${targetPosition.left}px`;
+              break;
+          case 'bottom-right':
+              style.top = `${targetPosition.top + targetPosition.height + 12}px`;
+              // The tooltip is w-72 which is 18rem = 288px.
+              // Align the right edge of the tooltip with the right edge of the target.
+              style.left = `${targetPosition.left + targetPosition.width - 288}px`;
               break;
           case 'right':
               style.top = `${targetPosition.top}px`;
