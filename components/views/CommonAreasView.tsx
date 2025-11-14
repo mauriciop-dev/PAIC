@@ -23,6 +23,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
+  const defaultColor = { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
 
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
@@ -99,12 +100,15 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         </p>
          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 flex-wrap">
-                {commonAreas.map(area => (
-                    <div key={area.id} className="flex items-center gap-1">
-                        <div className={`w-3 h-3 rounded-full ${area.color.bg} border ${area.color.border}`}></div>
-                        <span className="text-xs text-gray-600">{area.name}</span>
-                    </div>
-                ))}
+                {commonAreas.map(area => {
+                    const color = area.color || defaultColor; // Defensive check
+                    return (
+                        <div key={area.id} className="flex items-center gap-1">
+                            <div className={`w-3 h-3 rounded-full ${color.bg} border ${color.border}`}></div>
+                            <span className="text-xs text-gray-600">{area.name}</span>
+                        </div>
+                    );
+                })}
             </div>
             <button
               onClick={() => setIsManageModalOpen(true)}
@@ -143,7 +147,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                     <div className="space-y-1 mt-1 overflow-y-auto" style={{maxHeight: 'calc(8rem - 2rem)'}}>
                         {day && bookings.filter(b => b.day === day).map(booking => {
                             const area = commonAreas.find(a => a.name === booking.event);
-                            const colors = area ? area.color : { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+                            const colors = (area && area.color) ? area.color : defaultColor; // Defensive check
                             return (
                               <div
                                 key={booking.event+booking.day+booking.user}

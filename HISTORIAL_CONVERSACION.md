@@ -397,3 +397,14 @@
         1.  **`useEffect` de Montaje (se ejecuta 1 vez):** Este efecto se encarga de obtener la sesión inicial con `getSession()` y de configurar el listener `onAuthStateChange`. La única responsabilidad del listener es actualizar el estado de la `session` con el nuevo valor que recibe.
         2.  **`useEffect` de Reacción (se ejecuta cuando `session` cambia):** Un segundo efecto depende exclusivamente del estado `session`. Cuando este estado cambia (ya sea en la carga inicial o por un evento del listener), este efecto se activa y ejecuta toda la lógica para cargar el perfil del usuario, la información del conjunto, etc.
     -   **Resultado:** Esta separación de responsabilidades elimina por completo el bucle de recarga, los cierres de estado obsoletos y las condiciones de carrera. La aplicación ahora tiene un flujo de datos de autenticación claro, predecible y estable, solucionando de forma definitiva todos los problemas de sesión reportados.
+---
+
+## Sesión 39: Solución a Caída Crítica en "Áreas Comunes" por Datos Nulos
+
+-   **Usuario:** Reporta que la aplicación se cae (`white screen of death`) al hacer clic en la pestaña "Áreas Comunes", con un error `Cannot read properties of null (reading 'bg')`.
+-   **IA:**
+    -   **Diagnóstico:** Se identifica un error fatal de renderizado. El componente intentaba acceder a la propiedad `bg` de `area.color`, pero el objeto `color` era `null` para algunas áreas comunes en la base de datos. La causa raíz era que la función para añadir nuevas áreas (`apiService.addCommonArea`) no asignaba un color por defecto, dejando el campo `color` como `null` en la base de datos.
+    -   **Solución (Doble):**
+        1.  **Backend/API (Causa Raíz):** Se modifica `apiService.ts` para que la función `addCommonArea` ahora asigne automáticamente un color de una paleta predefinida al crear una nueva área. Esto previene la creación de futuros datos corruptos.
+        2.  **Frontend/UI (Resiliencia):** Se refactoriza `CommonAreasView.tsx` para ser resiliente a datos nulos. Se añaden comprobaciones de seguridad (`area.color || defaultValue`) antes de intentar renderizar los colores, asegurando que la interfaz no se caiga si encuentra datos antiguos sin color.
+    -   **Resultado:** La aplicación ya no se cae al entrar a "Áreas Comunes" y la creación de nuevas áreas es ahora robusta, garantizando la integridad de los datos.
