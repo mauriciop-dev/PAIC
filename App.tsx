@@ -80,7 +80,7 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
         setLoginError(null); // Clear previous errors
-        setIsLoadingSession(false);
+        // Note: setIsLoadingSession is handled in the reacting useEffect to prevent race conditions
     }).catch(e => {
         console.error("Critical error during initial getSession:", e);
         setLoginError({
@@ -107,10 +107,11 @@ const App: React.FC = () => {
   // This effect runs whenever the session object changes.
   // It's responsible for fetching all the user-dependent application data.
   useEffect(() => {
-    // If there's no session, there's nothing to do, just ensure profile is null.
+    // If there's no session, there's nothing to do. End loading and clear user data.
     if (!session?.user) {
         setUserProfile(null);
         setConjuntoInfo(null);
+        setIsLoadingSession(false); // End loading state
         return;
     }
 
@@ -118,44 +119,57 @@ const App: React.FC = () => {
     let cancelled = false;
 
     const fetchProfileData = async () => {
-        let profile = null;
-        // Retry loop to handle DB replication lag after sign-up.
-        for (let i = 0; i < 5; i++) {
-            if (cancelled) return;
-            profile = await apiService.fetchUserProfile(session.user.id);
-            if (profile) break;
-            console.warn(`Profile not found, retrying... Attempt ${i + 1}`);
-            await new Promise(res => setTimeout(res, 2000));
-        }
-
-        if (cancelled) return;
-
-        if (profile) {
-            setUserProfile(profile);
-            // After getting the profile, fetch the associated "conjunto" info.
-            if (profile.conjuntoId) {
-                const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+        try {
+            let profile = null;
+            // Retry loop to handle DB replication lag after sign-up.
+            for (let i = 0; i < 5; i++) {
                 if (cancelled) return;
-                if (info) {
-                    setConjuntoInfo(info);
+                profile = await apiService.fetchUserProfile(session.user.id);
+                if (profile) break;
+                console.warn(`Profile not found, retrying... Attempt ${i + 1}`);
+                await new Promise(res => setTimeout(res, 2000));
+            }
+
+            if (cancelled) return;
+
+            if (profile) {
+                setUserProfile(profile);
+                // After getting the profile, fetch the associated "conjunto" info.
+                if (profile.conjuntoId) {
+                    const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
+                    if (cancelled) return;
+                    if (info) {
+                        setConjuntoInfo(info);
+                    } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
+                        // Admin user has no conjunto, force initial setup.
+                        setIsInitialSetupModalOpen(true);
+                    }
                 } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                    // Admin user has no conjunto, force initial setup.
+                    // Admin user has no conjuntoId in their profile, force initial setup.
                     setIsInitialSetupModalOpen(true);
                 }
-            } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
-                // Admin user has no conjuntoId in their profile, force initial setup.
-                setIsInitialSetupModalOpen(true);
+            } else {
+                // This is a critical error state: user is authenticated but has no profile.
+                console.error("User is logged in but profile data is missing after retries.");
+                setLoginError({
+                    title: "Error de Sincronización",
+                    message: "No pudimos encontrar tu perfil. Esto puede ser un problema de sincronización. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
+                    type: 'sync',
+                });
+                setUserProfile(null);
+                setConjuntoInfo(null);
             }
-        } else {
-            // This is a critical error state: user is authenticated but has no profile.
-            console.error("User is logged in but profile data is missing after retries.");
+        } catch (error) {
+            console.error("Error fetching profile data:", error);
             setLoginError({
-                title: "Error de Sincronización",
-                message: "No pudimos encontrar tu perfil. Esto puede ser un problema de sincronización. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
+                title: "Error de Datos",
+                message: "Ocurrió un error al cargar la información de tu cuenta. Por favor, intenta de nuevo.",
                 type: 'sync',
             });
-            setUserProfile(null);
-            setConjuntoInfo(null);
+        } finally {
+             if (!cancelled) {
+                setIsLoadingSession(false); // End loading state after all data is fetched or fails
+            }
         }
     };
 
