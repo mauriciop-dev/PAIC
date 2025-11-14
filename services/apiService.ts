@@ -244,6 +244,21 @@ export const apiService = {
   async addBooking(conjuntoId: string, booking: T.Booking): Promise<void> {
     await supabase.from('bookings').insert({ ...toSupabase(booking), conjunto_id: conjuntoId });
   },
+  async fetchReservations(conjuntoId: string): Promise<T.Reservation[]> {
+    const { data, error } = await supabase.from('reservations').select('*').eq('conjunto_id', conjuntoId);
+    if (error) {
+      console.error('Error fetching reservations:', error);
+      return [];
+    }
+    return data ? fromSupabase(data) : [];
+  },
+  async addReservation(conjuntoId: string, reservation: Omit<T.Reservation, 'id'>): Promise<void> {
+    const { error } = await supabase.from('reservations').insert({ ...toSupabase(reservation), conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error adding reservation:', error);
+      throw error;
+    }
+  },
 
   // --- Due Dates & Tasks ---
   async fetchDueDates(conjuntoId: string): Promise<T.DueDate[]> {

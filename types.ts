@@ -98,6 +98,18 @@ export interface Booking {
     user: string;
 }
 
+export interface Reservation {
+  id: number;
+  apartment: string;
+  residentName: string;
+  commonAreaId: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  email: string;
+  phone: string;
+}
+
 export interface CommonArea {
   id: string;
   name: string;
