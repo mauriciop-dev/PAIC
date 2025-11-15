@@ -167,7 +167,8 @@ const processApiResponse = async (response: string): Promise<string> => {
             
             // This re-initializes the chat after a function call to keep the context clean.
             // It correctly calls initializeChat without an initial message.
-            await initializeChat((chat as any)?.userProfile as UserProfile, (chat as any)?.conjuntoInfo as ConjuntoInfo);
+            const userProfile = (chat as any)?.userProfile as UserProfile;
+            const conjuntoInfo = (chat as any)?.conjuntoInfo as ConjuntoInfo;
 
             switch (action.function) {
                 // --- DATABASE ---
@@ -195,6 +196,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                             else if (operation === 'delete') await apiService.deleteInternalStaff(currentConjuntoId, identifier.name);
                             break;
                     }
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Operación de ${operation} en ${table} completada exitosamente. ¿En qué más te puedo ayudar?`;
 
                 case 'queryDatabase':
@@ -212,6 +214,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                          if(resident) return `Residente del Apto ${apt}:\n- Nombre: ${resident.name}\n- Email: ${resident.email}\n- Teléfono: ${resident.phone}`;
                          return `No encontré un residente para el Apto ${apt}.`;
                     }
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `No pude procesar la consulta: "${query_description}". Intenta de nuevo.`;
 
                 case 'queryDebtors':
@@ -222,6 +225,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                     const debtorsList = debtors
                         .map(d => `- Apto ${d.apartment} (${d.name}): $${d.balance.toLocaleString('es-CO')}`)
                         .join('\n');
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Claro, aquí está la lista de residentes en mora:\n\n${debtorsList}`;
 
                 case 'queryProviders':
@@ -235,32 +239,46 @@ const processApiResponse = async (response: string): Promise<string> => {
                     const providersList = providers
                         .map(p => `- ${p.company} (${p.specialty}) - Contacto: ${p.phone || 'N/A'}, ${p.email || 'N/A'}`)
                         .join('\n');
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Entendido. Consulté la base de datos y encontré estos proveedores:\n\n${providersList}`;
 
                 // --- COMMON AREAS ---
                 case 'createReservation':
-                    await apiService.createReservationFromChat(currentConjuntoId, action.payload);
-                    return `¡Confirmado! He registrado la reserva del área "${action.payload.commonAreaName}" para el apartamento ${action.payload.apartment} en la fecha ${action.payload.date} de ${action.payload.startTime} a ${action.payload.endTime}. Se enviará una notificación de confirmación.`;
+                    try {
+                        await apiService.createReservationFromChat(currentConjuntoId, action.payload);
+                        await initializeChat(userProfile, conjuntoInfo);
+                        // window.dispatchEvent(new CustomEvent('data-changed', { detail: 'reservations' }));
+                        return `¡Excelente! La reserva del área de "${action.payload.commonAreaName}" para el "apartamento ${action.payload.apartment}" el día "${action.payload.date}" desde las "${action.payload.startTime}" hasta las "${action.payload.endTime}" ha sido confirmada y registrada en el sistema. ¿Necesitas algo más?`;
+                    } catch (error: any) {
+                        await initializeChat(userProfile, conjuntoInfo);
+                        return `Lo siento, no pude registrar la reserva. Motivo: ${error.message}`;
+                    }
+
 
                 // --- COMMUNICATIONS ---
                 case 'sendMassEmail':
                     const result = await apiService.sendMassEmail(currentConjuntoId, action.payload.group, action.payload.subject, action.payload.body);
+                    await initializeChat(userProfile, conjuntoInfo);
                     return result.message;
 
                 // --- FINANCES ---
                 case 'addIncome':
                     await apiService.addIncome(currentConjuntoId, action.payload as Omit<Income, 'id'>);
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Ingreso de $${action.payload.amount.toLocaleString()} por "${action.payload.description}" agregado. ¿Necesitas algo más?`;
                 case 'addExpense':
                     await apiService.addExpense(currentConjuntoId, action.payload as Omit<Expense, 'id'>);
+                    await initializeChat(userProfile, conjuntoInfo);
                      return `Gasto de $${action.payload.amount.toLocaleString()} por "${action.payload.description}" agregado. ¿Necesitas algo más?`;
                 
                 // --- SECURITY ---
                 case 'authorizeVisitor':
                     await apiService.addVisitorLog(currentConjuntoId, {...action.payload, status: 'Autorizado'});
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Visitante "${action.payload.visitorName}" autorizado para el Apto ${action.payload.apartment}.`;
                 case 'registerPackage':
                     await apiService.addPackageLog(currentConjuntoId, action.payload);
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Paquete de "${action.payload.courier}" para el Apto ${action.payload.apartment} registrado.`;
                 case 'updateVisitorStatus':
                     // FIX: Ensure the status is one of the allowed literal types before sending to the API.
@@ -269,6 +287,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                         return `El estado "${newStatus}" no es válido. Los estados permitidos son: Autorizado, Ingresó, Salió.`;
                     }
                     await apiService.updateVisitorLog(currentConjuntoId, action.payload.logId, { status: newStatus });
+                    await initializeChat(userProfile, conjuntoInfo);
                     return `Estado del visitante actualizado a "${action.payload.newStatus}".`;
             }
         }

@@ -69,6 +69,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
       const aiResponseText = await geminiService.runChat(currentInput, userProfile, conjuntoInfo, initialAiMessage);
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages(prev => [...prev, aiMessage]);
+
+       // If the response indicates a successful action, notify other components.
+      if (!aiResponseText.startsWith('Lo siento') && !aiResponseText.startsWith('No entendí')) {
+          window.dispatchEvent(new CustomEvent('data-changed'));
+      }
+
     } catch (error) {
       console.error('Error fetching AI response:', error);
       const errorMessage: Message = { sender: 'ai', text: 'Lo siento, ocurrió un error al procesar tu solicitud.' };

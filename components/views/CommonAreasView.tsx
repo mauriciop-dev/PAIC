@@ -49,6 +49,15 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
     if (userProfile.conjuntoId) {
       initialFetch();
     }
+     // Listen for custom event to refetch data
+    const handleDataChange = () => {
+      fetchData();
+    };
+    window.addEventListener('data-changed', handleDataChange as EventListener);
+
+    return () => {
+      window.removeEventListener('data-changed', handleDataChange as EventListener);
+    };
   }, [fetchData, userProfile.conjuntoId]);
   
   const handleSaveReservation = async (reservation: Omit<Reservation, 'id'>) => {
