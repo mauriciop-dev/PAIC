@@ -45,9 +45,10 @@ const getAiClient = (): Promise<GoogleGenAI> => {
 
 const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo): Promise<string> => {
     // FIX: Cache the prompt template to avoid fetching it on every chat initialization, improving performance.
+    // Cache busting is implemented here to ensure the latest prompt is always fetched after a new deployment.
     if (!systemPromptTemplate) { 
         try {
-            const response = await fetch('/src/prompts/system_prompt.txt');
+            const response = await fetch(`/src/prompts/system_prompt.txt?v=${new Date().getTime()}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
