@@ -25,7 +25,7 @@ interface LoginError {
   type: 'sync' | 'config';
 }
 
-type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
+export type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Gestionar Áreas' | 'Suscripción' | 'Usuarios' | 'Permisos de Usuario';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Dashboard);
@@ -391,7 +391,7 @@ const App: React.FC = () => {
             onSettingsClick={handleSettingsClick} 
             activeTabName={activeTab}
         />
-        {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} />}
+        {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} onSettingsClick={handleSettingsClick} />}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
           {needsAdminSetup ? (
              <div className="text-center p-10 text-gray-600">
@@ -421,10 +421,11 @@ const App: React.FC = () => {
           <SettingsModal 
             isOpen={isSettingsModalOpen} 
             onClose={() => setIsSettingsModalOpen(false)} 
-            onSave={handleSaveSettings} 
             userProfile={userProfile} 
             conjuntoInfo={conjuntoInfo} 
             initialTab={initialSettingsTab}
+            setConjuntoInfo={setConjuntoInfo}
+            setUserProfile={setUserProfile}
           />
       )}
       

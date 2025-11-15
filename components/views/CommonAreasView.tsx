@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
 import { Booking, CommonArea, UserProfile, Reservation } from '../../types';
-import ManageAreasModal from '../ManageAreasModal';
 import BookingModal from '../BookingModal';
 import { Icon } from '../ui/Icon';
 
@@ -22,7 +22,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -66,20 +65,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         console.error("Failed to save reservation:", error);
         // Here you could pass the error to the modal to display it
         throw error;
-    }
-  };
-  
-  const handleAddArea = async (name: string) => {
-    if (name.trim() && userProfile.conjuntoId) {
-      await apiService.addCommonArea(userProfile.conjuntoId, name.trim());
-      fetchData(); // Refresh list after adding
-    }
-  };
-
-  const handleRemoveArea = async (id: string) => {
-    if (userProfile.conjuntoId) {
-      await apiService.removeCommonArea(userProfile.conjuntoId, id);
-      fetchData(); // Refresh list after removing
     }
   };
 
@@ -189,12 +174,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                     );
                 })}
             </div>
-             <button
-              onClick={() => setIsManageModalOpen(true)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-md hover:bg-gray-100 bg-white shadow-sm"
-            >
-                Gestionar Áreas
-            </button>
             <button
               onClick={() => setIsBookingModalOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 text-sm"
@@ -282,15 +261,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         </div>
       )}
 
-      {isManageModalOpen && (
-        <ManageAreasModal 
-            isOpen={isManageModalOpen} 
-            onClose={() => setIsManageModalOpen(false)} 
-            areas={commonAreas}
-            onAddArea={handleAddArea}
-            onRemoveArea={handleRemoveArea}
-        />
-      )}
       {isBookingModalOpen && (
           <BookingModal
             isOpen={isBookingModalOpen}

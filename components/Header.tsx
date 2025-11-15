@@ -2,8 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile, UserRole, ConjuntoInfo } from '../types';
 import { Icon } from './ui/Icon';
-
-type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Suscripción';
+import { SettingsTab } from '../../App';
 
 interface HeaderProps {
   onHelpClick: () => void;

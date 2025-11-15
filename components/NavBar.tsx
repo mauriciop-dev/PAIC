@@ -3,11 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
+import { SettingsTab } from '../../App';
 
 interface NavBarProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   userProfile: UserProfile;
+  onSettingsClick: (tab?: SettingsTab) => void;
 }
 
 const allTabs = [
@@ -22,7 +24,7 @@ const allTabs = [
   { id: Tab.PendingTasks, label: 'Tareas', icon: 'checkSquare', roles: [UserRole.Trial, UserRole.Subscriber] },
 ];
 
-const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile }) => {
+const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile, onSettingsClick }) => {
   const [sliderItems, setSliderItems] = useState<{ text: string; color: 'red' | 'yellow' | 'green' }[]>([]);
   const [currentItem, setCurrentItem] = useState(0);
 
@@ -147,6 +149,15 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile })
             {tab.label}
           </button>
         ))}
+        {isConjuntoAdmin && (
+             <button
+                onClick={() => onSettingsClick()}
+                className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+                aria-label="Abrir configuración"
+             >
+                 <Icon name="settings" className="w-5 h-5" />
+             </button>
+        )}
       </div>
       {isConjuntoAdmin && sliderItems.length > 0 && (
           <div className="hidden sm:flex items-center gap-2 overflow-hidden flex-shrink min-w-0">
