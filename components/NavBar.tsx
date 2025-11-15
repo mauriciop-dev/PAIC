@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
@@ -66,7 +67,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile, o
           let color: 'red' | 'yellow' = 'yellow';
 
           if (d.status === 'Vencido') {
-            text = `VENCIDO: ${d.item}`;
+            text = `VENCIDO: ${d.item} hace ${Math.abs(dayDiff)} día(s)`;
             color = 'red';
           } else if (dayDiff <= 3) {
             text = `PAGO: ${d.item} vence en ${dayDiff} día(s)`;
@@ -134,7 +135,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile, o
     : 'bg-gray-500';
 
   return (
-    <nav id="main-navbar" className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4 flex-wrap">
+    <nav id="main-navbar" className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4">
       <div className="flex items-center gap-1 md:gap-2 flex-wrap">
         {visibleTabs.map((tab) => (
           <button
