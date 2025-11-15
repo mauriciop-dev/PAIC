@@ -38,6 +38,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+  
+  // Re-focus the input after the AI has responded
+  useEffect(() => {
+    if (!isLoading && isOpen) {
+        inputRef.current?.focus();
+    }
+  }, [isLoading, isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
