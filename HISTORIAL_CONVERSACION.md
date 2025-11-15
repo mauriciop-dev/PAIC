@@ -435,3 +435,11 @@
         2.  Obtener tanto las reservas creadas por la IA como las manuales.
         3.  Mostrar ambos tipos de reserva de forma unificada en el calendario, consolidando toda la información en una sola vista.
     -   **Recursos:** Se añadieron nuevos tipos (`Reservation` en `types.ts`) e íconos (`home`, `phone` en `Icon.tsx`).
+---
+
+## Sesión 42: Refinamiento del System Prompt del Chatbot
+
+-   **Usuario:** Propone una versión mejorada del `system_prompt.txt` para hacer que el chatbot se comporte de manera más estricta y profesional, similar a un agente.
+-   **IA:**
+    -   **Análisis:** Compara la versión actual con la nueva y concluye que la nueva es una mejora sustancial. Destaca la mayor rigidez en las reglas de formato, la lógica de menú más estricta, la separación clara para consultas de lenguaje natural, la formalización del flujo de conversación (petición de datos uno a uno y confirmación obligatoria) y la adición de una palabra clave "menu" para reiniciar.
+    -   **Acción:** Reemplaza el contenido de `src/prompts/system_prompt.txt` con la nueva versión proporcionada por el usuario para implementar estas mejoras de comportamiento en el asistente de IA.
