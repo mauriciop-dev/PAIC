@@ -273,14 +273,6 @@ const App: React.FC = () => {
     setInitialSettingsTab(tab);
     setIsSettingsModalOpen(true);
   };
-
-  const handleSaveSettings = async (updatedProfile: UserProfile, updatedConjunto: ConjuntoInfo) => {
-    await apiService.updateUserProfile(updatedProfile);
-    await apiService.updateConjuntoInfo(updatedConjunto);
-    setUserProfile(updatedProfile);
-    setConjuntoInfo(updatedConjunto);
-    setIsSettingsModalOpen(false);
-  };
   
   const handleInternalAuthSuccess = async (platformUser: PlatformUser) => {
       if (!platformUser.conjuntoId) return;

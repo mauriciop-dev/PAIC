@@ -107,15 +107,7 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, conjuntoInfo,
                     </div>
                    )}
                   <div className="p-1">
-                    {isConjuntoAdmin && (
-                      <button
-                        onClick={() => { onSettingsClick(); setIsMenuOpen(false); }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
-                      >
-                        <Icon name="settings" className="w-4 h-4 text-gray-500" />
-                        Configuración
-                      </button>
-                    )}
+                    {/* The main settings button is now the gear icon in the NavBar */}
                     <button
                       onClick={() => { onLogout(); setIsMenuOpen(false); }}
                       className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-md flex items-center gap-2"

@@ -65,6 +65,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 break;
             case 'Usuarios':
                 setPlatformUsers(await apiService.fetchUsers(userProfile.conjuntoId));
+                setRoles(await apiService.fetchRoles(userProfile.conjuntoId));
                 break;
             case 'Permisos de Usuario':
                  const [users, userRoles] = await Promise.all([
@@ -171,7 +172,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // --- Subscription Logic ---
-  const handleUpgradeClick = async () => { /* ... (implementation exists) ... */ };
+  const handleUpgradeClick = async () => {
+    setIsRedirectingToPayment(true);
+    setPaymentError(null);
+    try {
+      const initPoint = await mercadoPagoService.createPreference(conjuntoInfo);
+      if (initPoint) {
+        window.location.href = initPoint;
+      } else {
+        throw new Error("No se pudo obtener el punto de inicio del pago.");
+      }
+    } catch (error: any) {
+      setPaymentError(error.message || "Ocurrió un error al procesar el pago.");
+      setIsRedirectingToPayment(false);
+    }
+  };
 
 
   // --- Render Functions for each Tab ---
@@ -216,7 +231,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
   );
 
-  const renderAccessPointsTab = () => ( /* ... as before ... */ );
+  const renderAccessPointsTab = () => (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <input type="text" value={newAccessPointName} onChange={(e) => setNewAccessPointName(e.target.value)} placeholder="Nombre del punto de acceso" className="flex-1 p-2 border rounded-md"/>
+        <button onClick={handleAddAccessPoint} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">Agregar</button>
+      </div>
+      <div className="space-y-2 max-h-80 overflow-y-auto">
+        {accessPoints.map(point => (
+          <div key={point.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+            <span className="text-gray-800">{point.name}</span>
+            <button onClick={() => handleDeleteAccessPoint(point.id)} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderManageAreasTab = () => (
       <div>
         <div className="flex items-center gap-2 mb-4">
@@ -228,6 +259,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
   );
+
   const renderUsersTab = () => (
       <div>
         <div className="flex justify-end mb-4"><button onClick={() => handleUserModalOpen(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1"><Icon name="user-plus" className="w-4 h-4"/>Agregar Usuario</button></div>
@@ -239,6 +271,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       </div>
   );
+
   const renderRolesTab = () => (
      <div className="overflow-x-auto max-h-96">
         <table className="w-full text-sm text-left text-gray-500">
@@ -249,8 +282,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </table>
     </div>
   );
-  const renderSubscriptionTab = () => ( /* ... as before ... */ );
 
+  const renderSubscriptionTab = () => {
+      const isPaid = conjuntoInfo.subscriptionPlan === 'Paid';
+      return (
+          <div className="space-y-6">
+              <div className={`p-6 rounded-lg border ${isPaid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <h3 className="text-lg font-bold">Estado de tu Suscripción</h3>
+                  <p className={`text-2xl font-extrabold mt-2 ${isPaid ? 'text-green-700' : 'text-yellow-700'}`}>
+                      {isPaid ? 'Plan Pro' : 'Periodo de Prueba'}
+                  </p>
+                  {isPaid ? (
+                      <p className="mt-2 text-green-600">Tu suscripción está activa. ¡Gracias por confiar en PAIC!</p>
+                  ) : (
+                      <p className="mt-2 text-yellow-600">Disfruta de todas las funciones Pro durante tu periodo de prueba.</p>
+                  )}
+              </div>
+              {!isPaid && (
+                  <div className="p-6 bg-white rounded-lg shadow-md border">
+                      <h3 className="text-lg font-bold text-gray-800">Mejora al Plan Pro</h3>
+                      <p className="mt-2 text-gray-600">Obtén acceso ilimitado a todas las funciones, soporte prioritario y actualizaciones continuas por solo <span className="font-bold text-blue-600">$140,000 COP/mes</span>.</p>
+                      <button 
+                          onClick={handleUpgradeClick}
+                          disabled={isRedirectingToPayment}
+                          className="mt-4 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-blue-300 flex items-center justify-center gap-2"
+                      >
+                          <Icon name="credit-card" className="w-5 h-5"/>
+                          {isRedirectingToPayment ? 'Redirigiendo a la pasarela...' : 'Mejorar a Pro Ahora'}
+                      </button>
+                      {paymentError && <p className="text-sm text-red-600 text-center mt-3">{paymentError}</p>}
+                  </div>
+              )}
+          </div>
+      );
+  };
 
   if (!isOpen) return null;
   
