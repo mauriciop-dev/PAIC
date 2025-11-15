@@ -1,51 +1,43 @@
-
-import React, { useState, useEffect } from 'react';
-import { apiService } from '../services/apiService';
-import { CommonArea, UserProfile } from '../types';
+import React, { useState } from 'react';
+import { CommonArea } from '../types';
 import { Icon } from './ui/Icon';
 
 interface ManageAreasModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAreaUpdate: () => void; // Callback to refresh parent component
-  userProfile: UserProfile;
+  areas: CommonArea[];
+  onAddArea: (name: string) => Promise<void>;
+  onRemoveArea: (id: string) => Promise<void>;
 }
 
-const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, onAreaUpdate, userProfile }) => {
-  const [areas, setAreas] = useState<CommonArea[]>([]);
+const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, areas, onAddArea, onRemoveArea }) => {
   const [newAreaName, setNewAreaName] = useState('');
-
-  const fetchAreas = async () => {
-    if (!userProfile.conjuntoId) return;
-    // FIX: Pass conjuntoId to fetchCommonAreas.
-    const fetchedAreas = await apiService.fetchCommonAreas(userProfile.conjuntoId);
-    setAreas(fetchedAreas);
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchAreas();
-    }
-  }, [isOpen]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
   const handleAddArea = async () => {
-    if (newAreaName.trim() && userProfile.conjuntoId) {
-      // FIX: Pass conjuntoId to addCommonArea.
-      await apiService.addCommonArea(userProfile.conjuntoId, newAreaName.trim());
+    if (!newAreaName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onAddArea(newAreaName.trim());
       setNewAreaName('');
-      fetchAreas(); // Refresh list
-      onAreaUpdate(); // Notify parent
+    } catch (error) {
+      console.error("Failed to add area:", error);
+      // Optionally show an error message to the user in the modal
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleRemoveArea = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta área?') && userProfile.conjuntoId) {
-      // FIX: Pass conjuntoId to removeCommonArea.
-      await apiService.removeCommonArea(userProfile.conjuntoId, id);
-      fetchAreas(); // Refresh list
-      onAreaUpdate(); // Notify parent
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta área?')) {
+      try {
+        await onRemoveArea(id);
+      } catch (error) {
+        console.error("Failed to remove area:", error);
+        // Optionally show an error message in the modal
+      }
     }
   };
 
@@ -73,12 +65,14 @@ const ManageAreasModal: React.FC<ManageAreasModalProps> = ({ isOpen, onClose, on
                     placeholder="Nombre del área (ej. Parque Infantil)"
                     className="flex-1 p-2 border border-gray-300 rounded-md"
                     onKeyPress={(e) => e.key === 'Enter' && handleAddArea()}
+                    disabled={isSubmitting}
                 />
                 <button
                     onClick={handleAddArea}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300"
+                    disabled={isSubmitting || !newAreaName.trim()}
                 >
-                    Agregar
+                    {isSubmitting ? 'Agregando...' : 'Agregar'}
                 </button>
             </div>
         </div>

@@ -31,7 +31,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
 
   const fetchData = useCallback(async () => {
     if (!userProfile.conjuntoId) return;
-    setIsLoading(true);
     try {
         const [fetchedBookings, fetchedAreas, fetchedReservations] = await Promise.all([
             apiService.fetchBookings(userProfile.conjuntoId),
@@ -43,14 +42,19 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         setReservations(fetchedReservations);
     } catch (error) {
         console.error("Failed to fetch common areas data:", error);
-    } finally {
-        setIsLoading(false);
     }
-  }, [userProfile]);
+  }, [userProfile.conjuntoId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const initialFetch = async () => {
+        setIsLoading(true);
+        await fetchData();
+        setIsLoading(false);
+    }
+    if (userProfile.conjuntoId) {
+      initialFetch();
+    }
+  }, [fetchData, userProfile.conjuntoId]);
   
   const handleSaveReservation = async (reservation: Omit<Reservation, 'id'>) => {
     if(!userProfile.conjuntoId) return;
@@ -62,6 +66,20 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         console.error("Failed to save reservation:", error);
         // Here you could pass the error to the modal to display it
         throw error;
+    }
+  };
+  
+  const handleAddArea = async (name: string) => {
+    if (name.trim() && userProfile.conjuntoId) {
+      await apiService.addCommonArea(userProfile.conjuntoId, name.trim());
+      fetchData(); // Refresh list after adding
+    }
+  };
+
+  const handleRemoveArea = async (id: string) => {
+    if (userProfile.conjuntoId) {
+      await apiService.removeCommonArea(userProfile.conjuntoId, id);
+      fetchData(); // Refresh list after removing
     }
   };
 
@@ -268,8 +286,9 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         <ManageAreasModal 
             isOpen={isManageModalOpen} 
             onClose={() => setIsManageModalOpen(false)} 
-            onAreaUpdate={fetchData}
-            userProfile={userProfile}
+            areas={commonAreas}
+            onAddArea={handleAddArea}
+            onRemoveArea={handleRemoveArea}
         />
       )}
       {isBookingModalOpen && (
