@@ -1,6 +1,6 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { apiService } from './apiService';
-import { DueDate, UserProfile, ConjuntoInfo, Task, VisitorLog, PackageLog, Income, Expense, Booking, Resident, Provider } from "../types";
+import { DueDate, UserProfile, ConjuntoInfo, Task, VisitorLog, PackageLog, Income, Expense, Resident, Provider } from "../types";
 
 let aiPromise: Promise<GoogleGenAI> | null = null;
 let chat: Chat | null = null;
@@ -238,9 +238,9 @@ const processApiResponse = async (response: string): Promise<string> => {
                     return `Entendido. Consulté la base de datos y encontré estos proveedores:\n\n${providersList}`;
 
                 // --- COMMON AREAS ---
-                case 'addBooking':
-                    await apiService.addBooking(currentConjuntoId, action.payload as Booking);
-                    return `¡Listo! He agendado "${action.payload.event}" para ${action.payload.user}. ¿Algo más?`;
+                case 'createReservation':
+                    await apiService.createReservationFromChat(currentConjuntoId, action.payload);
+                    return `¡Confirmado! He registrado la reserva del área "${action.payload.commonAreaName}" para el apartamento ${action.payload.apartment} en la fecha ${action.payload.date} de ${action.payload.startTime} a ${action.payload.endTime}. Se enviará una notificación de confirmación.`;
 
                 // --- COMMUNICATIONS ---
                 case 'sendMassEmail':

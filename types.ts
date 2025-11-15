@@ -91,13 +91,6 @@ export interface InternalStaff {
     phone: string;
 }
 
-export interface Booking {
-    day: number;
-    time: string;
-    event: string; 
-    user: string;
-}
-
 export interface Reservation {
   id: number;
   apartment: string;

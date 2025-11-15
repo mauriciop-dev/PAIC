@@ -147,11 +147,18 @@ Use when the user asks for a list of providers. Filter by specialty if mentioned
 }
 ```
 
-4. COMMON AREAS
+4. COMMON AREAS RESERVATION
+Use this to book a common area. You MUST parse dates like "16 de noviembre de 2025" into the strict "YYYY-MM-DD" format. You MUST parse times like "12pm" or "6pm" into the strict 24-hour "HH:mm" format (e.g., "12:00", "18:00").
 ```json
 {
-  "function": "addBooking",
-  "payload": { "day": 15, "time": "2pm-4pm", "event": "BBQ", "user": "Apto 101" }
+  "function": "createReservation",
+  "payload": {
+    "commonAreaName": "BBQ",
+    "apartment": "102",
+    "date": "2025-11-16",
+    "startTime": "12:00",
+    "endTime": "18:00"
+  }
 }
 ```
 

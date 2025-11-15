@@ -237,13 +237,6 @@ export const apiService = {
   async removeCommonArea(conjuntoId: string, id: string): Promise<void> {
     await supabase.from('common_areas').delete().eq('conjunto_id', conjuntoId).eq('id', id);
   },
-  async fetchBookings(conjuntoId: string): Promise<T.Booking[]> {
-    const { data, error } = await supabase.from('bookings').select('*').eq('conjunto_id', conjuntoId);
-    return data ? fromSupabase(data) : [];
-  },
-  async addBooking(conjuntoId: string, booking: T.Booking): Promise<void> {
-    await supabase.from('bookings').insert({ ...toSupabase(booking), conjunto_id: conjuntoId });
-  },
   async fetchReservations(conjuntoId: string): Promise<T.Reservation[]> {
     const { data, error } = await supabase.from('reservations').select('*').eq('conjunto_id', conjuntoId);
     if (error) {
@@ -258,6 +251,42 @@ export const apiService = {
       console.error('Error adding reservation:', error);
       throw error;
     }
+  },
+  async createReservationFromChat(conjuntoId: string, payload: { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; }): Promise<void> {
+    // 1. Find common area by name
+    const { data: area, error: areaError } = await supabase
+        .from('common_areas')
+        .select('id')
+        .eq('conjunto_id', conjuntoId)
+        .ilike('name', `%${payload.commonAreaName}%`)
+        .single();
+
+    if (areaError || !area) {
+        console.error('Area not found:', payload.commonAreaName, areaError);
+        throw new Error(`No se encontró un área común llamada "${payload.commonAreaName}".`);
+    }
+
+    // 2. Find resident info by apartment
+    const resident = await this.fetchResidentByApartment(conjuntoId, payload.apartment);
+    if (!resident) {
+        console.error('Resident not found for apartment:', payload.apartment);
+        throw new Error(`No se encontró un residente para el apartamento "${payload.apartment}".`);
+    }
+    
+    // 3. Construct the full reservation object
+    const newReservation: Omit<T.Reservation, 'id'> = {
+        apartment: payload.apartment,
+        residentName: resident.name,
+        commonAreaId: area.id,
+        date: payload.date,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+        email: resident.email,
+        phone: resident.phone,
+    };
+    
+    // 4. Call the existing addReservation function
+    await this.addReservation(conjuntoId, newReservation);
   },
 
   // --- Due Dates & Tasks ---

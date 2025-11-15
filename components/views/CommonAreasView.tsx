@@ -1,14 +1,13 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
-import { Booking, CommonArea, UserProfile, Reservation } from '../../types';
+import { CommonArea, UserProfile, Reservation } from '../../types';
 import BookingModal from '../BookingModal';
 import { Icon } from '../ui/Icon';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 interface TooltipData {
-    content: any; // Can be Booking or Reservation
+    content: any; // Can be Reservation
     x: number;
     y: number;
 }
@@ -18,7 +17,6 @@ interface CommonAreasViewProps {
 }
 
 const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
-  const [bookings, setBookings] = useState<Booking[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -31,12 +29,10 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const fetchData = useCallback(async () => {
     if (!userProfile.conjuntoId) return;
     try {
-        const [fetchedBookings, fetchedAreas, fetchedReservations] = await Promise.all([
-            apiService.fetchBookings(userProfile.conjuntoId),
+        const [fetchedAreas, fetchedReservations] = await Promise.all([
             apiService.fetchCommonAreas(userProfile.conjuntoId),
             apiService.fetchReservations(userProfile.conjuntoId),
         ]);
-        setBookings(fetchedBookings);
         setCommonAreas(fetchedAreas);
         setReservations(fetchedReservations);
     } catch (error) {
@@ -71,22 +67,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const calendarEvents = useMemo(() => {
     const events: any[] = [];
 
-    // Process chatbot bookings for the current month/year
-    bookings.forEach((booking, index) => {
-        const area = commonAreas.find(a => a.name === booking.event);
-        events.push({
-            key: `booking-${index}-${booking.day}-${booking.event}`,
-            day: booking.day,
-            event: booking.event,
-            user: booking.user,
-            time: booking.time,
-            color: area?.color || defaultColor,
-            fullDetails: booking,
-            type: 'booking'
-        });
-    });
-
-    // Process modal reservations
     reservations.forEach(reservation => {
         const area = commonAreas.find(a => a.id === reservation.commonAreaId);
         if (!area) return;
@@ -107,7 +87,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
     });
 
     return events;
-  }, [bookings, reservations, commonAreas, currentDate]);
+  }, [reservations, commonAreas, currentDate]);
 
 
   const handlePrevMonth = () => {
@@ -242,7 +222,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
           }}
           className="z-50 w-56 p-3 text-sm text-white bg-gray-900 rounded-lg shadow-lg"
         >
-          {tooltip.content.type === 'reservation' ? (
+          {tooltip.content.type === 'reservation' && (
               <>
                 <p><span className="font-bold">Área:</span> {tooltip.content.event}</p>
                 <p><span className="font-bold">Residente:</span> {tooltip.content.fullDetails.residentName}</p>
@@ -250,13 +230,6 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                 <p><span className="font-bold">Horario:</span> {tooltip.content.time}</p>
                 <p><span className="font-bold">Tel:</span> {tooltip.content.fullDetails.phone}</p>
               </>
-          ) : (
-             <>
-                <p><span className="font-bold">Área:</span> {tooltip.content.event}</p>
-                <p><span className="font-bold">Reservado por:</span> {tooltip.content.user}</p>
-                <p><span className="font-bold">Horario:</span> {tooltip.content.time}</p>
-                <p className="text-xs text-gray-400 mt-1">Reserva de IA</p>
-             </>
           )}
         </div>
       )}
