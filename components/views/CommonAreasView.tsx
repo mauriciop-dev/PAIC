@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
 import { Booking, CommonArea, UserProfile, Reservation } from '../../types';
 import ManageAreasModal from '../ManageAreasModal';
@@ -29,7 +29,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
 
   const defaultColor = { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
@@ -46,11 +46,11 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
     } finally {
         setIsLoading(false);
     }
-  };
+  }, [userProfile]);
 
   useEffect(() => {
     fetchData();
-  }, [userProfile.conjuntoId]);
+  }, [fetchData]);
   
   const handleSaveReservation = async (reservation: Omit<Reservation, 'id'>) => {
     if(!userProfile.conjuntoId) return;
