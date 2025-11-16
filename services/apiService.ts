@@ -171,12 +171,12 @@ export const apiService = {
 
   // --- Platform Users & Roles ---
   async fetchUsers(conjuntoId: string): Promise<T.PlatformUser[]> {
-      const { data, error } = await supabase.from('platform_users').select('*').eq('conjunto_id', conjuntoId);
+      const { data, error } = await supabase.from('users').select('*').eq('conjunto_id', conjuntoId);
       if(error) console.error(error);
       return data ? fromSupabase(data) : [];
   },
   async addUser(conjuntoId: string, user: T.PlatformUser): Promise<void> {
-      const { error } = await supabase.from('platform_users').insert({ ...toSupabase(user), conjunto_id: conjuntoId });
+      const { error } = await supabase.from('users').insert({ ...toSupabase(user), conjunto_id: conjuntoId });
       if (error) throw error;
   },
   async updateUser(conjuntoId: string, user: T.PlatformUser): Promise<void> {
@@ -187,11 +187,11 @@ export const apiService = {
         if(error) throw error;
       }
 
-      const { error } = await supabase.from('platform_users').update(updatePayload).eq('conjunto_id', conjuntoId).eq('id', user.id);
+      const { error } = await supabase.from('users').update(updatePayload).eq('conjunto_id', conjuntoId).eq('id', user.id);
       if (error) throw error;
   },
   async deleteUser(conjuntoId: string, userId: number): Promise<void> {
-      const { error } = await supabase.from('platform_users').delete().eq('conjunto_id', conjuntoId).eq('id', userId);
+      const { error } = await supabase.from('users').delete().eq('conjunto_id', conjuntoId).eq('id', userId);
       if (error) throw error;
   },
   async fetchRoles(conjuntoId: string): Promise<T.UserRoleDefinition[]> {
