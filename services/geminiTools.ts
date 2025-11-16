@@ -1,36 +1,152 @@
 import { FunctionDeclaration, Type } from "@google/genai";
 
-const manageDatabase: FunctionDeclaration = {
-    name: 'manageDatabase',
-    description: "Gestiona registros en la base de datos (residentes, proveedores, etc.). Para cambios de propietario, usa 'edit'.",
+// --- Resident Management ---
+const addResident: FunctionDeclaration = {
+    name: 'addResident',
+    description: "Agrega un nuevo residente a la base de datos.",
     parameters: {
         type: Type.OBJECT,
         properties: {
-            table: { type: Type.STRING, enum: ["residents", "account_status", "providers", "internal_staff"] },
-            operation: { type: Type.STRING, enum: ["add", "edit", "delete"] },
-            identifier: {
-                type: Type.OBJECT,
-                properties: {
-                    apartment: { type: Type.STRING },
-                    id: { type: Type.INTEGER },
-                    name: { type: Type.STRING },
-                }
-            },
+            apartment: { type: Type.STRING, description: "Número del apartamento. Ej: 101, 202A" },
+            name: { type: Type.STRING },
+            email: { type: Type.STRING },
+            phone: { type: Type.STRING },
+        },
+        required: ["apartment", "name", "email", "phone"]
+    }
+};
+
+const updateResident: FunctionDeclaration = {
+    name: 'updateResident',
+    description: "Actualiza la información de un residente existente, identificado por su número de apartamento.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            apartment: { type: Type.STRING, description: "Número del apartamento a modificar." },
             data: {
                 type: Type.OBJECT,
                 properties: {
                     name: { type: Type.STRING },
                     email: { type: Type.STRING },
                     phone: { type: Type.STRING },
-                    company: { type: Type.STRING },
-                    specialty: { type: Type.STRING },
-                    position: { type: Type.STRING },
-                }
+                },
+                description: "Objeto con los campos a actualizar."
             }
         },
-        required: ["table", "operation"]
+        required: ["apartment", "data"]
     }
 };
+
+const deleteResident: FunctionDeclaration = {
+    name: 'deleteResident',
+    description: "Elimina un residente de la base de datos, identificado por su número de apartamento.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            apartment: { type: Type.STRING, description: "Número del apartamento del residente a eliminar." },
+        },
+        required: ["apartment"]
+    }
+};
+
+// --- Provider Management ---
+const addProvider: FunctionDeclaration = {
+    name: 'addProvider',
+    description: "Agrega un nuevo proveedor de servicios a la base de datos.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            company: { type: Type.STRING, description: "Nombre de la empresa o del proveedor." },
+            specialty: { type: Type.STRING, description: "Especialidad del proveedor. Ej: Plomería, Electricista" },
+            email: { type: Type.STRING },
+            phone: { type: Type.STRING },
+        },
+        required: ["company", "specialty", "email", "phone"]
+    }
+};
+
+const updateProvider: FunctionDeclaration = {
+    name: 'updateProvider',
+    description: "Actualiza la información de un proveedor, identificado por el nombre de la empresa.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            company: { type: Type.STRING, description: "Nombre de la empresa del proveedor a modificar." },
+            data: {
+                type: Type.OBJECT,
+                properties: {
+                    specialty: { type: Type.STRING },
+                    email: { type: Type.STRING },
+                    phone: { type: Type.STRING },
+                },
+                description: "Objeto con los campos a actualizar."
+            }
+        },
+        required: ["company", "data"]
+    }
+};
+
+const deleteProvider: FunctionDeclaration = {
+    name: 'deleteProvider',
+    description: "Elimina un proveedor de la base de datos, identificado por el nombre de la empresa.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            company: { type: Type.STRING, description: "Nombre de la empresa del proveedor a eliminar." },
+        },
+        required: ["company"]
+    }
+};
+
+// --- Internal Staff Management ---
+const addInternalStaff: FunctionDeclaration = {
+    name: 'addInternalStaff',
+    description: "Agrega un nuevo miembro del personal interno (ej: todero, jardinero).",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING },
+            position: { type: Type.STRING, description: "Cargo del miembro del personal." },
+            email: { type: Type.STRING },
+            phone: { type: Type.STRING },
+        },
+        required: ["name", "position", "email", "phone"]
+    }
+};
+
+const updateInternalStaff: FunctionDeclaration = {
+    name: 'updateInternalStaff',
+    description: "Actualiza la información de un miembro del personal, identificado por su nombre.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING, description: "Nombre del miembro del personal a modificar." },
+            data: {
+                type: Type.OBJECT,
+                properties: {
+                    position: { type: Type.STRING },
+                    email: { type: Type.STRING },
+                    phone: { type: Type.STRING },
+                },
+                description: "Objeto con los campos a actualizar."
+            }
+        },
+        required: ["name", "data"]
+    }
+};
+
+const deleteInternalStaff: FunctionDeclaration = {
+    name: 'deleteInternalStaff',
+    description: "Elimina un miembro del personal de la base de datos, identificado por su nombre.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING, description: "Nombre del miembro del personal a eliminar." },
+        },
+        required: ["name"]
+    }
+};
+
 
 const createReservation: FunctionDeclaration = {
     name: 'createReservation',
@@ -167,7 +283,17 @@ const queryDebtors: FunctionDeclaration = {
 
 export const geminiTools = [{
     functionDeclarations: [
-        manageDatabase,
+        // Database Management
+        addResident,
+        updateResident,
+        deleteResident,
+        addProvider,
+        updateProvider,
+        deleteProvider,
+        addInternalStaff,
+        updateInternalStaff,
+        deleteInternalStaff,
+        // Other functionalities
         createReservation,
         queryDatabase,
         queryProviders,

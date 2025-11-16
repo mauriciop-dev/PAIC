@@ -1,7 +1,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, FunctionCall } from "@google/genai";
 import { apiService } from './apiService';
 // FIX: Added missing types to ensure proper casting and type safety.
-import { UserProfile, ConjuntoInfo, Income, Expense, VisitorLog, Resident, Provider, PackageLog } from "../types";
+import { UserProfile, ConjuntoInfo, Income, Expense, VisitorLog, Resident, Provider, PackageLog, InternalStaff } from "../types";
 import { geminiTools } from './geminiTools';
 
 let aiPromise: Promise<GoogleGenAI> | null = null;
@@ -108,7 +108,6 @@ const runChat = async (prompt: string, userProfile: UserProfile | null, conjunto
 };
 
 const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<string> => {
-    // For simplicity, we process the first function call. Gemini may support parallel calls in the future.
     const call = functionCalls[0];
     const { name, args } = call;
 
@@ -119,40 +118,92 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
         return "Error de contexto: no se pudo determinar el conjunto actual.";
     }
     
-    apiService.logChatbotInteraction(currentConjuntoId); // Log every attempted action
+    apiService.logChatbotInteraction(currentConjuntoId);
 
     try {
         switch (name) {
-            case 'manageDatabase': {
-                // FIX: Added type assertions to 'args' properties to satisfy function signatures.
-                const { table, operation, data, identifier } = args as { table: string, operation: string, data: unknown, identifier: unknown };
-                switch (table) {
-                    case 'residents':
-                        if (operation === 'add') await apiService.addResident(currentConjuntoId, data as Resident);
-                        else if (operation === 'edit') await apiService.updateResident(currentConjuntoId, { ...(identifier as any), ...(data as any) });
-                        else if (operation === 'delete') await apiService.deleteResident(currentConjuntoId, (identifier as { apartment: string }).apartment);
-                        break;
-                    case 'providers':
-                        if (operation === 'add') await apiService.addProvider(currentConjuntoId, data as Omit<Provider, 'id'>);
-                        else if (operation === 'edit') await apiService.updateProvider(currentConjuntoId, { ...(identifier as any), ...(data as any) });
-                        else if (operation === 'delete') await apiService.deleteProvider(currentConjuntoId, (identifier as { id: number }).id);
-                        break;
-                    default:
-                        throw new Error(`Tabla '${table}' no es válida para esta operación.`);
-                }
-                return `¡Confirmado! La operación de **${operation}** en la tabla **${table}** se completó exitosamente.`;
+            // --- Resident Management ---
+            case 'addResident': {
+// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
+                await apiService.addResident(currentConjuntoId, args as unknown as Resident);
+// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
+                return `¡Confirmado! Residente para el apto **${(args as unknown as Resident).apartment}** agregado exitosamente.`;
+            }
+            case 'updateResident': {
+                const { apartment, data } = args as unknown as { apartment: string, data: Partial<Resident> };
+                const existingResident = await apiService.fetchResidentByApartment(currentConjuntoId, apartment);
+                if (!existingResident) throw new Error(`No se encontró un residente en el apartamento ${apartment}.`);
+                await apiService.updateResident(currentConjuntoId, { ...existingResident, ...data });
+                return `¡Confirmado! La información del residente del apto **${apartment}** ha sido actualizada.`;
+            }
+            case 'deleteResident': {
+                const { apartment } = args as unknown as { apartment: string };
+                await apiService.deleteResident(currentConjuntoId, apartment);
+                return `¡Confirmado! El residente del apto **${apartment}** ha sido eliminado.`;
+            }
+
+            // --- Provider Management ---
+            case 'addProvider': {
+// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
+                await apiService.addProvider(currentConjuntoId, args as unknown as Omit<Provider, 'id'>);
+                return `¡Confirmado! Proveedor **${(args as unknown as Provider).company}** agregado exitosamente.`;
+            }
+            case 'updateProvider': {
+                const { company, data } = args as unknown as { company: string, data: Partial<Provider> };
+                const providers = await apiService.fetchProviders(currentConjuntoId);
+                const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
+                if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
+                if (matchingProviders.length > 1) return `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`;
+                const providerToUpdate = matchingProviders[0];
+                await apiService.updateProvider(currentConjuntoId, { ...providerToUpdate, ...data });
+                return `¡Confirmado! La información del proveedor **${company}** ha sido actualizada.`;
+            }
+            case 'deleteProvider': {
+                const { company } = args as unknown as { company: string };
+                const providers = await apiService.fetchProviders(currentConjuntoId);
+                const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
+                if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
+                if (matchingProviders.length > 1) return `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`;
+                const providerToDelete = matchingProviders[0];
+                await apiService.deleteProvider(currentConjuntoId, providerToDelete.id);
+                return `¡Confirmado! El proveedor **${company}** ha sido eliminado.`;
+            }
+
+            // --- Internal Staff Management ---
+            case 'addInternalStaff': {
+// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
+                await apiService.addInternalStaff(currentConjuntoId, args as unknown as InternalStaff);
+// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
+                return `¡Confirmado! Miembro del personal **${(args as unknown as InternalStaff).name}** agregado exitosamente.`;
+            }
+            case 'updateInternalStaff': {
+                const { name, data } = args as unknown as { name: string, data: Partial<InternalStaff> };
+                const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
+                const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
+                if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
+                if (matchingStaff.length > 1) return `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles para identificar a la persona correcta.`;
+                const staffToUpdate = matchingStaff[0];
+                await apiService.updateInternalStaff(currentConjuntoId, { ...staffToUpdate, ...data } as InternalStaff);
+                return `¡Confirmado! La información de **${name}** ha sido actualizada.`;
+            }
+            case 'deleteInternalStaff': {
+                const { name } = args as unknown as { name: string };
+                const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
+                const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
+                if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
+                if (matchingStaff.length > 1) return `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles para identificar a la persona correcta.`;
+                await apiService.deleteInternalStaff(currentConjuntoId, name);
+                return `¡Confirmado! El miembro del personal **${name}** ha sido eliminado.`;
             }
 
             case 'createReservation': {
-                // FIX: Cast `args` to the shape expected by `createReservationFromChat`.
-                const reservationArgs = args as { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; };
+                const reservationArgs = args as unknown as { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; };
                 await apiService.createReservationFromChat(currentConjuntoId, reservationArgs);
                 return `¡Confirmado! La reserva del área **${reservationArgs.commonAreaName}** para el **Apto ${reservationArgs.apartment}** el **${reservationArgs.date}** de **${reservationArgs.startTime} a ${reservationArgs.endTime}** ha sido registrada exitosamente.`;
             }
             
             case 'queryDatabase': {
-                // FIX: Cast `args` to access its properties with correct types.
-                const { table, query_description } = args as { table: string, query_description: string };
+                const { table, query_description } = args as unknown as { table: string, query_description: string };
                 const aptMatch = query_description.match(/\d+/);
                 const apt = aptMatch ? aptMatch[0] : null;
 
@@ -177,8 +228,7 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             }
 
             case 'queryProviders': {
-                // FIX: Cast `args` to access `specialty` safely.
-                const { specialty } = args as { specialty?: string };
+                const { specialty } = args as unknown as { specialty?: string };
                 const providers = await apiService.fetchProvidersBySpecialty(currentConjuntoId, specialty || '');
                  if (providers.length === 0) {
                     return specialty ? `No encontré proveedores con la especialidad "${specialty}".` : `No hay proveedores registrados.`;
@@ -188,40 +238,37 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             }
             
             case 'sendMassEmail': {
-                // FIX: Cast `args` to access its properties safely.
-                const { group, subject, body } = args as { group: string, subject: string, body: string };
+                const { group, subject, body } = args as unknown as { group: string, subject: string, body: string };
                 const result = await apiService.sendMassEmail(currentConjuntoId, group, subject, body);
                 return result.message;
             }
 
             case 'addIncome': {
-                const incomeArgs = args as Omit<Income, 'id'>;
+                const incomeArgs = args as unknown as Omit<Income, 'id'>;
                 await apiService.addIncome(currentConjuntoId, incomeArgs);
                 return `Ingreso de $${incomeArgs.amount.toLocaleString()} por "${incomeArgs.description}" agregado. ¿Necesitas algo más?`;
             }
             
             case 'addExpense': {
-                const expenseArgs = args as Omit<Expense, 'id'>;
+                const expenseArgs = args as unknown as Omit<Expense, 'id'>;
                 await apiService.addExpense(currentConjuntoId, expenseArgs);
                  return `Gasto de $${expenseArgs.amount.toLocaleString()} por "${expenseArgs.description}" agregado. ¿Necesitas algo más?`;
             }
             
             case 'authorizeVisitor': {
-                // FIX: Spread `args` and add status, ensuring the object matches the expected type.
-                const visitorArgs = args as { visitorName: string, apartment: string, date: string };
+                const visitorArgs = args as unknown as { visitorName: string, apartment: string, date: string };
                 await apiService.addVisitorLog(currentConjuntoId, {...visitorArgs, status: 'Autorizado'});
                 return `Visitante "${visitorArgs.visitorName}" autorizado para el Apto ${visitorArgs.apartment}.`;
             }
             
             case 'registerPackage': {
-                const packageArgs = args as Partial<PackageLog>;
+                const packageArgs = args as unknown as Partial<PackageLog>;
                 await apiService.addPackageLog(currentConjuntoId, packageArgs);
                 return `Paquete de "${packageArgs.courier}" para el Apto ${packageArgs.apartment} registrado.`;
             }
            
             case 'updateVisitorStatus': {
-                // FIX: Cast `args` to access its properties safely.
-                const { logId, status } = args as { logId: number, status: string };
+                const { logId, status } = args as unknown as { logId: number, status: string };
                 const newStatus = status as VisitorLog['status'];
                 if (!['Autorizado', 'Ingresó', 'Salió'].includes(newStatus)) {
                     return `El estado "${newStatus}" no es válido. Los estados permitidos son: Autorizado, Ingresó, Salió.`;
@@ -237,8 +284,6 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
         console.error(`Error executing function ${name}:`, error);
         return `Lo siento, no pude completar la operación. Motivo: ${error.message}`;
     } finally {
-        // Re-initialize chat to clear context after a function call completes or fails.
-        // This prevents the AI from getting stuck in a loop.
         await initializeChat(userProfile, conjuntoInfo);
     }
 };
