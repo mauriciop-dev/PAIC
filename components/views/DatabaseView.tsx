@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
 import { Resident, AccountStatus, Provider, InternalStaff, UserProfile, UserRole, PlatformUser, UserRoleDefinition, Tab } from '../../types';
 import ResidentModal from '../ResidentModal';
@@ -48,7 +47,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
@@ -67,11 +66,21 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userProfile.conjuntoId]);
 
   useEffect(() => {
     fetchData();
-  }, [userProfile.conjuntoId]);
+    
+    // Listen for custom event to refetch data when chatbot makes a change
+    const handleDataChange = () => {
+      fetchData();
+    };
+    window.addEventListener('data-changed', handleDataChange);
+
+    return () => {
+      window.removeEventListener('data-changed', handleDataChange);
+    };
+  }, [fetchData]);
 
   // Modal Handlers
   const handleResidentModalOpen = (resident: Resident | null) => { setSelectedResident(resident); setIsResidentModalOpen(true); };

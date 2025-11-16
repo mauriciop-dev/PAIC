@@ -173,31 +173,36 @@ const processApiResponse = async (response: string): Promise<string> => {
             switch (action.function) {
                 // --- DATABASE ---
                 case 'manageDatabase':
-                    const { table, operation, identifier, data } = action.payload;
-                    switch (table) {
-                        case 'residents':
-                            if (operation === 'add') await apiService.addResident(currentConjuntoId, data);
-                            else if (operation === 'edit') await apiService.updateResident(currentConjuntoId, { ...identifier, ...data });
-                            else if (operation === 'delete') await apiService.deleteResident(currentConjuntoId, identifier.apartment);
-                            break;
-                        case 'account_status':
-                            if (operation === 'add') await apiService.addAccountStatus(currentConjuntoId, data);
-                            else if (operation === 'edit') await apiService.updateAccountStatus(currentConjuntoId, { ...identifier, ...data });
-                            else if (operation === 'delete') await apiService.deleteAccountStatus(currentConjuntoId, identifier.apartment);
-                            break;
-                         case 'providers':
-                            if (operation === 'add') await apiService.addProvider(currentConjuntoId, data);
-                            else if (operation === 'edit') await apiService.updateProvider(currentConjuntoId, { ...identifier, ...data });
-                            else if (operation === 'delete') await apiService.deleteProvider(currentConjuntoId, identifier.id);
-                            break;
-                        case 'internal_staff':
-                            if (operation === 'add') await apiService.addInternalStaff(currentConjuntoId, data);
-                            else if (operation === 'edit') await apiService.updateInternalStaff(currentConjuntoId, { ...identifier, ...data });
-                            else if (operation === 'delete') await apiService.deleteInternalStaff(currentConjuntoId, identifier.name);
-                            break;
+                    try {
+                        const { table, operation, identifier, data } = action.payload;
+                        switch (table) {
+                            case 'residents':
+                                if (operation === 'add') await apiService.addResident(currentConjuntoId, data);
+                                else if (operation === 'edit') await apiService.updateResident(currentConjuntoId, { ...identifier, ...data });
+                                else if (operation === 'delete') await apiService.deleteResident(currentConjuntoId, identifier.apartment);
+                                break;
+                            case 'account_status':
+                                if (operation === 'add') await apiService.addAccountStatus(currentConjuntoId, data);
+                                else if (operation === 'edit') await apiService.updateAccountStatus(currentConjuntoId, { ...identifier, ...data });
+                                else if (operation === 'delete') await apiService.deleteAccountStatus(currentConjuntoId, identifier.apartment);
+                                break;
+                             case 'providers':
+                                if (operation === 'add') await apiService.addProvider(currentConjuntoId, data);
+                                else if (operation === 'edit') await apiService.updateProvider(currentConjuntoId, { ...identifier, ...data });
+                                else if (operation === 'delete') await apiService.deleteProvider(currentConjuntoId, identifier.id);
+                                break;
+                            case 'internal_staff':
+                                if (operation === 'add') await apiService.addInternalStaff(currentConjuntoId, data);
+                                else if (operation === 'edit') await apiService.updateInternalStaff(currentConjuntoId, { ...identifier, ...data });
+                                else if (operation === 'delete') await apiService.deleteInternalStaff(currentConjuntoId, identifier.name);
+                                break;
+                        }
+                        await initializeChat(userProfile, conjuntoInfo);
+                        return `¡Confirmado! La operación de **${operation}** en **${table}** se ha completado exitosamente. ¿En qué más te puedo ayudar?`;
+                    } catch (error: any) {
+                         await initializeChat(userProfile, conjuntoInfo);
+                        return `Lo siento, no pude completar la operación en la base de datos. Motivo: ${error.message}`;
                     }
-                    await initializeChat(userProfile, conjuntoInfo);
-                    return `Operación de ${operation} en ${table} completada exitosamente. ¿En qué más te puedo ayudar?`;
 
                 case 'queryDatabase':
                     const { table: queryTable, query_description } = action.payload;
@@ -247,8 +252,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                     try {
                         await apiService.createReservationFromChat(currentConjuntoId, action.payload);
                         await initializeChat(userProfile, conjuntoInfo);
-                        // window.dispatchEvent(new CustomEvent('data-changed', { detail: 'reservations' }));
-                        return `¡Excelente! La reserva del área de "${action.payload.commonAreaName}" para el "apartamento ${action.payload.apartment}" el día "${action.payload.date}" desde las "${action.payload.startTime}" hasta las "${action.payload.endTime}" ha sido confirmada y registrada en el sistema. ¿Necesitas algo más?`;
+                        return `¡Confirmado! La reserva del área **${action.payload.commonAreaName}** para el **apartamento ${action.payload.apartment}** el día **${action.payload.date}** de **${action.payload.startTime}** a **${action.payload.endTime}** ha sido registrada exitosamente.`;
                     } catch (error: any) {
                         await initializeChat(userProfile, conjuntoInfo);
                         return `Lo siento, no pude registrar la reserva. Motivo: ${error.message}`;
