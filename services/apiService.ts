@@ -253,27 +253,27 @@ export const apiService = {
     }
   },
   async createReservationFromChat(conjuntoId: string, payload: { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; }): Promise<void> {
-    // 1. Find common area by name
+    // 1. Find common area by name. Use a more precise query.
     const { data: area, error: areaError } = await supabase
         .from('common_areas')
         .select('id')
         .eq('conjunto_id', conjuntoId)
-        .ilike('name', `%${payload.commonAreaName}%`)
+        .ilike('name', `%${payload.commonAreaName.trim()}%`)
         .single();
 
     if (areaError || !area) {
         console.error('Area not found:', payload.commonAreaName, areaError);
-        throw new Error(`No se encontró un área común llamada "${payload.commonAreaName}".`);
+        throw new Error(`No se encontró un área común llamada "${payload.commonAreaName}". Revisa el nombre e intenta de nuevo.`);
     }
 
-    // 2. Find resident info by apartment
+    // 2. Find resident info by apartment. Ensure resident exists before proceeding.
     const resident = await this.fetchResidentByApartment(conjuntoId, payload.apartment);
     if (!resident) {
         console.error('Resident not found for apartment:', payload.apartment);
-        throw new Error(`No se encontró un residente para el apartamento "${payload.apartment}".`);
+        throw new Error(`No se encontró un residente para el apartamento "${payload.apartment}". Por favor, verifica el número.`);
     }
     
-    // 3. Construct the full reservation object
+    // 3. Construct the full reservation object with validated data
     const newReservation: Omit<T.Reservation, 'id'> = {
         apartment: payload.apartment,
         residentName: resident.name,
@@ -285,7 +285,7 @@ export const apiService = {
         phone: resident.phone,
     };
     
-    // 4. Call the existing addReservation function
+    // 4. Call the existing addReservation function, which will throw an error on failure
     await this.addReservation(conjuntoId, newReservation);
   },
 

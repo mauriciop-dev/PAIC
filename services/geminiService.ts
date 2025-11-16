@@ -175,32 +175,40 @@ const processApiResponse = async (response: string): Promise<string> => {
                 case 'manageDatabase':
                     try {
                         const { table, operation, identifier, data } = action.payload;
+                        let success = false;
                         switch (table) {
                             case 'residents':
                                 if (operation === 'add') await apiService.addResident(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateResident(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteResident(currentConjuntoId, identifier.apartment);
+                                success = true;
                                 break;
                             case 'account_status':
                                 if (operation === 'add') await apiService.addAccountStatus(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateAccountStatus(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteAccountStatus(currentConjuntoId, identifier.apartment);
+                                success = true;
                                 break;
                              case 'providers':
                                 if (operation === 'add') await apiService.addProvider(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateProvider(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteProvider(currentConjuntoId, identifier.id);
+                                success = true;
                                 break;
                             case 'internal_staff':
                                 if (operation === 'add') await apiService.addInternalStaff(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateInternalStaff(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteInternalStaff(currentConjuntoId, identifier.name);
+                                success = true;
                                 break;
                         }
-                        await initializeChat(userProfile, conjuntoInfo);
-                        return `¡Confirmado! La operación de **${operation}** en **${table}** se ha completado exitosamente. ¿En qué más te puedo ayudar?`;
+                        if (success) {
+                            await initializeChat(userProfile, conjuntoInfo);
+                            return `¡Confirmado! La operación de **${operation}** en la tabla **${table}** se ha completado exitosamente. ¿En qué más te puedo ayudar?`;
+                        }
+                        throw new Error(`Tabla '${table}' no es válida para esta operación.`);
                     } catch (error: any) {
-                         await initializeChat(userProfile, conjuntoInfo);
+                        await initializeChat(userProfile, conjuntoInfo);
                         return `Lo siento, no pude completar la operación en la base de datos. Motivo: ${error.message}`;
                     }
 
