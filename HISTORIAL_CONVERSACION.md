@@ -1,4 +1,3 @@
-
 # Historial de Conversación con el Asistente de IA
 
 ## Sesión 1: Inicio y Configuración del Proyecto (SuperAdmin)
@@ -458,3 +457,15 @@
         4.  **Centraliza** la gestión de "Usuarios" y "Permisos de Usuario" desde `DatabaseView.tsx` a nuevas pestañas en `SettingsModal`.
         5.  **Mejora la UI:** Añade un ícono de engranaje en `NavBar.tsx` para activar el modal, ahorrando espacio y mejorando la UX como sugirió el usuario.
     -   **Resultado:** La aplicación ahora tiene una sección de configuración centralizada, intuitiva y robusta. El error de cierre de sesión en "Gestionar Áreas" se soluciona de forma definitiva. La UI es más limpia y profesional.
+---
+
+## Sesión 44: Adopción de Markdown para Respuestas del Chatbot
+
+-   **Usuario:** Sugiere dejar de luchar contra la tendencia del modelo de IA a usar formato Markdown y, en su lugar, adoptarlo para mejorar la legibilidad.
+-   **IA:**
+    -   **Diagnóstico:** Totalmente de acuerdo. Luchar contra el formato natural del modelo es ineficiente y produce resultados inconsistentes. La IA también estaba "alucinando" submenús que no existen en la lógica de la aplicación.
+    -   **Solución (Arquitectura):**
+        1.  **Adopción de Markdown:** Se integra la librería `marked.js` en la aplicación para renderizar las respuestas del chatbot de texto plano a HTML. El componente `Chatbot.tsx` se actualiza para usar este renderizador, mostrando ahora negritas y listas de forma nativa.
+        2.  **Reescritura del Prompt:** Se modifica `system_prompt.txt` para eliminar la prohibición de formato. Se reemplaza con **reglas de formato obligatorio** que exigen el uso de un subconjunto específico de Markdown (`**`, listas `1.` y `-`) para mantener la consistencia y la claridad.
+        3.  **Corrección de Alucinación:** Se refuerza la regla para la opción "Áreas comunes", prohibiendo explícitamente la creación de submenús inventados y forzando a la IA a seguir el flujo de conversación directa.
+    -   **Resultado:** Las respuestas del chatbot son ahora significativamente más legibles y están mejor estructuradas. El comportamiento del asistente es más fiable y predecible, ya que las nuevas reglas se alinean con las fortalezas del modelo de lenguaje.

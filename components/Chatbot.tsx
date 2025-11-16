@@ -2,6 +2,25 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Message, UserProfile, ConjuntoInfo } from '../types';
 import { Icon } from './ui/Icon';
 import { geminiService } from '../services/geminiService';
+import { marked } from 'marked';
+
+// A simple renderer component defined within the Chatbot component file
+// It uses the 'marked' library to parse markdown and Tailwind's prose classes for styling.
+const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  // marked.parse() converts Markdown string to HTML.
+  // By default, marked sanitizes the HTML to prevent XSS attacks,
+  // making it safe to use with dangerouslySetInnerHTML.
+  // gfm: true enables GitHub Flavored Markdown (like tables, strikethrough).
+  // breaks: true makes line breaks in the source appear as <br> tags.
+  const rawMarkup = marked.parse(content, { gfm: true, breaks: true });
+  return (
+    <div
+      className="prose prose-sm prose-strong:font-semibold max-w-full"
+      dangerouslySetInnerHTML={{ __html: rawMarkup as string }}
+    />
+  );
+};
+
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -21,7 +40,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
     if (userProfile && conjuntoInfo && messages.length === 0 && isOpen) {
         setMessages([
             // FIX: Property 'name' does not exist on type 'UserProfile'. Use 'fullName' instead.
-            { sender: 'ai', text: `Hola ${userProfile.fullName}, soy PAIC y te ayudaré a administrar ${conjuntoInfo.name}.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
+            { sender: 'ai', text: `Hola **${userProfile.fullName}**, soy PAIC y te ayudaré a administrar **${conjuntoInfo.name}**.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
         ]);
     } else if (!isOpen) {
         // Clear messages when chatbot is closed to ensure it re-initializes with the welcome message
@@ -115,7 +134,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
                   : 'bg-blue-600 text-white rounded-br-none'
               }`}
             >
-              <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+              {msg.sender === 'user' 
+                ? <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+                : <MarkdownRenderer content={msg.text} />
+              }
             </div>
             {/* FIX: Property 'picture' does not exist on type 'UserProfile'. Use 'avatarUrl' instead. */}
             {msg.sender === 'user' && userProfile && userProfile.avatarUrl && <img src={userProfile.avatarUrl} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
