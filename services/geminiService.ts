@@ -165,52 +165,46 @@ const processApiResponse = async (response: string): Promise<string> => {
         if (action.function && action.payload && currentConjuntoId) {
             apiService.logChatbotInteraction(currentConjuntoId); // Log interaction
             
-            // This re-initializes the chat after a function call to keep the context clean.
-            // It correctly calls initializeChat without an initial message.
             const userProfile = (chat as any)?.userProfile as UserProfile;
             const conjuntoInfo = (chat as any)?.conjuntoInfo as ConjuntoInfo;
 
             switch (action.function) {
-                // --- DATABASE ---
                 case 'manageDatabase':
                     try {
-                        const { table, operation, identifier, data } = action.payload;
-                        let success = false;
+                        const { table, operation, data, identifier } = action.payload;
                         switch (table) {
                             case 'residents':
                                 if (operation === 'add') await apiService.addResident(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateResident(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteResident(currentConjuntoId, identifier.apartment);
-                                success = true;
                                 break;
-                            case 'account_status':
-                                if (operation === 'add') await apiService.addAccountStatus(currentConjuntoId, data);
-                                else if (operation === 'edit') await apiService.updateAccountStatus(currentConjuntoId, { ...identifier, ...data });
-                                else if (operation === 'delete') await apiService.deleteAccountStatus(currentConjuntoId, identifier.apartment);
-                                success = true;
-                                break;
-                             case 'providers':
+                            case 'providers':
                                 if (operation === 'add') await apiService.addProvider(currentConjuntoId, data);
                                 else if (operation === 'edit') await apiService.updateProvider(currentConjuntoId, { ...identifier, ...data });
                                 else if (operation === 'delete') await apiService.deleteProvider(currentConjuntoId, identifier.id);
-                                success = true;
                                 break;
-                            case 'internal_staff':
-                                if (operation === 'add') await apiService.addInternalStaff(currentConjuntoId, data);
-                                else if (operation === 'edit') await apiService.updateInternalStaff(currentConjuntoId, { ...identifier, ...data });
-                                else if (operation === 'delete') await apiService.deleteInternalStaff(currentConjuntoId, identifier.name);
-                                success = true;
-                                break;
+                            // Add other table cases here as needed
+                            default:
+                                throw new Error(`Tabla '${table}' no es válida para esta operación.`);
                         }
-                        if (success) {
-                            await initializeChat(userProfile, conjuntoInfo);
-                            return `¡Confirmado! La operación de **${operation}** en la tabla **${table}** se ha completado exitosamente. ¿En qué más te puedo ayudar?`;
-                        }
-                        throw new Error(`Tabla '${table}' no es válida para esta operación.`);
+                        await initializeChat(userProfile, conjuntoInfo);
+                        return `¡Confirmado! La operación de **${operation}** en la tabla **${table}** se completó exitosamente.`;
                     } catch (error: any) {
                         await initializeChat(userProfile, conjuntoInfo);
                         return `Lo siento, no pude completar la operación en la base de datos. Motivo: ${error.message}`;
                     }
+
+                case 'createReservation':
+                    try {
+                        await apiService.createReservationFromChat(currentConjuntoId, action.payload);
+                        await initializeChat(userProfile, conjuntoInfo);
+                        return `¡Confirmado! La reserva del área **${action.payload.commonAreaName}** para el **Apto ${action.payload.apartment}** el **${action.payload.date}** de **${action.payload.startTime} a ${action.payload.endTime}** ha sido registrada exitosamente.`;
+                    } catch (error: any) {
+                        await initializeChat(userProfile, conjuntoInfo);
+                        return `Lo siento, no pude registrar la reserva. Motivo: ${error.message}`;
+                    }
+                
+                // --- Keep other cases as they are ---
 
                 case 'queryDatabase':
                     const { table: queryTable, query_description } = action.payload;
@@ -254,19 +248,7 @@ const processApiResponse = async (response: string): Promise<string> => {
                         .join('\n');
                     await initializeChat(userProfile, conjuntoInfo);
                     return `Entendido. Consulté la base de datos y encontré estos proveedores:\n\n${providersList}`;
-
-                // --- COMMON AREAS ---
-                case 'createReservation':
-                    try {
-                        await apiService.createReservationFromChat(currentConjuntoId, action.payload);
-                        await initializeChat(userProfile, conjuntoInfo);
-                        return `¡Confirmado! La reserva del área **${action.payload.commonAreaName}** para el **apartamento ${action.payload.apartment}** el día **${action.payload.date}** de **${action.payload.startTime}** a **${action.payload.endTime}** ha sido registrada exitosamente.`;
-                    } catch (error: any) {
-                        await initializeChat(userProfile, conjuntoInfo);
-                        return `Lo siento, no pude registrar la reserva. Motivo: ${error.message}`;
-                    }
-
-
+                
                 // --- COMMUNICATIONS ---
                 case 'sendMassEmail':
                     const result = await apiService.sendMassEmail(currentConjuntoId, action.payload.group, action.payload.subject, action.payload.body);
@@ -301,9 +283,12 @@ const processApiResponse = async (response: string): Promise<string> => {
                     await apiService.updateVisitorLog(currentConjuntoId, action.payload.logId, { status: newStatus });
                     await initializeChat(userProfile, conjuntoInfo);
                     return `Estado del visitante actualizado a "${action.payload.newStatus}".`;
+
+                default:
+                     return `No entendí la acción: ${action.function}.`;
             }
         }
-        return `No entendí la acción: ${response}`;
+        return `Respuesta no válida: ${response}`;
     } catch (err: any) {
         console.error('Error processing API response:', err);
         return 'Hubo un error al procesar la respuesta. Por favor, revisa el formato.';

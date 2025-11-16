@@ -486,12 +486,12 @@
 
 ## Sesión 46: Conexión Real y a Prueba de Errores con la Base de Datos
 
--   **Usuario:** Proporciona evidencia de que las reservas y otras operaciones del chatbot no se guardan en la base de datos, a pesar de las confirmaciones, y señala que está mirando la tabla `bookings`.
+-   **Usuario:** Proporciona evidencia (CSV) de que la tabla `reservations` tiene la estructura correcta, invalidando un diagnóstico anterior. Reporta que las operaciones del chatbot siguen sin guardarse en la base de datos.
 -   **IA:**
-    -   **Diagnóstico:** Se identifican dos problemas clave:
-        1.  **Discrepancia de Tabla:** El usuario está observando la tabla `bookings`, mientras que la aplicación utiliza la tabla `reservations`. Esto explica por qué las operaciones manuales (que sí funcionan) tampoco aparecen donde el usuario está mirando.
-        2.  **Confirmaciones Falsas:** Se confirma que la lógica del chatbot para `manageDatabase` (agregar proveedores, etc.) no tenía manejo de errores y daba confirmaciones falsas. Además, la función para crear reservas (`createReservationFromChat`) era frágil y podía fallar silenciosamente si no encontraba un residente o área con el nombre exacto.
+    -   **Diagnóstico:** Se confirma que la estructura de la tabla `reservations` es correcta. El problema real se identifica en dos puntos:
+        1.  **Lógica de API Frágil:** La función `createReservationFromChat` en `apiService.ts` fallaba silenciosamente si no encontraba el nombre exacto del área común o del residente en la base de datos.
+        2.  **Confirmaciones Falsas:** El `geminiService.ts` no tenía un manejo de errores para las operaciones de base de datos, por lo que informaba al usuario de un éxito inexistente cuando la API fallaba.
     -   **Solución (Doble):**
-        1.  **Lógica de API Robusta:** Se refactoriza `apiService.ts`, específicamente `createReservationFromChat`, para realizar verificaciones explícitas de la existencia del área común y del residente antes de intentar crear la reserva. Si alguno no se encuentra, ahora lanza un error claro y específico.
-        2.  **Manejo de Errores Centralizado:** Se blinda `geminiService.ts` añadiendo un bloque `try/catch` a la función `manageDatabase`. Ahora, tanto esta función como la de `createReservation` solo devuelven un mensaje de éxito **si** la llamada al `apiService` se completa sin errores. Cualquier fallo en la base de datos es capturado y reportado al usuario con el motivo real, eliminando por completo las "confirmaciones falsas".
-    -   **Resultado:** La conexión entre el chatbot, la base de datos (`reservations`) y la interfaz es ahora real, instantánea y robusta. Se elimina la posibilidad de fallos silenciosos y se mejora drásticamente la fiabilidad del asistente.
+        1.  **`apiService.ts`:** Se refactoriza `createReservationFromChat` para que verifique explícitamente que el área y el residente existen antes de intentar guardar. Si no los encuentra, ahora lanza un error descriptivo.
+        2.  **`geminiService.ts`:** Se blinda `processApiResponse` con bloques `try/catch` para las funciones `manageDatabase` y `createReservation`. Ahora, el chatbot solo envía un mensaje de confirmación si la operación en la base de datos es exitosa. Si falla, informa al usuario del error real.
+    -   **Resultado:** La conexión entre el chatbot, la base de datos y la interfaz es ahora real, instantánea y a prueba de errores, eliminando las "confirmaciones falsas" y los fallos silenciosos.

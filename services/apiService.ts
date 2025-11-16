@@ -127,13 +127,16 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addProvider(conjuntoId: string, provider: Omit<T.Provider, 'id'>) {
-    await supabase.from('providers').insert({ ...toSupabase(provider), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('providers').insert({ ...toSupabase(provider), conjunto_id: conjuntoId });
+    if (error) throw error;
   },
   async updateProvider(conjuntoId: string, provider: T.Provider) {
-    await supabase.from('providers').update(toSupabase(provider)).eq('conjunto_id', conjuntoId).eq('id', provider.id);
+    const { error } = await supabase.from('providers').update(toSupabase(provider)).eq('conjunto_id', conjuntoId).eq('id', provider.id);
+    if (error) throw error;
   },
   async deleteProvider(conjuntoId: string, id: number) {
-    await supabase.from('providers').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('providers').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) throw error;
   },
   async bulkUpsertProviders(conjuntoId: string, providers: T.Provider[]): Promise<T.Provider[]> {
       const payload = providers.map(p => ({ ...toSupabase(p), conjunto_id: conjuntoId }));
@@ -148,13 +151,16 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addInternalStaff(conjuntoId: string, staff: T.InternalStaff) {
-    await supabase.from('internal_staff').insert({ ...toSupabase(staff), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('internal_staff').insert({ ...toSupabase(staff), conjunto_id: conjuntoId });
+    if (error) throw error;
   },
   async updateInternalStaff(conjuntoId: string, staff: T.InternalStaff) {
-    await supabase.from('internal_staff').update(toSupabase(staff)).eq('conjunto_id', conjuntoId).eq('name', staff.name);
+    const { error } = await supabase.from('internal_staff').update(toSupabase(staff)).eq('conjunto_id', conjuntoId).eq('name', staff.name);
+    if (error) throw error;
   },
   async deleteInternalStaff(conjuntoId: string, name: string) {
-    await supabase.from('internal_staff').delete().eq('conjunto_id', conjuntoId).eq('name', name);
+    const { error } = await supabase.from('internal_staff').delete().eq('conjunto_id', conjuntoId).eq('name', name);
+    if (error) throw error;
   },
   async bulkUpsertInternalStaff(conjuntoId: string, staff: T.InternalStaff[]): Promise<T.InternalStaff[]> {
       const payload = staff.map(s => ({ ...toSupabase(s), conjunto_id: conjuntoId }));
