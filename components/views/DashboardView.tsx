@@ -115,9 +115,21 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
             ]);
     
             // --- Process Data for Stats Cards ---
+            const todayForStats = new Date();
+            todayForStats.setHours(0, 0, 0, 0); // Normalize to compare dates only
+
             const residentsInDebt = accountStatusData.filter(a => a.outstandingBalance > 0);
             const pendingTasks = tasksData.filter(t => !t.completed);
-            const overduePayments = dueDatesData.filter(d => d.status === 'Vencido');
+            const overduePayments = dueDatesData.filter(d => {
+                if (d.status === 'Vencido') return true;
+                if (d.status === 'Pendiente') {
+                    // Adding 'T00:00:00' ensures the date is parsed in the local timezone,
+                    // avoiding off-by-one day errors with UTC conversion.
+                    const dueDate = new Date(d.dueDate + 'T00:00:00');
+                    return dueDate < todayForStats;
+                }
+                return false;
+            });
             const packagesToDeliver = packagesData.filter(p => p.status === 'En recepción');
     
             // --- Process Data for Notifications ---
@@ -182,19 +194,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
             // --- Process Data for Charts ---
             const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
             const monthlyDataMap = new Map<string, { name: string, ingresos: number, gastos: number }>();
-            
-            [...incomesData, ...expensesData].forEach(item => {
+
+            incomesData.forEach(item => {
                 const date = new Date(item.date + 'T00:00:00');
                 const month = date.getMonth();
                 const year = date.getFullYear();
                 const key = `${year}-${String(month).padStart(2, '0')}`;
                 const name = `${monthNames[month]} ${String(year).slice(2)}`;
                 if (!monthlyDataMap.has(key)) monthlyDataMap.set(key, { name, ingresos: 0, gastos: 0 });
-                if ('category' in item && Object.values(IncomeCategory).includes(item.category as any)) {
-                    monthlyDataMap.get(key)!.ingresos += item.amount;
-                } else {
-                    monthlyDataMap.get(key)!.gastos += item.amount;
-                }
+                monthlyDataMap.get(key)!.ingresos += item.amount;
+            });
+
+            expensesData.forEach(item => {
+                const date = new Date(item.date + 'T00:00:00');
+                const month = date.getMonth();
+                const year = date.getFullYear();
+                const key = `${year}-${String(month).padStart(2, '0')}`;
+                const name = `${monthNames[month]} ${String(year).slice(2)}`;
+                if (!monthlyDataMap.has(key)) monthlyDataMap.set(key, { name, ingresos: 0, gastos: 0 });
+                monthlyDataMap.get(key)!.gastos += item.amount;
             });
 
             const monthlyIncomeVsExpense = Array.from(monthlyDataMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(entry => entry[1]);
