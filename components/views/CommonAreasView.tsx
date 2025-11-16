@@ -28,6 +28,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
 
   const fetchData = useCallback(async () => {
     if (!userProfile.conjuntoId) return;
+    setIsLoading(true);
     try {
         const [fetchedAreas, fetchedReservations] = await Promise.all([
             apiService.fetchCommonAreas(userProfile.conjuntoId),
@@ -37,28 +38,24 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         setReservations(fetchedReservations);
     } catch (error) {
         console.error("Failed to fetch common areas data:", error);
+    } finally {
+        setIsLoading(false);
     }
   }, [userProfile.conjuntoId]);
 
   useEffect(() => {
-    const initialFetch = async () => {
-        setIsLoading(true);
-        await fetchData();
-        setIsLoading(false);
-    }
-    if (userProfile.conjuntoId) {
-      initialFetch();
-    }
-     // Listen for custom event to refetch data
+    fetchData(); // Initial fetch
+    
+    // Listen for custom event to refetch data when chatbot makes a change
     const handleDataChange = () => {
       fetchData();
     };
-    window.addEventListener('data-changed', handleDataChange as EventListener);
+    window.addEventListener('data-changed', handleDataChange);
 
     return () => {
-      window.removeEventListener('data-changed', handleDataChange as EventListener);
+      window.removeEventListener('data-changed', handleDataChange);
     };
-  }, [fetchData, userProfile.conjuntoId]);
+  }, [fetchData]);
   
   const handleSaveReservation = async (reservation: Omit<Reservation, 'id'>) => {
     if(!userProfile.conjuntoId) return;
