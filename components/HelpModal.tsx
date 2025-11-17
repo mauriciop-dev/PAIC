@@ -26,10 +26,12 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onStartTour }) => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-700">Videotutoriales</h3>
           <ul className="list-disc list-inside space-y-2 text-blue-600">
-            <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Introducción a PAIC</a></li>
-            <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Cómo cargar tu base de datos</a></li>
-            <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Gestionando áreas comunes con el Chatbot</a></li>
-            <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Enviando comunicaciones a residentes</a></li>
+            <li><a href="https://www.youtube.com/watch?v=N-42ptIn9BU" target="_blank" rel="noopener noreferrer" className="hover:underline">Introducción y Primeros Pasos en PAIC</a></li>
+            <li><a href="https://youtu.be/v5G11xzsKdw" target="_blank" rel="noopener noreferrer" className="hover:underline">Carga Masiva de Datos (Residentes, Cuentas, etc.)</a></li>
+            <li><a href="https://youtu.be/WTYMghVqug8" target="_blank" rel="noopener noreferrer" className="hover:underline">Gestión de Áreas Comunes y Reservas</a></li>
+            <li><a href="https://youtu.be/2ELjTFx20kM" target="_blank" rel="noopener noreferrer" className="hover:underline">Módulo de Comunicaciones: Envío de Correos</a></li>
+            <li><a href="https://youtu.be/tF9auzMMegw" target="_blank" rel="noopener noreferrer" className="hover:underline">Módulo de Finanzas: Ingresos y Egresos</a></li>
+            <li><a href="https://youtu.be/BVqTb9lsGCw" target="_blank" rel="noopener noreferrer" className="hover:underline">Módulo de Seguridad: Visitantes y Paquetería</a></li>
           </ul>
         </div>
         
