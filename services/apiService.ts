@@ -2,11 +2,23 @@ import { supabase } from './supabaseClient';
 import { fromSupabase, toSupabase } from '../utils/dbMappers';
 import * as T from '../types';
 
-/**
- * NOTE: In a real-world scenario, extensive error handling, data validation,
- * and proper RLS policies on Supabase would be crucial. This service is implemented
- * based on the function calls observed throughout the application.
- */
+// Helper local para generar el HTML base de los correos
+const generateEmailTemplate = (title: string, content: string, conjuntoName: string) => `
+  <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+    <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 20px;">${title}</h1>
+      <p style="margin: 5px 0 0 0; opacity: 0.8;">${conjuntoName}</p>
+    </div>
+    <div style="padding: 24px; color: #1e293b; line-height: 1.6;">
+      ${content}
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center;">
+        Este es un mensaje automático generado por <strong>PAIC</strong> para la administración de su conjunto residencial.
+      </p>
+    </div>
+  </div>
+`;
+
 export const apiService = {
   // --- User & Profile Management ---
   async fetchUserProfile(userId: string): Promise<T.UserProfile | null> {
@@ -68,7 +80,7 @@ export const apiService = {
     return data ? fromSupabase(data) : null;
   },
   async addResident(conjuntoId: string, resident: T.Resident) {
-    await supabase.from('residents').insert({ ...toSupabase(resident), conjunto_id: conjuntoId });
+    await supabase.from('residents').upsert({ ...toSupabase(resident), conjunto_id: conjuntoId }, { onConflict: 'conjunto_id, apartment' });
   },
   async updateResident(conjuntoId: string, resident: T.Resident) {
     await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
@@ -227,13 +239,12 @@ export const apiService = {
         { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
         { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
     ];
-    // A simple hash function to pick a color based on the area name, to make it deterministic
     const hashCode = (str: string) => {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
             hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
+            hash = hash & hash;
         }
         return Math.abs(hash);
     };
@@ -257,29 +268,42 @@ export const apiService = {
       console.error('Error adding reservation:', error);
       throw error;
     }
+    
+    // Notificación automática al residente
+    const info = await this.fetchConjuntoInfo(conjuntoId);
+    if (info) {
+        const content = `
+          <p>Hola, <strong>${reservation.residentName}</strong>.</p>
+          <p>Se ha registrado exitosamente una reserva para su apartamento en <strong>${info.name}</strong>.</p>
+          <p><strong>Detalles de la Reserva:</strong></p>
+          <ul>
+            <li><strong>Área:</strong> ${reservation.commonAreaId} (ID)</li>
+            <li><strong>Fecha:</strong> ${reservation.date}</li>
+            <li><strong>Horario:</strong> ${reservation.startTime} a ${reservation.endTime}</li>
+            <li><strong>Apartamento:</strong> ${reservation.apartment}</li>
+          </ul>
+          <p>Si no reconoce esta operación, por favor contacte a la administración inmediatamente.</p>
+        `;
+        this.sendCommunicationEmail([reservation.email], 'Confirmación de Reserva de Área Común', content, [], info.adminName, info.adminEmail);
+    }
   },
   async createReservationFromChat(conjuntoId: string, payload: { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; }): Promise<void> {
-    // 1. Find common area by name. Use a more precise query.
     const { data: area, error: areaError } = await supabase
         .from('common_areas')
-        .select('id')
+        .select('id, name')
         .eq('conjunto_id', conjuntoId)
         .ilike('name', `%${payload.commonAreaName.trim()}%`)
         .single();
 
     if (areaError || !area) {
-        console.error('Area not found:', payload.commonAreaName, areaError);
-        throw new Error(`No se encontró un área común llamada "${payload.commonAreaName}". Revisa el nombre e intenta de nuevo.`);
+        throw new Error(`No se encontró un área común llamada "${payload.commonAreaName}".`);
     }
 
-    // 2. Find resident info by apartment. Ensure resident exists before proceeding.
     const resident = await this.fetchResidentByApartment(conjuntoId, payload.apartment);
     if (!resident) {
-        console.error('Resident not found for apartment:', payload.apartment);
-        throw new Error(`No se encontró un residente para el apartamento "${payload.apartment}". Por favor, verifica el número.`);
+        throw new Error(`No se encontró un residente para el apartamento "${payload.apartment}".`);
     }
     
-    // 3. Construct the full reservation object with validated data
     const newReservation: Omit<T.Reservation, 'id'> = {
         apartment: payload.apartment,
         residentName: resident.name,
@@ -291,7 +315,6 @@ export const apiService = {
         phone: resident.phone,
     };
     
-    // 4. Call the existing addReservation function, which will throw an error on failure
     await this.addReservation(conjuntoId, newReservation);
   },
 
@@ -374,19 +397,91 @@ export const apiService = {
   },
   async addVisitorLog(conjuntoId: string, log: Omit<T.VisitorLog, 'id'>) {
     await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId });
+    
+    // Notificación de autorización de visitante
+    const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
+    const info = await this.fetchConjuntoInfo(conjuntoId);
+    if (resident && info) {
+        const content = `
+          <p>Se ha autorizado un nuevo visitante para su apartamento:</p>
+          <ul>
+            <li><strong>Visitante:</strong> ${log.visitorName}</li>
+            <li><strong>Fecha:</strong> ${log.date}</li>
+            <li><strong>Apartamento:</strong> ${log.apartment}</li>
+          </ul>
+        `;
+        this.sendCommunicationEmail([resident.email], 'Autorización de Visitante', content, [], info.adminName, info.adminEmail);
+    }
   },
   async updateVisitorLog(conjuntoId: string, id: number, updates: Partial<Omit<T.VisitorLog, 'id'>>) {
-    await supabase.from('visitor_logs').update(toSupabase(updates)).eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) throw error;
+
+    // Notificación de ingreso/salida
+    if (updates.status) {
+        const { data: log } = await supabase.from('visitor_logs').select('*').eq('id', id).single();
+        if (log) {
+            const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
+            const info = await this.fetchConjuntoInfo(conjuntoId);
+            if (resident && info) {
+                const isEntry = updates.status === 'Ingresó';
+                const action = isEntry ? 'ha ingresado al' : 'ha salido del';
+                const timeLabel = isEntry ? 'Hora de Ingreso' : 'Hora de Salida';
+                const timeVal = isEntry ? updates.entryTime : updates.exitTime;
+
+                const content = `
+                  <p>Notificación de seguridad: El visitante <strong>${log.visitor_name}</strong> ${action} conjunto.</p>
+                  <ul>
+                    <li><strong>Estado:</strong> ${updates.status}</li>
+                    <li><strong>${timeLabel}:</strong> ${timeVal}</li>
+                  </ul>
+                `;
+                this.sendCommunicationEmail([resident.email], `Movimiento de Visitante - ${updates.status}`, content, [], info.adminName, info.adminEmail);
+            }
+        }
+    }
   },
   async fetchPackageLogs(conjuntoId: string): Promise<T.PackageLog[]> {
     const { data } = await supabase.from('package_logs').select('*').eq('conjunto_id', conjuntoId).order('received_date', { ascending: false });
     return data ? fromSupabase(data) : [];
   },
   async addPackageLog(conjuntoId: string, log: Partial<T.PackageLog>) {
-    await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' });
+    const { error } = await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' });
+    if (error) throw error;
+
+    // Notificación de recepción de paquete
+    const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment!);
+    const info = await this.fetchConjuntoInfo(conjuntoId);
+    if (resident && info) {
+        const content = `
+          <p>Un nuevo paquete ha sido recibido en portería para su apartamento:</p>
+          <ul>
+            <li><strong>Transportadora:</strong> ${log.courier}</li>
+            <li><strong>Guía:</strong> ${log.trackingNumber || 'N/A'}</li>
+            <li><strong>Apartamento:</strong> ${log.apartment}</li>
+          </ul>
+          <p>Por favor, acérquese a reclamarlo lo antes posible.</p>
+        `;
+        this.sendCommunicationEmail([resident.email], 'Nuevo Paquete en Recepción', content, [], info.adminName, info.adminEmail);
+    }
   },
   async updatePackageLogStatus(conjuntoId: string, id: number, status: T.PackageLog['status']) {
     await supabase.from('package_logs').update({ status }).eq('conjunto_id', conjuntoId).eq('id', id);
+
+    if (status === 'Entregado') {
+        const { data: log } = await supabase.from('package_logs').select('*').eq('id', id).single();
+        if (log) {
+            const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
+            const info = await this.fetchConjuntoInfo(conjuntoId);
+            if (resident && info) {
+                const content = `
+                  <p>Su paquete de <strong>${log.courier}</strong> ha sido marcado como <strong>Entregado</strong>.</p>
+                  <p>Gracias por usar el sistema de gestión PAIC.</p>
+                `;
+                this.sendCommunicationEmail([resident.email], 'Paquete Entregado', content, [], info.adminName, info.adminEmail);
+            }
+        }
+    }
   },
   async fetchAccessPoints(conjuntoId: string): Promise<T.AccessPoint[]> {
       const { data } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
@@ -416,16 +511,23 @@ export const apiService = {
   
   // --- Communications ---
   async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{message: string}> {
-      // This would typically be a call to a serverless function that gets emails and sends.
-      // For now, we simulate success.
-      console.log('Sending email to', group, 'for conjunto', conjuntoId);
+      const info = await this.fetchConjuntoInfo(conjuntoId);
+      if (!info) throw new Error("Conjunto no encontrado.");
+      
+      const content = `<p>${body.replace(/\n/g, '<br>')}</p>`;
+      // Logic for mass emails would normally iterate over group and call send-email.
+      // For now, let's keep the existing flow but using the template.
       return { message: `Simulación: Correo enviado al grupo ${group}.` };
   },
   async sendCommunicationEmail(to: string[], subject: string, body: string, attachments: {name: string, url: string}[], fromName: string, fromEmail: string): Promise<{success: boolean, error?: string}> {
-    // FIX: Replaced manual fetch with supabase.functions.invoke, which is the correct method for Supabase JS v2.
-    // The 'getURL' method does not exist on the FunctionsClient in this version.
+    // Obtenemos el nombre del conjunto para la plantilla si es posible
+    const info = await supabase.from('conjuntos').select('name').eq('admin_email', fromEmail).single();
+    const conjuntoName = info.data?.name || "Administración";
+
+    const formattedHtml = generateEmailTemplate(subject, body, conjuntoName);
+
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html: body, fromName }, // attachments would be handled by function if supported
+      body: { to, subject, html: formattedHtml, fromName },
     });
 
     if (error) {
