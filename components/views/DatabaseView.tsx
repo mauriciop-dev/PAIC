@@ -91,46 +91,66 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   // Save Handlers
   const handleSaveResident = async (resident: Resident) => {
     if (!userProfile.conjuntoId) return;
-    if (selectedResident) {
-        await apiService.updateResident(userProfile.conjuntoId, resident);
-    } else {
-        await apiService.addResident(userProfile.conjuntoId, resident);
+    try {
+        if (selectedResident) {
+            await apiService.updateResident(userProfile.conjuntoId, resident);
+        } else {
+            await apiService.addResident(userProfile.conjuntoId, resident);
+        }
+        await fetchData();
+        setIsResidentModalOpen(false);
+    } catch (error: any) {
+        console.error("Error saving resident:", error);
+        alert(`Error al guardar residente: ${error.message || 'Error desconocido'}`);
     }
-    fetchData();
-    setIsResidentModalOpen(false);
   };
   
   const handleSaveProvider = async (provider: Provider) => {
     if (!userProfile.conjuntoId) return;
-    if (selectedProvider) {
-        await apiService.updateProvider(userProfile.conjuntoId, provider);
-    } else {
-        await apiService.addProvider(userProfile.conjuntoId, provider);
+    try {
+        if (selectedProvider) {
+            await apiService.updateProvider(userProfile.conjuntoId, provider);
+        } else {
+            await apiService.addProvider(userProfile.conjuntoId, provider);
+        }
+        await fetchData();
+        setIsProviderModalOpen(false);
+    } catch (error: any) {
+        console.error("Error saving provider:", error);
+        alert(`Error al guardar proveedor: ${error.message || 'Error desconocido'}`);
     }
-    fetchData();
-    setIsProviderModalOpen(false);
   };
 
   const handleSaveStaff = async (staff: InternalStaff) => {
     if (!userProfile.conjuntoId) return;
-    if (selectedStaff) {
-        await apiService.updateInternalStaff(userProfile.conjuntoId, staff);
-    } else {
-        await apiService.addInternalStaff(userProfile.conjuntoId, staff);
+    try {
+        if (selectedStaff) {
+            await apiService.updateInternalStaff(userProfile.conjuntoId, staff);
+        } else {
+            await apiService.addInternalStaff(userProfile.conjuntoId, staff);
+        }
+        await fetchData();
+        setIsStaffModalOpen(false);
+    } catch (error: any) {
+        console.error("Error saving staff:", error);
+        alert(`Error al guardar personal: ${error.message || 'Error desconocido'}`);
     }
-    fetchData();
-    setIsStaffModalOpen(false);
   };
   
   const handleSaveAccountStatus = async (account: AccountStatus) => {
     if (!userProfile.conjuntoId) return;
-    if (selectedAccountStatus) {
-        await apiService.updateAccountStatus(userProfile.conjuntoId, account);
-    } else {
-        await apiService.addAccountStatus(userProfile.conjuntoId, account);
+    try {
+        if (selectedAccountStatus) {
+            await apiService.updateAccountStatus(userProfile.conjuntoId, account);
+        } else {
+            await apiService.addAccountStatus(userProfile.conjuntoId, account);
+        }
+        await fetchData();
+        setIsAccountStatusModalOpen(false);
+    } catch (error: any) {
+        console.error("Error saving account status:", error);
+        alert(`Error al guardar estado de cuenta: ${error.message || 'Error desconocido'}`);
     }
-    fetchData();
-    setIsAccountStatusModalOpen(false);
   };
 
   // Delete Handlers

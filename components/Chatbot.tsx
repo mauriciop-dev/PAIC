@@ -7,11 +7,11 @@ import { marked } from 'marked';
 // A simple renderer component defined within the Chatbot component file
 // It uses the 'marked' library to parse markdown and Tailwind's prose classes for styling.
 const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  if (typeof content !== 'string') {
+    console.error('MarkdownRenderer received non-string content:', content);
+    return null;
+  }
   // marked.parse() converts Markdown string to HTML.
-  // By default, marked sanitizes the HTML to prevent XSS attacks,
-  // making it safe to use with dangerouslySetInnerHTML.
-  // gfm: true enables GitHub Flavored Markdown (like tables, strikethrough).
-  // breaks: true makes line breaks in the source appear as <br> tags.
   const rawMarkup = marked.parse(content, { gfm: true, breaks: true });
   return (
     <div

@@ -80,13 +80,25 @@ export const apiService = {
     return data ? fromSupabase(data) : null;
   },
   async addResident(conjuntoId: string, resident: T.Resident) {
-    await supabase.from('residents').upsert({ ...toSupabase(resident), conjunto_id: conjuntoId }, { onConflict: 'conjunto_id, apartment' });
+    const { error } = await supabase.from('residents').upsert({ ...toSupabase(resident), conjunto_id: conjuntoId }, { onConflict: 'conjunto_id, apartment' });
+    if (error) {
+      console.error('Error adding resident:', error);
+      throw error;
+    }
   },
   async updateResident(conjuntoId: string, resident: T.Resident) {
-    await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
+    const { error } = await supabase.from('residents').update(toSupabase(resident)).eq('conjunto_id', conjuntoId).eq('apartment', resident.apartment);
+    if (error) {
+      console.error('Error updating resident:', error);
+      throw error;
+    }
   },
   async deleteResident(conjuntoId: string, apartment: string) {
-    await supabase.from('residents').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    const { error } = await supabase.from('residents').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    if (error) {
+      console.error('Error deleting resident:', error);
+      throw error;
+    }
   },
   async bulkUpsertResidents(conjuntoId: string, residents: T.Resident[]): Promise<T.Resident[]> {
     const payload = residents.map(r => ({ ...toSupabase(r), conjunto_id: conjuntoId }));
@@ -114,13 +126,25 @@ export const apiService = {
       return data;
   },
   async addAccountStatus(conjuntoId: string, account: T.AccountStatus) {
-    await supabase.from('account_status').insert({ ...toSupabase(account), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('account_status').insert({ ...toSupabase(account), conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error adding account status:', error);
+      throw error;
+    }
   },
   async updateAccountStatus(conjuntoId: string, account: T.AccountStatus) {
-    await supabase.from('account_status').update(toSupabase(account)).eq('conjunto_id', conjuntoId).eq('apartment', account.apartment);
+    const { error } = await supabase.from('account_status').update(toSupabase(account)).eq('conjunto_id', conjuntoId).eq('apartment', account.apartment);
+    if (error) {
+      console.error('Error updating account status:', error);
+      throw error;
+    }
   },
   async deleteAccountStatus(conjuntoId: string, apartment: string) {
-    await supabase.from('account_status').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    const { error } = await supabase.from('account_status').delete().eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    if (error) {
+      console.error('Error deleting account status:', error);
+      throw error;
+    }
   },
   async bulkUpsertAccountStatus(conjuntoId: string, accounts: T.AccountStatus[]): Promise<T.AccountStatus[]> {
     const payload = accounts.map(a => ({ ...toSupabase(a), conjunto_id: conjuntoId }));
@@ -249,10 +273,18 @@ export const apiService = {
         return Math.abs(hash);
     };
     const color = colorOptions[hashCode(name) % colorOptions.length];
-    await supabase.from('common_areas').insert({ conjunto_id: conjuntoId, name, color });
+    const { error } = await supabase.from('common_areas').insert({ conjunto_id: conjuntoId, name, color });
+    if (error) {
+      console.error('Error adding common area:', error);
+      throw error;
+    }
   },
   async removeCommonArea(conjuntoId: string, id: string): Promise<void> {
-    await supabase.from('common_areas').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('common_areas').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error removing common area:', error);
+      throw error;
+    }
   },
   async fetchReservations(conjuntoId: string): Promise<T.Reservation[]> {
     const { data, error } = await supabase.from('reservations').select('*').eq('conjunto_id', conjuntoId);
@@ -352,16 +384,32 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addIncome(conjuntoId: string, income: Omit<T.Income, 'id'>) {
-    await supabase.from('incomes').insert({ ...toSupabase(income), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('incomes').insert({ ...toSupabase(income), conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error adding income:', error);
+      throw error;
+    }
   },
   async updateIncome(conjuntoId: string, income: T.Income) {
-    await supabase.from('incomes').update(toSupabase(income)).eq('conjunto_id', conjuntoId).eq('id', income.id);
+    const { error } = await supabase.from('incomes').update(toSupabase(income)).eq('conjunto_id', conjuntoId).eq('id', income.id);
+    if (error) {
+      console.error('Error updating income:', error);
+      throw error;
+    }
   },
   async deleteIncome(conjuntoId: string, id: number) {
-    await supabase.from('incomes').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('incomes').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error deleting income:', error);
+      throw error;
+    }
   },
   async deleteAllIncomes(conjuntoId: string) {
-    await supabase.from('incomes').delete().eq('conjunto_id', conjuntoId);
+    const { error } = await supabase.from('incomes').delete().eq('conjunto_id', conjuntoId);
+    if (error) {
+      console.error('Error deleting all incomes:', error);
+      throw error;
+    }
   },
   async bulkInsertIncomes(conjuntoId: string, incomes: Omit<T.Income, 'id'>[]): Promise<void> {
       const payload = incomes.map(i => ({...toSupabase(i), conjunto_id: conjuntoId}));
@@ -373,16 +421,32 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addExpense(conjuntoId: string, expense: Omit<T.Expense, 'id'>) {
-    await supabase.from('expenses').insert({ ...toSupabase(expense), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('expenses').insert({ ...toSupabase(expense), conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error adding expense:', error);
+      throw error;
+    }
   },
   async updateExpense(conjuntoId: string, expense: T.Expense) {
-    await supabase.from('expenses').update(toSupabase(expense)).eq('conjunto_id', conjuntoId).eq('id', expense.id);
+    const { error } = await supabase.from('expenses').update(toSupabase(expense)).eq('conjunto_id', conjuntoId).eq('id', expense.id);
+    if (error) {
+      console.error('Error updating expense:', error);
+      throw error;
+    }
   },
   async deleteExpense(conjuntoId: string, id: number) {
-    await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error deleting expense:', error);
+      throw error;
+    }
   },
   async deleteAllExpenses(conjuntoId: string) {
-    await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId);
+    const { error } = await supabase.from('expenses').delete().eq('conjunto_id', conjuntoId);
+    if (error) {
+      console.error('Error deleting all expenses:', error);
+      throw error;
+    }
   },
   async bulkInsertExpenses(conjuntoId: string, expenses: Omit<T.Expense, 'id'>[]): Promise<void> {
       const payload = expenses.map(e => ({...toSupabase(e), conjunto_id: conjuntoId}));
@@ -396,7 +460,11 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addVisitorLog(conjuntoId: string, log: Omit<T.VisitorLog, 'id'>) {
-    await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId });
+    const { error } = await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error adding visitor log:', error);
+      throw error;
+    }
     
     // Notificación de autorización de visitante
     const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
@@ -466,7 +534,11 @@ export const apiService = {
     }
   },
   async updatePackageLogStatus(conjuntoId: string, id: number, status: T.PackageLog['status']) {
-    await supabase.from('package_logs').update({ status }).eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('package_logs').update({ status }).eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error updating package log status:', error);
+      throw error;
+    }
 
     if (status === 'Entregado') {
         const { data: log } = await supabase.from('package_logs').select('*').eq('id', id).single();
@@ -488,10 +560,18 @@ export const apiService = {
       return data ? fromSupabase(data) : [];
   },
   async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
-    await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
+    const { error } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
+    if (error) {
+      console.error('Error adding access point:', error);
+      throw error;
+    }
   },
   async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
-    await supabase.from('access_points').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    const { error } = await supabase.from('access_points').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error deleting access point:', error);
+      throw error;
+    }
   },
 
   // --- Dashboard & Analytics ---

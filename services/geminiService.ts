@@ -9,28 +9,34 @@ let chat: Chat | null = null;
 let currentConjuntoId: string | null = null;
 let systemPromptTemplate: string | null = null;
 
-const model = 'gemini-2.5-flash';
+const model = 'gemini-3-flash-preview';
 
 const getAiClient = (): Promise<GoogleGenAI> => {
     if (!aiPromise) {
         aiPromise = new Promise((resolve, reject) => {
             let apiKey: string | undefined;
+            
+            // Try different possible environment variable names
+            // In this environment, process.env.GEMINI_API_KEY is the standard.
+            // We also check VITE_ prefix for client-side exposure if configured.
             if (typeof process !== 'undefined' && process.env) {
-                // @ts-ignore
-                apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+                apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
             }
+            
             if (!apiKey) {
                 try {
                     // @ts-ignore
                     if (import.meta.env) {
                         // @ts-ignore
-                        apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                        apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
                     }
                 } catch (e) { /* Silently fail */ }
             }
-            if (!apiKey) {
-                return reject(new Error("La variable de entorno de la API de Gemini no está configurada."));
+
+            if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+                return reject(new Error("La API Key de Gemini no está configurada o es inválida. Por favor, configúrala en los ajustes de la plataforma."));
             }
+
             const ai = new GoogleGenAI({ apiKey: apiKey });
             resolve(ai);
         });
@@ -46,13 +52,20 @@ const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoI
             systemPromptTemplate = await response.text();
         } catch (error) {
             console.error("Failed to fetch system prompt:", error);
-            return `You are a helpful assistant for ${conjuntoInfo.name}. The user is ${userProfile.fullName}.`;
+            // Fallback if fetch fails
+            return `Eres un asistente útil para el conjunto ${conjuntoInfo?.name || 'residencial'}. El usuario es ${userProfile?.fullName || 'Administrador'}.`;
         }
     }
+    
+    if (!userProfile || !conjuntoInfo) {
+        console.warn("getSystemPrompt called with missing profile or conjunto info");
+        return systemPromptTemplate || "Eres un asistente útil.";
+    }
+
     const formattedDate = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     return (systemPromptTemplate || '')
-        .replace(/{{userName}}/g, userProfile.fullName)
-        .replace(/{{conjuntoName}}/g, conjuntoInfo.name)
+        .replace(/{{userName}}/g, userProfile.fullName || 'Usuario')
+        .replace(/{{conjuntoName}}/g, conjuntoInfo.name || 'Conjunto')
         .replace(/{{currentDate}}/g, formattedDate);
 };
 
@@ -97,40 +110,56 @@ const runChat = async (prompt: string, userProfile: UserProfile | null, conjunto
         const functionCalls = response.functionCalls;
 
         if (functionCalls && functionCalls.length > 0) {
+            console.log("Gemini requested function calls:", functionCalls);
             return await processFunctionCalls(functionCalls);
         }
         
+        if (!response.text) {
+            console.warn("Gemini returned an empty response.");
+            return "Recibí una respuesta vacía del asistente. Por favor, intenta de nuevo.";
+        }
+
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error during chat execution:", error);
-        return "Lo siento, tuve un problema al procesar tu solicitud.";
+        if (error.message?.includes('API_KEY_INVALID')) {
+            return "La API Key de Gemini parece ser inválida. Por favor, revísala en la configuración.";
+        }
+        return `Lo siento, tuve un problema al procesar tu solicitud: ${error.message || 'Error desconocido'}`;
     }
 };
 
 const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<string> => {
+    if (!functionCalls || functionCalls.length === 0) {
+        return "No se recibieron instrucciones claras del asistente.";
+    }
+
     const call = functionCalls[0];
     const { name, args } = call;
+    console.log(`Executing function call: ${name}`, args);
 
     const userProfile = (chat as any)?.userProfile as UserProfile;
     const conjuntoInfo = (chat as any)?.conjuntoInfo as ConjuntoInfo;
 
     if (!currentConjuntoId) {
+        console.error("Context error: currentConjuntoId is missing in processFunctionCalls");
         return "Error de contexto: no se pudo determinar el conjunto actual.";
     }
     
-    apiService.logChatbotInteraction(currentConjuntoId);
-
     try {
+        apiService.logChatbotInteraction(currentConjuntoId).catch(e => console.warn("Failed to log interaction:", e));
+
         switch (name) {
             // --- Resident Management ---
             case 'addResident': {
-// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
-                await apiService.addResident(currentConjuntoId, args as unknown as Resident);
-// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
-                return `¡Confirmado! Residente para el apto **${(args as unknown as Resident).apartment}** agregado exitosamente.`;
+                const residentArgs = args as unknown as Resident;
+                if (!residentArgs || !residentArgs.apartment) throw new Error("Faltan datos del residente (apartamento).");
+                await apiService.addResident(currentConjuntoId, residentArgs);
+                return `¡Confirmado! Residente para el apto **${residentArgs.apartment}** agregado exitosamente.`;
             }
             case 'updateResident': {
                 const { apartment, data } = args as unknown as { apartment: string, data: Partial<Resident> };
+                if (!apartment) throw new Error("Falta el número de apartamento.");
                 const existingResident = await apiService.fetchResidentByApartment(currentConjuntoId, apartment);
                 if (!existingResident) throw new Error(`No se encontró un residente en el apartamento ${apartment}.`);
                 await apiService.updateResident(currentConjuntoId, { ...existingResident, ...data });
@@ -138,18 +167,21 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             }
             case 'deleteResident': {
                 const { apartment } = args as unknown as { apartment: string };
+                if (!apartment) throw new Error("Falta el número de apartamento.");
                 await apiService.deleteResident(currentConjuntoId, apartment);
                 return `¡Confirmado! El residente del apto **${apartment}** ha sido eliminado.`;
             }
 
             // --- Provider Management ---
             case 'addProvider': {
-// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
-                await apiService.addProvider(currentConjuntoId, args as unknown as Omit<Provider, 'id'>);
-                return `¡Confirmado! Proveedor **${(args as unknown as Provider).company}** agregado exitosamente.`;
+                const providerArgs = args as unknown as Omit<Provider, 'id'>;
+                if (!providerArgs || !providerArgs.company) throw new Error("Faltan datos del proveedor (empresa).");
+                await apiService.addProvider(currentConjuntoId, providerArgs);
+                return `¡Confirmado! Proveedor **${providerArgs.company}** agregado exitosamente.`;
             }
             case 'updateProvider': {
                 const { company, data } = args as unknown as { company: string, data: Partial<Provider> };
+                if (!company) throw new Error("Falta el nombre de la empresa.");
                 const providers = await apiService.fetchProviders(currentConjuntoId);
                 const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
                 if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
@@ -160,6 +192,7 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             }
             case 'deleteProvider': {
                 const { company } = args as unknown as { company: string };
+                if (!company) throw new Error("Falta el nombre de la empresa.");
                 const providers = await apiService.fetchProviders(currentConjuntoId);
                 const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
                 if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
@@ -171,13 +204,14 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
 
             // --- Internal Staff Management ---
             case 'addInternalStaff': {
-// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
-                await apiService.addInternalStaff(currentConjuntoId, args as unknown as InternalStaff);
-// FIX: Cast to 'unknown' first to prevent TypeScript conversion error.
-                return `¡Confirmado! Miembro del personal **${(args as unknown as InternalStaff).name}** agregado exitosamente.`;
+                const staffArgs = args as unknown as InternalStaff;
+                if (!staffArgs || !staffArgs.name) throw new Error("Faltan datos del personal (nombre).");
+                await apiService.addInternalStaff(currentConjuntoId, staffArgs);
+                return `¡Confirmado! Miembro del personal **${staffArgs.name}** agregado exitosamente.`;
             }
             case 'updateInternalStaff': {
                 const { name, data } = args as unknown as { name: string, data: Partial<InternalStaff> };
+                if (!name) throw new Error("Falta el nombre de la persona.");
                 const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
                 const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
                 if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
@@ -188,6 +222,7 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             }
             case 'deleteInternalStaff': {
                 const { name } = args as unknown as { name: string };
+                if (!name) throw new Error("Falta el nombre de la persona.");
                 const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
                 const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
                 if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
@@ -198,6 +233,9 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
 
             case 'createReservation': {
                 const reservationArgs = args as unknown as { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; };
+                if (!reservationArgs.commonAreaName || !reservationArgs.apartment || !reservationArgs.date) {
+                    throw new Error("Faltan datos para crear la reserva (área, apartamento o fecha).");
+                }
                 await apiService.createReservationFromChat(currentConjuntoId, reservationArgs);
                 return `¡Confirmado! La reserva del área **${reservationArgs.commonAreaName}** para el **Apto ${reservationArgs.apartment}** el **${reservationArgs.date}** de **${reservationArgs.startTime} a ${reservationArgs.endTime}** ha sido registrada exitosamente.`;
             }
@@ -239,42 +277,48 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
             
             case 'sendMassEmail': {
                 const { group, subject, body } = args as unknown as { group: string, subject: string, body: string };
+                if (!group || !subject || !body) throw new Error("Faltan datos para enviar el correo masivo.");
                 const result = await apiService.sendMassEmail(currentConjuntoId, group, subject, body);
                 return result.message;
             }
 
             case 'addIncome': {
                 const incomeArgs = args as unknown as Omit<Income, 'id'>;
+                if (!incomeArgs.amount || !incomeArgs.description) throw new Error("Faltan datos del ingreso (monto o descripción).");
                 await apiService.addIncome(currentConjuntoId, incomeArgs);
                 return `Ingreso de $${incomeArgs.amount.toLocaleString()} por "${incomeArgs.description}" agregado. ¿Necesitas algo más?`;
             }
             
             case 'addExpense': {
                 const expenseArgs = args as unknown as Omit<Expense, 'id'>;
+                if (!expenseArgs.amount || !expenseArgs.description) throw new Error("Faltan datos del gasto (monto o descripción).");
                 await apiService.addExpense(currentConjuntoId, expenseArgs);
                  return `Gasto de $${expenseArgs.amount.toLocaleString()} por "${expenseArgs.description}" agregado. ¿Necesitas algo más?`;
             }
             
             case 'authorizeVisitor': {
                 const visitorArgs = args as unknown as { visitorName: string, apartment: string, date: string };
+                if (!visitorArgs.visitorName || !visitorArgs.apartment) throw new Error("Faltan datos del visitante.");
                 await apiService.addVisitorLog(currentConjuntoId, {...visitorArgs, status: 'Autorizado'});
                 return `Visitante "${visitorArgs.visitorName}" autorizado para el Apto ${visitorArgs.apartment}.`;
             }
             
             case 'registerPackage': {
                 const packageArgs = args as unknown as Partial<PackageLog>;
+                if (!packageArgs.apartment || !packageArgs.courier) throw new Error("Faltan datos del paquete.");
                 await apiService.addPackageLog(currentConjuntoId, packageArgs);
                 return `Paquete de "${packageArgs.courier}" para el Apto ${packageArgs.apartment} registrado.`;
             }
            
             case 'updateVisitorStatus': {
                 const { logId, status } = args as unknown as { logId: number, status: string };
+                if (!logId || !status) throw new Error("Faltan datos para actualizar el estado del visitante.");
                 const newStatus = status as VisitorLog['status'];
                 if (!['Autorizado', 'Ingresó', 'Salió'].includes(newStatus)) {
                     return `El estado "${newStatus}" no es válido. Los estados permitidos son: Autorizado, Ingresó, Salió.`;
                 }
                 await apiService.updateVisitorLog(currentConjuntoId, logId, { status: newStatus });
-                return `Estado del visitante actualizado a "${args.status}".`;
+                return `Estado del visitante actualizado a "${status}".`;
             }
 
             default:
@@ -282,33 +326,37 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
         }
     } catch (error: any) {
         console.error(`Error executing function ${name}:`, error);
-        return `Lo siento, no pude completar la operación. Motivo: ${error.message}`;
+        return `Lo siento, no pude completar la operación. Motivo: ${error.message || 'Error desconocido'}`;
     } finally {
-        await initializeChat(userProfile, conjuntoInfo);
+        if (userProfile && conjuntoInfo) {
+            await initializeChat(userProfile, conjuntoInfo);
+        }
     }
 };
 
 const generateSubject = async (body: string): Promise<string> => {
-    const ai = await getAiClient();
-    const prompt = `Genera un asunto corto y profesional para el siguiente correo electrónico:\n\n"${body}"\n\nAsunto:`;
     try {
+        const ai = await getAiClient();
+        const prompt = `Genera un asunto corto y profesional para el siguiente correo electrónico:\n\n"${body}"\n\nAsunto:`;
         const response = await ai.models.generateContent({ model, contents: prompt });
+        if (!response.text) throw new Error("Empty response from Gemini");
         return response.text.trim();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating subject:", error);
-        return "Asunto no disponible";
+        return "Asunto no disponible (Error: " + (error.message || "desconocido") + ")";
     }
 };
 
 const improveWriting = async (body: string): Promise<string> => {
-    const ai = await getAiClient();
-    const prompt = `Mejora la redacción del siguiente texto para que sea más claro, profesional y conciso, manteniendo el tono original. No agregues saludos ni despedidas, solo mejora el texto proporcionado:\n\n"${body}"`;
     try {
+        const ai = await getAiClient();
+        const prompt = `Mejora la redacción del siguiente texto para que sea más claro, profesional y conciso, manteniendo el tono original. No agregues saludos ni despedidas, solo mejora el texto proporcionado:\n\n"${body}"`;
         const response = await ai.models.generateContent({ model, contents: prompt });
+        if (!response.text) throw new Error("Empty response from Gemini");
         return response.text.trim();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error improving writing:", error);
-        return body;
+        return body; // Return original body on error
     }
 };
 

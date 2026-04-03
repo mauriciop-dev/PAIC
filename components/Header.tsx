@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile, UserRole, ConjuntoInfo } from '../types';
 import { Icon } from './ui/Icon';
-import { SettingsTab } from '../../App';
+import { SettingsTab } from '../App';
 
 interface HeaderProps {
   onHelpClick: () => void;

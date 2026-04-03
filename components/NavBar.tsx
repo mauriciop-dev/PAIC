@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tab, UserProfile, UserRole } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
-import { SettingsTab } from '../../App';
+import { SettingsTab } from '../App';
 
 interface NavBarProps {
   activeTab: Tab;

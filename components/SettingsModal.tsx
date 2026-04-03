@@ -4,7 +4,7 @@ import { UserProfile, ConjuntoInfo, AccessPoint, UserRole, CommonArea, PlatformU
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 import { mercadoPagoService } from '../services/mercadoPagoService';
-import { SettingsTab } from '../../App';
+import { SettingsTab } from '../App';
 import UserModal from './UserModal';
 import RoleModal from './RoleModal';
 
