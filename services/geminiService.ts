@@ -4,10 +4,18 @@ import { apiService } from './apiService';
 import { UserProfile, ConjuntoInfo, Income, Expense, VisitorLog, Resident, Provider, PackageLog, InternalStaff } from "../types";
 import { geminiTools } from './geminiTools';
 
+interface ChatHistoryEntry {
+    role: 'user' | 'model';
+    text: string;
+}
+
 let aiPromise: Promise<GoogleGenAI> | null = null;
 let chat: Chat | null = null;
 let currentConjuntoId: string | null = null;
 let systemPromptTemplate: string | null = null;
+let conversationHistory: ChatHistoryEntry[] = [];
+
+const MAX_HISTORY_LENGTH = 50;
 
 const model = 'gemini-3-flash-preview';
 
@@ -71,9 +79,18 @@ const getSystemPrompt = async (userProfile: UserProfile, conjuntoInfo: ConjuntoI
 
 const initializeChat = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo, initialAiMessage?: string) => {
     try {
+        if (currentConjuntoId !== conjuntoInfo.id) {
+            conversationHistory = [];
+        }
+        if (initialAiMessage && conversationHistory.length === 0) {
+            conversationHistory.push({ role: 'model', text: initialAiMessage });
+        }
+
         const aiClient = await getAiClient();
         const systemInstruction = await getSystemPrompt(userProfile, conjuntoInfo);
-        const history = initialAiMessage ? [{ role: 'model', parts: [{ text: initialAiMessage }] }] : undefined;
+        const history = conversationHistory.length > 0
+            ? conversationHistory.map(e => ({ role: e.role, parts: [{ text: e.text }] }))
+            : undefined;
 
         chat = aiClient.chats.create({
             model: model,
@@ -109,17 +126,24 @@ const runChat = async (prompt: string, userProfile: UserProfile | null, conjunto
         const response: GenerateContentResponse = await chat.sendMessage({ message: prompt });
         const functionCalls = response.functionCalls;
 
+        let finalResponse: string;
         if (functionCalls && functionCalls.length > 0) {
             console.log("Gemini requested function calls:", functionCalls);
-            return await processFunctionCalls(functionCalls);
-        }
-        
-        if (!response.text) {
+            finalResponse = await processFunctionCalls(functionCalls);
+        } else if (!response.text) {
             console.warn("Gemini returned an empty response.");
-            return "Recibí una respuesta vacía del asistente. Por favor, intenta de nuevo.";
+            finalResponse = "Recibí una respuesta vacía del asistente. Por favor, intenta de nuevo.";
+        } else {
+            finalResponse = response.text;
         }
 
-        return response.text;
+        conversationHistory.push({ role: 'user', text: prompt });
+        conversationHistory.push({ role: 'model', text: finalResponse });
+        if (conversationHistory.length > MAX_HISTORY_LENGTH) {
+            conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
+        }
+
+        return finalResponse;
     } catch (error: any) {
         console.error("Error during chat execution:", error);
         if (error.message?.includes('API_KEY_INVALID')) {
@@ -421,8 +445,14 @@ const improveWriting = async (body: string): Promise<string> => {
     }
 };
 
+const resetSession = () => {
+    chat = null;
+    conversationHistory = [];
+};
+
 export const geminiService = {
     runChat,
     generateSubject,
     improveWriting,
+    resetSession,
 };

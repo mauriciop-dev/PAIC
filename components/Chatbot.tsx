@@ -43,8 +43,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
             { sender: 'ai', text: `Hola **${userProfile.fullName}**, soy PAIC y te ayudaré a administrar **${conjuntoInfo.name}**.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
         ]);
     } else if (!isOpen) {
-        // Clear messages when chatbot is closed to ensure it re-initializes with the welcome message
         setMessages([]);
+        geminiService.resetSession();
     }
   }, [userProfile, conjuntoInfo, isOpen]);
 
