@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { apiService } from '../../services/apiService';
 import { UserProfile, Income, Expense, IncomeCategory, ExpenseCategory, ChartData, Provider } from '../../types';
+import ConfirmModal from '../ConfirmModal';
+import SearchBar from '../SearchBar';
 import { Icon } from '../ui/Icon';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -165,10 +167,12 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [editingIncome, setEditingIncome] = useState<Income | null>(null);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+    const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
@@ -222,31 +226,27 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     };
     
     const handleDeleteIncome = async (id: number) => {
-        if (window.confirm('¿Seguro que quieres eliminar este ingreso?') && userProfile.conjuntoId) {
-            await apiService.deleteIncome(userProfile.conjuntoId, id);
-            fetchData();
-        }
+        if (!userProfile.conjuntoId) return;
+        await apiService.deleteIncome(userProfile.conjuntoId, id);
+        fetchData();
     };
     
     const handleDeleteAllIncomes = async () => {
-        if (window.confirm('¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de ingresos de forma permanente.') && userProfile.conjuntoId) {
-            await apiService.deleteAllIncomes(userProfile.conjuntoId);
-            fetchData();
-        }
+        if (!userProfile.conjuntoId) return;
+        await apiService.deleteAllIncomes(userProfile.conjuntoId);
+        fetchData();
     };
 
     const handleDeleteExpense = async (id: number) => {
-        if (window.confirm('¿Seguro que quieres eliminar este gasto?') && userProfile.conjuntoId) {
-            await apiService.deleteExpense(userProfile.conjuntoId, id);
-            fetchData();
-        }
+        if (!userProfile.conjuntoId) return;
+        await apiService.deleteExpense(userProfile.conjuntoId, id);
+        fetchData();
     };
 
     const handleDeleteAllExpenses = async () => {
-        if (window.confirm('¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de gastos de forma permanente.') && userProfile.conjuntoId) {
-            await apiService.deleteAllExpenses(userProfile.conjuntoId);
-            fetchData();
-        }
+        if (!userProfile.conjuntoId) return;
+        await apiService.deleteAllExpenses(userProfile.conjuntoId);
+        fetchData();
     };
     
     const handleRefresh = async () => {
@@ -457,7 +457,9 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     );
     
     const renderTable = (type: 'income' | 'expense') => {
-        const data = type === 'income' ? incomes : expenses;
+        const data = (type === 'income' ? incomes : expenses).filter(item =>
+            !searchQuery || `${item.description} ${item.category} ${item.date} ${item.amount}`.toLowerCase().includes(searchQuery.toLowerCase())
+        );
         const columns = ['Descripción', 'Categoría', 'Fecha', 'Monto'];
         
         return (
@@ -472,10 +474,11 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                         {feedbackMessage && <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{feedbackMessage.text}</p>}
                     </div>
                     <div className="flex items-center gap-2">
+                        <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar..." />
                         <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
                             <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={() => type === 'income' ? handleDeleteAllIncomes() : handleDeleteAllExpenses()} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md font-semibold text-xs hover:bg-red-200">Eliminar Todos</button>
+                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Todos los Ingresos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de ingresos de forma permanente.', onConfirm: handleDeleteAllIncomes } : { title: 'Eliminar Todos los Gastos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de gastos de forma permanente.', onConfirm: handleDeleteAllExpenses })} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md font-semibold text-xs hover:bg-red-200">Eliminar Todos</button>
                         <button onClick={() => type === 'income' ? handleOpenIncomeModal(null) : handleOpenExpenseModal(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1">
                             Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
                         </button>
@@ -498,7 +501,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                                     <td className="px-6 py-4 font-semibold">{formatCurrency(item.amount)}</td>
                                     <td className="px-6 py-4 text-right space-x-2">
                                         <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                        <button onClick={() => type === 'income' ? handleDeleteIncome(item.id) : handleDeleteExpense(item.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
                             ))}
@@ -537,6 +540,14 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
 
             <IncomeModal isOpen={isIncomeModalOpen} onClose={handleCloseModals} onSave={handleSaveIncome} incomeToEdit={editingIncome} />
             <ExpenseModal isOpen={isExpenseModalOpen} onClose={handleCloseModals} onSave={handleSaveExpense} expenseToEdit={editingExpense} />
+            <ConfirmModal
+                isOpen={confirmAction !== null}
+                title={confirmAction?.title || ''}
+                message={confirmAction?.message || ''}
+                confirmLabel="Eliminar"
+                onConfirm={() => { confirmAction?.onConfirm(); setConfirmAction(null); }}
+                onCancel={() => setConfirmAction(null)}
+            />
         </div>
     );
 };

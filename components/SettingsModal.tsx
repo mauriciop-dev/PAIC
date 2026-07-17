@@ -5,6 +5,7 @@ import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 import { mercadoPagoService } from '../services/mercadoPagoService';
 import { SettingsTab } from '../App';
+import ConfirmModal from './ConfirmModal';
 import UserModal from './UserModal';
 import RoleModal from './RoleModal';
 
@@ -49,6 +50,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   
   const [isLoadingTabData, setIsLoadingTabData] = useState(false);
 
@@ -117,11 +119,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // --- Access Points Logic ---
   const handleAddAccessPoint = async () => { if (newAccessPointName.trim() && userProfile.conjuntoId) { await apiService.addAccessPoint(userProfile.conjuntoId, newAccessPointName.trim()); setNewAccessPointName(''); fetchDataForTab('Puntos de Acceso'); }};
-  const handleDeleteAccessPoint = async (id: number) => { if(window.confirm('¿Seguro?') && userProfile.conjuntoId) { await apiService.deleteAccessPoint(userProfile.conjuntoId, id); fetchDataForTab('Puntos de Acceso'); }};
+  const handleDeleteAccessPoint = async (id: number) => { if(userProfile.conjuntoId) { await apiService.deleteAccessPoint(userProfile.conjuntoId, id); fetchDataForTab('Puntos de Acceso'); }};
 
   // --- Common Areas Logic ---
   const handleAddArea = async () => { if (newAreaName.trim() && userProfile.conjuntoId) { await apiService.addCommonArea(userProfile.conjuntoId, newAreaName.trim()); setNewAreaName(''); fetchDataForTab('Gestionar Áreas'); }};
-  const handleRemoveArea = async (id: string) => { if (window.confirm('¿Seguro?') && userProfile.conjuntoId) { await apiService.removeCommonArea(userProfile.conjuntoId, id); fetchDataForTab('Gestionar Áreas'); }};
+  const handleRemoveArea = async (id: string) => { if (userProfile.conjuntoId) { await apiService.removeCommonArea(userProfile.conjuntoId, id); fetchDataForTab('Gestionar Áreas'); }};
   
   // --- Users & Roles Logic ---
   const handleUserModalOpen = (user: PlatformUser | null) => { setModalError(null); setSelectedUser(user); setIsUserModalOpen(true); };
@@ -136,7 +138,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setIsUserModalOpen(false);
       } catch (error: any) { setModalError(error.message); }
   };
-  const handleDeleteUser = async (userId: number) => { if(window.confirm('¿Seguro?') && userProfile.conjuntoId) { await apiService.deleteUser(userProfile.conjuntoId, userId); fetchDataForTab('Usuarios'); }};
+  const handleDeleteUser = async (userId: number) => { if(userProfile.conjuntoId) { await apiService.deleteUser(userProfile.conjuntoId, userId); fetchDataForTab('Usuarios'); }};
   const handleSaveRole = async (role: UserRoleDefinition, userIdToAssign?: number) => {
     if (!userProfile.conjuntoId) return;
     setModalError(null);
@@ -241,7 +243,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         {accessPoints.map(point => (
           <div key={point.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
             <span className="text-gray-800">{point.name}</span>
-            <button onClick={() => handleDeleteAccessPoint(point.id)} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button>
+            <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button>
           </div>
         ))}
       </div>
@@ -255,7 +257,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <button onClick={handleAddArea} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">Agregar</button>
         </div>
         <div className="space-y-2 max-h-80 overflow-y-auto">
-            {commonAreas.map(area => (<div key={area.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md"> <span className="text-gray-800">{area.name}</span> <button onClick={() => handleRemoveArea(area.id)} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button></div>))}
+            {commonAreas.map(area => (<div key={area.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md"> <span className="text-gray-800">{area.name}</span> <button onClick={() => setConfirmAction({ title: 'Eliminar Área Común', message: '¿Seguro que quieres eliminar esta área común?', onConfirm: () => handleRemoveArea(area.id) })} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button></div>))}
         </div>
       </div>
   );
@@ -266,7 +268,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="overflow-x-auto max-h-96">
             <table className="w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0"><tr><th className="px-6 py-3">Nombre</th><th className="px-6 py-3">Correo</th><th className="px-6 py-3">Rol</th><th className="px-6 py-3 text-right">Acciones</th></tr></thead>
-                <tbody>{platformUsers.map(user => (<tr key={user.id} className="bg-white border-b hover:bg-gray-50"><td className="px-6 py-4">{user.name}</td><td className="px-6 py-4">{user.email}</td><td className="px-6 py-4">{user.role}</td><td className="px-6 py-4 text-right space-x-2"><button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button><button onClick={() => handleDeleteUser(user.id)} className="font-medium text-red-600 hover:underline">Eliminar</button></td></tr>))}</tbody>
+                <tbody>{platformUsers.map(user => (<tr key={user.id} className="bg-white border-b hover:bg-gray-50"><td className="px-6 py-4">{user.name}</td><td className="px-6 py-4">{user.email}</td><td className="px-6 py-4">{user.role}</td><td className="px-6 py-4 text-right space-x-2"><button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button><button onClick={() => setConfirmAction({ title: 'Eliminar Usuario', message: '¿Seguro que quieres eliminar este usuario?', onConfirm: () => handleDeleteUser(user.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button></td></tr>))}</tbody>
             </table>
         </div>
       </div>
@@ -347,6 +349,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         
         {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} error={modalError} />}
         {isRoleModalOpen && editingUserPermissions && <RoleModal isOpen={isRoleModalOpen} onClose={() => {setIsRoleModalOpen(false); setEditingUserPermissions(null);}} onSave={handleSaveRole} userToEdit={editingUserPermissions} allRoles={roles} error={modalError} />}
+        <ConfirmModal
+          isOpen={confirmAction !== null}
+          title={confirmAction?.title || ''}
+          message={confirmAction?.message || ''}
+          confirmLabel="Eliminar"
+          onConfirm={() => { confirmAction?.onConfirm(); setConfirmAction(null); }}
+          onCancel={() => setConfirmAction(null)}
+        />
       </div>
     </div>
   );

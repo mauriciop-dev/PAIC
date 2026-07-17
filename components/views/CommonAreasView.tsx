@@ -6,8 +6,19 @@ import { Icon } from '../ui/Icon';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+interface CalendarEvent {
+    key: string;
+    day: number;
+    event: string;
+    user: string;
+    time: string;
+    color: { bg: string; text: string; border: string };
+    fullDetails: Reservation;
+    type: 'reservation';
+}
+
 interface TooltipData {
-    content: any; // Can be Reservation
+    content: CalendarEvent;
     x: number;
     y: number;
 }
@@ -71,7 +82,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   };
 
   const calendarEvents = useMemo(() => {
-    const events: any[] = [];
+    const events: CalendarEvent[] = [];
 
     reservations.forEach(reservation => {
         const area = commonAreas.find(a => a.id === reservation.commonAreaId);
@@ -127,7 +138,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
     return calendarDays;
   };
 
-  const handleMouseEnter = (eventData: any, event: React.MouseEvent) => {
+  const handleMouseEnter = (eventData: CalendarEvent, event: React.MouseEvent) => {
     setTooltip({
       content: eventData,
       x: event.clientX,

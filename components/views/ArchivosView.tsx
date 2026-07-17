@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ConjuntoInfo, UserProfile, StoredFile } from '../../types';
 import { apiService } from '../../services/apiService';
+import ConfirmModal from '../ConfirmModal';
 import { Icon } from '../ui/Icon';
 
 interface ArchivosViewProps {
@@ -13,6 +14,7 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = async () => {
@@ -79,15 +81,15 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
   };
 
   const handleDeleteFile = async (fileName: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar "${fileName}"? Esta acción no se puede deshacer.`) && userProfile.conjuntoId) {
-      try {
-        await apiService.deleteFileForConjunto(userProfile.conjuntoId, fileName);
-        setFeedback({ type: 'success', text: 'Archivo eliminado exitosamente.' });
-        fetchFiles(); // Refresh the list
-      } catch (error: any) {
-        setFeedback({ type: 'error', text: `Error al eliminar: ${error.message}` });
-      }
+    if (!userProfile.conjuntoId) return;
+    try {
+      await apiService.deleteFileForConjunto(userProfile.conjuntoId, fileName);
+      setFeedback({ type: 'success', text: 'Archivo eliminado exitosamente.' });
+      fetchFiles();
+    } catch (error: any) {
+      setFeedback({ type: 'error', text: `Error al eliminar: ${error.message}` });
     }
+    setDeleteTarget(null);
   };
 
   const bytesToSize = (bytes: number) => {
@@ -147,7 +149,7 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
                       <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
                         Descargar
                       </a>
-                      <button onClick={() => handleDeleteFile(file.name)} className="font-medium text-red-600 hover:underline">
+                      <button onClick={() => setDeleteTarget(file.name)} className="font-medium text-red-600 hover:underline">
                         Eliminar
                       </button>
                     </td>
@@ -164,6 +166,14 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
           </div>
         )}
       </div>
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Eliminar Archivo"
+        message={deleteTarget ? `¿Estás seguro de que quieres eliminar "${deleteTarget}"? Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        onConfirm={() => deleteTarget !== null && handleDeleteFile(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

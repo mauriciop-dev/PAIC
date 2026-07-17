@@ -5,6 +5,8 @@ import ResidentModal from '../ResidentModal';
 import ProviderModal from '../ProviderModal';
 import InternalStaffModal from '../InternalStaffModal';
 import AccountStatusModal from '../AccountStatusModal';
+import ConfirmModal from '../ConfirmModal';
+import SearchBar from '../SearchBar';
 import { Icon } from '../ui/Icon';
 
 declare var XLSX: any;
@@ -44,6 +46,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -153,33 +157,28 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     }
   };
 
-  // Delete Handlers
   const handleDeleteResident = async (apartment: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar al residente del apartamento ${apartment}?`) && userProfile.conjuntoId) {
-        await apiService.deleteResident(userProfile.conjuntoId, apartment);
-        fetchData();
-    }
+    if (!userProfile.conjuntoId) return;
+    await apiService.deleteResident(userProfile.conjuntoId, apartment);
+    fetchData();
   };
   
   const handleDeleteProvider = async (id: number) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este proveedor?') && userProfile.conjuntoId) {
-        await apiService.deleteProvider(userProfile.conjuntoId, id);
-        fetchData();
-    }
+    if (!userProfile.conjuntoId) return;
+    await apiService.deleteProvider(userProfile.conjuntoId, id);
+    fetchData();
   };
 
   const handleDeleteStaff = async (name: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar a este miembro del personal?') && userProfile.conjuntoId) {
-        await apiService.deleteInternalStaff(userProfile.conjuntoId, name);
-        fetchData();
-    }
+    if (!userProfile.conjuntoId) return;
+    await apiService.deleteInternalStaff(userProfile.conjuntoId, name);
+    fetchData();
   };
   
   const handleDeleteAccountStatus = async (apartment: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar el estado de cuenta del apartamento ${apartment}?`) && userProfile.conjuntoId) {
-        await apiService.deleteAccountStatus(userProfile.conjuntoId, apartment);
-        fetchData();
-    }
+    if (!userProfile.conjuntoId) return;
+    await apiService.deleteAccountStatus(userProfile.conjuntoId, apartment);
+    fetchData();
   };
 
   const handleUploadClick = () => {
@@ -370,6 +369,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar en tabla..." />
                     <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
                         <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
@@ -412,7 +412,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           </tr>
                       </thead>
                       <tbody>
-                          {residents.map((resident) => (
+                          {residents.filter(r => !searchQuery || `${r.apartment} ${r.name} ${r.email} ${r.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((resident) => (
                               <tr key={resident.apartment} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{resident.apartment}</td>
                                   <td className="px-6 py-4">{resident.name}</td>
@@ -420,7 +420,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{resident.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleResidentModalOpen(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                     <button onClick={() => handleDeleteResident(resident.apartment)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                     <button onClick={() => setConfirmAction({ title: 'Eliminar Residente', message: `¿Estás seguro de que quieres eliminar al residente del apartamento ${resident.apartment}?`, onConfirm: () => handleDeleteResident(resident.apartment) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
                           ))}
@@ -442,7 +442,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           </tr>
                       </thead>
                       <tbody>
-                          {accountStatus.map((account) => (
+                          {accountStatus.filter(a => !searchQuery || `${a.apartment} ${a.lastPaymentDate} ${a.adminFeeValue} ${a.outstandingBalance}`.toLowerCase().includes(searchQuery.toLowerCase())).map((account) => (
                               <tr key={account.apartment} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{account.apartment}</td>
                                   <td className="px-6 py-4">{account.lastPaymentDate}</td>
@@ -452,7 +452,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4 font-semibold">${account.outstandingBalance.toLocaleString()}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                       <button onClick={() => handleAccountStatusModalOpen(account)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                      <button onClick={() => handleDeleteAccountStatus(account.apartment)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                      <button onClick={() => setConfirmAction({ title: 'Eliminar Estado de Cuenta', message: `¿Estás seguro de que quieres eliminar el estado de cuenta del apartamento ${account.apartment}?`, onConfirm: () => handleDeleteAccountStatus(account.apartment) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
                           ))}
@@ -472,7 +472,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           </tr>
                       </thead>
                       <tbody>
-                          {providers.map((provider) => (
+                          {providers.filter(p => !searchQuery || `${p.company} ${p.specialty} ${p.email} ${p.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((provider) => (
                               <tr key={provider.id} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{provider.company}</td>
                                   <td className="px-6 py-4">{provider.specialty}</td>
@@ -480,7 +480,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{provider.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                       <button onClick={() => handleProviderModalOpen(provider)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                      <button onClick={() => handleDeleteProvider(provider.id)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                      <button onClick={() => setConfirmAction({ title: 'Eliminar Proveedor', message: '¿Estás seguro de que quieres eliminar este proveedor?', onConfirm: () => handleDeleteProvider(provider.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
                           ))}
@@ -500,7 +500,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           </tr>
                       </thead>
                       <tbody>
-                          {internalStaff.map((staff) => (
+                          {internalStaff.filter(s => !searchQuery || `${s.name} ${s.position} ${s.email} ${s.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((staff) => (
                               <tr key={staff.name} className="bg-white border-b hover:bg-gray-50">
                                   <td className="px-6 py-4 font-medium text-gray-900">{staff.name}</td>
                                   <td className="px-6 py-4">{staff.position}</td>
@@ -508,7 +508,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{staff.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleStaffModalOpen(staff)} className="font-medium text-blue-600 hover:underline">Editar</button>
-                                     <button onClick={() => handleDeleteStaff(staff.name)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                                     <button onClick={() => setConfirmAction({ title: 'Eliminar Personal', message: '¿Estás seguro de que quieres eliminar a este miembro del personal?', onConfirm: () => handleDeleteStaff(staff.name) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                   </td>
                               </tr>
                           ))}
@@ -577,6 +577,14 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
           onSave={handleSaveAccountStatus}
         />
       )}
+      <ConfirmModal
+        isOpen={confirmAction !== null}
+        title={confirmAction?.title || ''}
+        message={confirmAction?.message || ''}
+        confirmLabel={confirmAction?.confirmLabel || 'Eliminar'}
+        onConfirm={() => { confirmAction?.onConfirm(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 };

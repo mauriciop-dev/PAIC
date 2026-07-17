@@ -1,15 +1,15 @@
-
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Tab, UserProfile, ConjuntoInfo } from '../types';
-import DashboardView from './views/DashboardView';
-import DatabaseView from './views/DatabaseView';
-import CommonAreasView from './views/CommonAreasView';
-import DueDatesView from './views/DueDatesView';
-import PendingTasksView from './views/PendingTasksView';
-import ComunicacionesView from './views/ComunicacionesView';
-import ArchivosView from './views/ArchivosView';
-import FinanzasView from './views/FinanzasView';
-import SeguridadView from './views/SeguridadView';
+
+const DashboardView = lazy(() => import('./views/DashboardView'));
+const DatabaseView = lazy(() => import('./views/DatabaseView'));
+const CommonAreasView = lazy(() => import('./views/CommonAreasView'));
+const DueDatesView = lazy(() => import('./views/DueDatesView'));
+const PendingTasksView = lazy(() => import('./views/PendingTasksView'));
+const ComunicacionesView = lazy(() => import('./views/ComunicacionesView'));
+const ArchivosView = lazy(() => import('./views/ArchivosView'));
+const FinanzasView = lazy(() => import('./views/FinanzasView'));
+const SeguridadView = lazy(() => import('./views/SeguridadView'));
 
 interface DashboardProps {
   activeTab: Tab;
@@ -20,14 +20,21 @@ interface DashboardProps {
   selectedAccessPointId: number | null;
 }
 
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="animate-pulse flex flex-col items-center gap-3">
+      <div className="w-8 h-8 bg-blue-200 rounded-full"></div>
+      <div className="h-4 bg-gray-200 rounded w-32"></div>
+    </div>
+  </div>
+);
+
 const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjuntoName, userProfile, conjuntoInfo, selectedAccessPointId }) => {
   const renderContent = () => {
-    // The loading/setup state is now handled by the parent App component, making this one cleaner.
-    // We can assume conjuntoInfo is valid when this component's content is rendered.
     if (!conjuntoInfo) {
         return <div className="text-center p-10">Cargando información del conjunto...</div>;
     }
-      
+
     switch (activeTab) {
       case Tab.Dashboard:
         return <DashboardView setActiveTab={setActiveTab} userProfile={userProfile} />;
@@ -52,7 +59,13 @@ const Dashboard: React.FC<DashboardProps> = ({ activeTab, setActiveTab, conjunto
     }
   };
 
-  return <div className="w-full h-full">{renderContent()}</div>;
+  return (
+    <div className="w-full h-full">
+      <Suspense fallback={<LoadingFallback />}>
+        {renderContent()}
+      </Suspense>
+    </div>
+  );
 };
 
 export default Dashboard;

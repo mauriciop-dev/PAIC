@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { Task, UserProfile } from '../../types';
+import ConfirmModal from '../ConfirmModal';
 import { Icon } from '../ui/Icon';
 
 interface PendingTasksViewProps {
@@ -14,6 +15,7 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     const [newTaskText, setNewTaskText] = useState('');
     const [newTaskDate, setNewTaskDate] = useState('');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
     const fetchData = async () => {
         if (!userProfile.conjuntoId) return;
@@ -69,11 +71,10 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta tarea?') && userProfile.conjuntoId) {
-            // FIX: Pass conjuntoId to deleteTask.
-            await apiService.deleteTask(userProfile.conjuntoId, id);
-            fetchData();
-        }
+        if (!userProfile.conjuntoId) return;
+        await apiService.deleteTask(userProfile.conjuntoId, id);
+        fetchData();
+        setDeleteTarget(null);
     };
     
     const startEditing = (task: Task) => {
@@ -174,7 +175,7 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
                     </div>
                     <div className="flex gap-2">
                         <button 
-                            onClick={() => handleDelete(task.id)}
+                            onClick={() => setDeleteTarget(task.id)}
                             className="text-sm text-gray-400 hover:text-red-600"
                             aria-label="Eliminar tarea"
                         >
@@ -189,6 +190,14 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
             </div>
         )}
       </div>
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Eliminar Tarea"
+        message="¿Estás seguro de que quieres eliminar esta tarea?"
+        confirmLabel="Eliminar"
+        onConfirm={() => deleteTarget !== null && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

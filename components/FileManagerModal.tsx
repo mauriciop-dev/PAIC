@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ConjuntoInfo, StoredFile } from '../types';
 import { apiService } from '../services/apiService';
+import ConfirmModal from './ConfirmModal';
 import { Icon } from './ui/Icon';
 
 interface FileManagerModalProps {
@@ -14,6 +15,7 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = async () => {
@@ -82,15 +84,15 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
   };
 
   const handleDeleteFile = async (fileName: string) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`) && conjunto.id) {
-      try {
-        await apiService.deleteFileForConjunto(conjunto.id, fileName);
-        setFeedback({ type: 'success', text: 'Archivo eliminado.' });
+    if (!conjunto.id) return;
+    try {
+      await apiService.deleteFileForConjunto(conjunto.id, fileName);
+      setFeedback({ type: 'success', text: 'Archivo eliminado.' });
         fetchFiles();
       } catch (error: any) {
         setFeedback({ type: 'error', text: `Error al eliminar: ${error.message}` });
       }
-    }
+      setDeleteTarget(null);
   };
   
   const bytesToSize = (bytes: number) => {
@@ -132,7 +134,7 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
                     <td className="px-6 py-4">{new Date(file.createdAt).toLocaleDateString('es-CO')}</td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Ver</a>
-                      <button onClick={() => handleDeleteFile(file.name)} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                      <button onClick={() => setDeleteTarget(file.name)} className="font-medium text-red-600 hover:underline">Eliminar</button>
                     </td>
                   </tr>
                 ))}
@@ -163,6 +165,14 @@ const FileManagerModal: React.FC<FileManagerModalProps> = ({ isOpen, onClose, co
            </div>
         </footer>
       </div>
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Eliminar Archivo"
+        message={deleteTarget ? `¿Estás seguro de que quieres eliminar "${deleteTarget}"?` : ''}
+        confirmLabel="Eliminar"
+        onConfirm={() => deleteTarget !== null && handleDeleteFile(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

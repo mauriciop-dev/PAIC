@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { apiService } from '../../services/apiService';
 import { DueDate, UserProfile } from '../../types';
 import DueDateModal from '../DueDateModal';
+import ConfirmModal from '../ConfirmModal';
+import SearchBar from '../SearchBar';
 import { Icon } from '../ui/Icon';
 
 type StatusFilter = 'Todos' | 'Pendiente' | 'Vencido' | 'Pagado';
@@ -17,6 +19,8 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   const [filter, setFilter] = useState<StatusFilter>('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDueDate, setEditingDueDate] = useState<DueDate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
@@ -72,11 +76,10 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   };
   
   const handleDelete = async (id: number) => {
-      if (window.confirm('¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer.') && userProfile.conjuntoId) {
-          // FIX: Pass conjuntoId to deleteDueDate.
-          await apiService.deleteDueDate(userProfile.conjuntoId, id);
-          fetchData(); // Refresh data
-      }
+      if (!userProfile.conjuntoId) return;
+      await apiService.deleteDueDate(userProfile.conjuntoId, id);
+      fetchData();
+      setDeleteTarget(null);
   };
 
   const getStatusChipStyle = (status: DueDate['status']) => {
@@ -97,7 +100,10 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
     }
   };
   
-  const filteredDueDates = allDueDates.filter(d => filter === 'Todos' || d.status === filter);
+  const filteredDueDates = allDueDates.filter(d =>
+    (filter === 'Todos' || d.status === filter) &&
+    (!searchQuery || `${d.item} ${d.category} ${d.dueDate} ${d.status}`.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div>
@@ -118,7 +124,10 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
             </div>
         </div>
 
-      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
+      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 min-w-0">
+          <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar por concepto, categoría o fecha..." />
+        </div>
         <div className="flex items-center gap-2">
             <span className="font-semibold text-sm text-gray-700">Filtrar por:</span>
             {(['Todos', 'Pendiente', 'Vencido', 'Pagado'] as StatusFilter[]).map(status => (
@@ -154,7 +163,7 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
                       {payment.status}
                     </span>
                     <button onClick={() => handleOpenEditModal(payment)} className="font-medium text-blue-600 hover:underline text-sm p-1">Editar</button>
-                    <button onClick={() => handleDelete(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
+                    <button onClick={() => setDeleteTarget(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
                   </div>
                 </li>
               )) : (
@@ -173,6 +182,14 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
             dueDateToEdit={editingDueDate}
         />
       )}
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title="Eliminar Vencimiento"
+        message="¿Estás seguro de que quieres eliminar este vencimiento? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => deleteTarget !== null && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };
