@@ -38,10 +38,15 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
 
   useEffect(() => {
     if (userProfile && conjuntoInfo && messages.length === 0 && isOpen) {
-        setMessages([
-            // FIX: Property 'name' does not exist on type 'UserProfile'. Use 'fullName' instead.
-            { sender: 'ai', text: `Hola **${userProfile.fullName}**, soy PAIC y te ayudaré a administrar **${conjuntoInfo.name}**.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
-        ]);
+        geminiService.loadHistory(userProfile, conjuntoInfo).then(saved => {
+            if (saved && saved.length > 0) {
+                setMessages(saved.map(m => ({ sender: m.role as 'user' | 'ai', text: m.text })));
+            } else {
+                setMessages([
+                    { sender: 'ai', text: `Hola **${userProfile.fullName}**, soy PAIC y te ayudaré a administrar **${conjuntoInfo.name}**.\n\n¿En qué te puedo ayudar hoy?\n\n1. Base de datos\n2. Áreas comunes\n3. Comunicaciones\n4. Finanzas\n5. Seguridad\n6. Vencimientos\n7. Tareas\n\nPuedes elegir una opción o escribir tu solicitud.` }
+                ]);
+            }
+        });
     } else if (!isOpen) {
         setMessages([]);
         geminiService.resetSession();

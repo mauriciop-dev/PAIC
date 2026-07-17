@@ -427,3 +427,25 @@ CREATE INDEX idx_account_status_conjunto_id ON public.account_status (conjunto_i
 CREATE INDEX idx_providers_conjunto_id ON public.providers (conjunto_id);
 CREATE INDEX idx_expenses_conjunto_id ON public.expenses (conjunto_id);
 CREATE INDEX idx_incomes_conjunto_id ON public.incomes (conjunto_id);
+
+-- ============================================
+-- Chat Messages (persistent conversation history)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id UUID NOT NULL,
+    conjunto_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'model')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_lookup
+    ON public.chat_messages (user_id, conjunto_id, created_at DESC);
+
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users own their chat messages"
+    ON public.chat_messages
+    FOR ALL
+    USING (auth.uid() = user_id);

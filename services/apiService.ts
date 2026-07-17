@@ -588,6 +588,28 @@ export const apiService = {
   async logChatbotInteraction(conjuntoId: string): Promise<void> {
     await supabase.rpc('log_chatbot_interaction', { p_conjunto_id: conjuntoId });
   },
+  async saveChatMessage(userId: string, conjuntoId: string, role: 'user' | 'model', content: string): Promise<void> {
+    await supabase.from('chat_messages').insert({
+      user_id: userId,
+      conjunto_id: conjuntoId,
+      role,
+      content,
+    });
+  },
+  async loadChatHistory(userId: string, conjuntoId: string, limit = 50): Promise<{ role: 'user' | 'model'; content: string }[]> {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('user_id', userId)
+      .eq('conjunto_id', conjuntoId)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+    if (error) {
+      console.error("Error loading chat history:", error);
+      return [];
+    }
+    return data as { role: 'user' | 'model'; content: string }[];
+  },
   
   // --- Communications ---
   async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{message: string}> {

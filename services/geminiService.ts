@@ -143,6 +143,11 @@ const runChat = async (prompt: string, userProfile: UserProfile | null, conjunto
             conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
         }
 
+        if (userProfile?.id && conjuntoInfo?.id) {
+            apiService.saveChatMessage(userProfile.id, conjuntoInfo.id, 'user', prompt).catch(() => {});
+            apiService.saveChatMessage(userProfile.id, conjuntoInfo.id, 'model', finalResponse).catch(() => {});
+        }
+
         return finalResponse;
     } catch (error: any) {
         console.error("Error during chat execution:", error);
@@ -450,9 +455,18 @@ const resetSession = () => {
     conversationHistory = [];
 };
 
+const loadHistory = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo): Promise<{ role: 'user' | 'model'; text: string }[]> => {
+    if (!userProfile?.id || !conjuntoInfo?.id) return [];
+    const messages = await apiService.loadChatHistory(userProfile.id, conjuntoInfo.id);
+    if (messages.length === 0) return [];
+    conversationHistory = messages.map(m => ({ role: m.role, text: m.content }));
+    return conversationHistory;
+};
+
 export const geminiService = {
     runChat,
     generateSubject,
     improveWriting,
     resetSession,
+    loadHistory,
 };
