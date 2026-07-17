@@ -89,11 +89,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
       const aiMessage: Message = { sender: 'ai', text: aiResponseText };
       setMessages(prev => [...prev, aiMessage]);
 
-       // If the response indicates a successful action (not an error or clarification), notify other components.
-      if (aiResponseText.toLowerCase().includes('confirmado') || aiResponseText.toLowerCase().includes('exitosamente')) {
-          window.dispatchEvent(new CustomEvent('data-changed'));
-      }
-
     } catch (error) {
       console.error('Error fetching AI response:', error);
       const errorMessage: Message = { sender: 'ai', text: 'Lo siento, ocurrió un error al procesar tu solicitud.' };

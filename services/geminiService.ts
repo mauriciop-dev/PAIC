@@ -129,7 +129,19 @@ const runChat = async (prompt: string, userProfile: UserProfile | null, conjunto
     }
 };
 
-const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<string> => {
+const MUTATION_FUNCTIONS = new Set([
+    'addResident', 'updateResident', 'deleteResident',
+    'addProvider', 'updateProvider', 'deleteProvider',
+    'addInternalStaff', 'updateInternalStaff', 'deleteInternalStaff',
+    'createReservation',
+    'addIncome', 'addExpense',
+    'authorizeVisitor', 'updateVisitorStatus', 'registerPackage',
+    'sendMassEmail',
+]);
+
+const processFunctionCalls = async (functionCalls: FunctionCall[], depth = 0): Promise<string> => {
+    if (depth > 5) return "Se alcanzó el límite de operaciones encadenadas. Por favor, continúa con tu solicitud.";
+
     if (!functionCalls || functionCalls.length === 0) {
         return "No se recibieron instrucciones claras del asistente.";
     }
@@ -138,14 +150,14 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
     const { name, args } = call;
     console.log(`Executing function call: ${name}`, args);
 
-    const userProfile = (chat as any)?.userProfile as UserProfile;
-    const conjuntoInfo = (chat as any)?.conjuntoInfo as ConjuntoInfo;
-
     if (!currentConjuntoId) {
         console.error("Context error: currentConjuntoId is missing in processFunctionCalls");
         return "Error de contexto: no se pudo determinar el conjunto actual.";
     }
-    
+
+    let resultText: string;
+    let isMutation = false;
+
     try {
         apiService.logChatbotInteraction(currentConjuntoId).catch(e => console.warn("Failed to log interaction:", e));
 
@@ -155,7 +167,8 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const residentArgs = args as unknown as Resident;
                 if (!residentArgs || !residentArgs.apartment) throw new Error("Faltan datos del residente (apartamento).");
                 await apiService.addResident(currentConjuntoId, residentArgs);
-                return `¡Confirmado! Residente para el apto **${residentArgs.apartment}** agregado exitosamente.`;
+                resultText = `Residente para el apto ${residentArgs.apartment} agregado exitosamente.`;
+                break;
             }
             case 'updateResident': {
                 const { apartment, data } = args as unknown as { apartment: string, data: Partial<Resident> };
@@ -163,13 +176,15 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const existingResident = await apiService.fetchResidentByApartment(currentConjuntoId, apartment);
                 if (!existingResident) throw new Error(`No se encontró un residente en el apartamento ${apartment}.`);
                 await apiService.updateResident(currentConjuntoId, { ...existingResident, ...data });
-                return `¡Confirmado! La información del residente del apto **${apartment}** ha sido actualizada.`;
+                resultText = `Información del residente del apto ${apartment} actualizada.`;
+                break;
             }
             case 'deleteResident': {
                 const { apartment } = args as unknown as { apartment: string };
                 if (!apartment) throw new Error("Falta el número de apartamento.");
                 await apiService.deleteResident(currentConjuntoId, apartment);
-                return `¡Confirmado! El residente del apto **${apartment}** ha sido eliminado.`;
+                resultText = `Residente del apto ${apartment} eliminado.`;
+                break;
             }
 
             // --- Provider Management ---
@@ -177,7 +192,8 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const providerArgs = args as unknown as Omit<Provider, 'id'>;
                 if (!providerArgs || !providerArgs.company) throw new Error("Faltan datos del proveedor (empresa).");
                 await apiService.addProvider(currentConjuntoId, providerArgs);
-                return `¡Confirmado! Proveedor **${providerArgs.company}** agregado exitosamente.`;
+                resultText = `Proveedor ${providerArgs.company} agregado exitosamente.`;
+                break;
             }
             case 'updateProvider': {
                 const { company, data } = args as unknown as { company: string, data: Partial<Provider> };
@@ -185,10 +201,11 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const providers = await apiService.fetchProviders(currentConjuntoId);
                 const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
                 if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
-                if (matchingProviders.length > 1) return `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`;
+                if (matchingProviders.length > 1) { resultText = `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`; break; }
                 const providerToUpdate = matchingProviders[0];
                 await apiService.updateProvider(currentConjuntoId, { ...providerToUpdate, ...data });
-                return `¡Confirmado! La información del proveedor **${company}** ha sido actualizada.`;
+                resultText = `Información del proveedor ${company} actualizada.`;
+                break;
             }
             case 'deleteProvider': {
                 const { company } = args as unknown as { company: string };
@@ -196,10 +213,11 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const providers = await apiService.fetchProviders(currentConjuntoId);
                 const matchingProviders = providers.filter(p => p.company.toLowerCase() === company.toLowerCase());
                 if (matchingProviders.length === 0) throw new Error(`No se encontró un proveedor con el nombre "${company}".`);
-                if (matchingProviders.length > 1) return `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`;
+                if (matchingProviders.length > 1) { resultText = `Encontré varios proveedores con el nombre "${company}". Por favor, sé más específico.`; break; }
                 const providerToDelete = matchingProviders[0];
                 await apiService.deleteProvider(currentConjuntoId, providerToDelete.id);
-                return `¡Confirmado! El proveedor **${company}** ha sido eliminado.`;
+                resultText = `Proveedor ${company} eliminado.`;
+                break;
             }
 
             // --- Internal Staff Management ---
@@ -207,7 +225,8 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const staffArgs = args as unknown as InternalStaff;
                 if (!staffArgs || !staffArgs.name) throw new Error("Faltan datos del personal (nombre).");
                 await apiService.addInternalStaff(currentConjuntoId, staffArgs);
-                return `¡Confirmado! Miembro del personal **${staffArgs.name}** agregado exitosamente.`;
+                resultText = `Miembro del personal ${staffArgs.name} agregado exitosamente.`;
+                break;
             }
             case 'updateInternalStaff': {
                 const { name, data } = args as unknown as { name: string, data: Partial<InternalStaff> };
@@ -215,10 +234,11 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
                 const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
                 if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
-                if (matchingStaff.length > 1) return `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles para identificar a la persona correcta.`;
+                if (matchingStaff.length > 1) { resultText = `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles.`; break; }
                 const staffToUpdate = matchingStaff[0];
                 await apiService.updateInternalStaff(currentConjuntoId, { ...staffToUpdate, ...data } as InternalStaff);
-                return `¡Confirmado! La información de **${name}** ha sido actualizada.`;
+                resultText = `Información de ${name} actualizada.`;
+                break;
             }
             case 'deleteInternalStaff': {
                 const { name } = args as unknown as { name: string };
@@ -226,9 +246,10 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 const staffList = await apiService.fetchInternalStaff(currentConjuntoId);
                 const matchingStaff = staffList.filter(s => s.name.toLowerCase() === name.toLowerCase());
                 if (matchingStaff.length === 0) throw new Error(`No se encontró un miembro del personal llamado "${name}".`);
-                if (matchingStaff.length > 1) return `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles para identificar a la persona correcta.`;
+                if (matchingStaff.length > 1) { resultText = `Encontré varias personas llamadas "${name}". Por favor, proporciona más detalles.`; break; }
                 await apiService.deleteInternalStaff(currentConjuntoId, name);
-                return `¡Confirmado! El miembro del personal **${name}** ha sido eliminado.`;
+                resultText = `Miembro del personal ${name} eliminado.`;
+                break;
             }
 
             case 'createReservation': {
@@ -237,7 +258,8 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                     throw new Error("Faltan datos para crear la reserva (área, apartamento o fecha).");
                 }
                 await apiService.createReservationFromChat(currentConjuntoId, reservationArgs);
-                return `¡Confirmado! La reserva del área **${reservationArgs.commonAreaName}** para el **Apto ${reservationArgs.apartment}** el **${reservationArgs.date}** de **${reservationArgs.startTime} a ${reservationArgs.endTime}** ha sido registrada exitosamente.`;
+                resultText = `Reserva del área ${reservationArgs.commonAreaName} para el Apto ${reservationArgs.apartment} el ${reservationArgs.date} registrada exitosamente.`;
+                break;
             }
             
             case 'queryDatabase': {
@@ -247,67 +269,85 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
 
                 if (table === 'account_status' && apt) {
                     const account = await apiService.fetchAccountStatusByApartment(currentConjuntoId, apt);
-                    if (account) return `El saldo pendiente del Apto ${apt} es de $${account.outstandingBalance.toLocaleString()}. Último pago: ${account.lastPaymentDate}.`;
-                    return `No encontré información para el Apto ${apt}.`;
+                    resultText = account
+                        ? `El saldo pendiente del Apto ${apt} es de $${account.outstandingBalance.toLocaleString()}. Último pago: ${account.lastPaymentDate}.`
+                        : `No encontré información para el Apto ${apt}.`;
+                    break;
                 }
-                 if (table === 'residents' && apt) {
+                if (table === 'residents' && apt) {
                     const resident = await apiService.fetchResidentByApartment(currentConjuntoId, apt);
-                     if(resident) return `Residente del Apto ${apt}:\n- Nombre: ${resident.name}\n- Email: ${resident.email}\n- Teléfono: ${resident.phone}`;
-                     return `No encontré un residente para el Apto ${apt}.`;
+                    resultText = resident
+                        ? `Residente del Apto ${apt}: Nombre: ${resident.name}, Email: ${resident.email}, Teléfono: ${resident.phone}`
+                        : `No encontré un residente para el Apto ${apt}.`;
+                    break;
                 }
-                return `No pude procesar la consulta: "${query_description}". Intenta de nuevo.`;
+                resultText = `No pude procesar la consulta: "${query_description}". Intenta de nuevo.`;
+                break;
             }
 
             case 'queryDebtors': {
                 const debtors = await apiService.fetchDebtors(currentConjuntoId);
-                if (debtors.length === 0) return "¡Buenas noticias! No hay residentes en mora en este momento.";
-                const debtorsList = debtors.map(d => `- Apto ${d.apartment} (${d.name}): $${d.balance.toLocaleString('es-CO')}`).join('\n');
-                return `Claro, aquí está la lista de residentes en mora:\n\n${debtorsList}`;
+                if (debtors.length === 0) {
+                    resultText = "No hay residentes en mora en este momento.";
+                } else {
+                    const debtorsList = debtors.map(d => `Apto ${d.apartment} (${d.name}): $${d.balance.toLocaleString('es-CO')}`).join('\n');
+                    resultText = `Residentes en mora:\n${debtorsList}`;
+                }
+                break;
             }
 
             case 'queryProviders': {
                 const { specialty } = args as unknown as { specialty?: string };
                 const providers = await apiService.fetchProvidersBySpecialty(currentConjuntoId, specialty || '');
-                 if (providers.length === 0) {
-                    return specialty ? `No encontré proveedores con la especialidad "${specialty}".` : `No hay proveedores registrados.`;
+                if (providers.length === 0) {
+                    resultText = specialty
+                        ? `No encontré proveedores con la especialidad "${specialty}".`
+                        : `No hay proveedores registrados.`;
+                } else {
+                    const providersList = providers.map(p => `${p.company} (${p.specialty}) - Contacto: ${p.phone || 'N/A'}, ${p.email || 'N/A'}`).join('\n');
+                    resultText = `Proveedores encontrados:\n${providersList}`;
                 }
-                const providersList = providers.map(p => `- ${p.company} (${p.specialty}) - Contacto: ${p.phone || 'N/A'}, ${p.email || 'N/A'}`).join('\n');
-                return `Entendido. Consulté la base de datos y encontré estos proveedores:\n\n${providersList}`;
+                break;
             }
             
             case 'sendMassEmail': {
                 const { group, subject, body } = args as unknown as { group: string, subject: string, body: string };
                 if (!group || !subject || !body) throw new Error("Faltan datos para enviar el correo masivo.");
                 const result = await apiService.sendMassEmail(currentConjuntoId, group, subject, body);
-                return result.message;
+                resultText = result.message;
+                break;
             }
 
             case 'addIncome': {
                 const incomeArgs = args as unknown as Omit<Income, 'id'>;
                 if (!incomeArgs.amount || !incomeArgs.description) throw new Error("Faltan datos del ingreso (monto o descripción).");
                 await apiService.addIncome(currentConjuntoId, incomeArgs);
-                return `Ingreso de $${incomeArgs.amount.toLocaleString()} por "${incomeArgs.description}" agregado. ¿Necesitas algo más?`;
+                resultText = `Ingreso de $${incomeArgs.amount.toLocaleString()} por "${incomeArgs.description}" agregado.`;
+                break;
             }
             
             case 'addExpense': {
                 const expenseArgs = args as unknown as Omit<Expense, 'id'>;
                 if (!expenseArgs.amount || !expenseArgs.description) throw new Error("Faltan datos del gasto (monto o descripción).");
                 await apiService.addExpense(currentConjuntoId, expenseArgs);
-                 return `Gasto de $${expenseArgs.amount.toLocaleString()} por "${expenseArgs.description}" agregado. ¿Necesitas algo más?`;
+                resultText = `Gasto de $${expenseArgs.amount.toLocaleString()} por "${expenseArgs.description}" agregado.`;
+                break;
             }
             
             case 'authorizeVisitor': {
                 const visitorArgs = args as unknown as { visitorName: string, apartment: string, date: string };
                 if (!visitorArgs.visitorName || !visitorArgs.apartment) throw new Error("Faltan datos del visitante.");
                 await apiService.addVisitorLog(currentConjuntoId, {...visitorArgs, status: 'Autorizado'});
-                return `Visitante "${visitorArgs.visitorName}" autorizado para el Apto ${visitorArgs.apartment}.`;
+                resultText = `Visitante "${visitorArgs.visitorName}" autorizado para el Apto ${visitorArgs.apartment}.`;
+                break;
             }
             
             case 'registerPackage': {
                 const packageArgs = args as unknown as Partial<PackageLog>;
                 if (!packageArgs.apartment || !packageArgs.courier) throw new Error("Faltan datos del paquete.");
                 await apiService.addPackageLog(currentConjuntoId, packageArgs);
-                return `Paquete de "${packageArgs.courier}" para el Apto ${packageArgs.apartment} registrado.`;
+                resultText = `Paquete de "${packageArgs.courier}" para el Apto ${packageArgs.apartment} registrado.`;
+                break;
             }
            
             case 'updateVisitorStatus': {
@@ -315,23 +355,44 @@ const processFunctionCalls = async (functionCalls: FunctionCall[]): Promise<stri
                 if (!logId || !status) throw new Error("Faltan datos para actualizar el estado del visitante.");
                 const newStatus = status as VisitorLog['status'];
                 if (!['Autorizado', 'Ingresó', 'Salió'].includes(newStatus)) {
-                    return `El estado "${newStatus}" no es válido. Los estados permitidos son: Autorizado, Ingresó, Salió.`;
+                    resultText = `El estado "${newStatus}" no es válido. Estados permitidos: Autorizado, Ingresó, Salió.`;
+                    break;
                 }
                 await apiService.updateVisitorLog(currentConjuntoId, logId, { status: newStatus });
-                return `Estado del visitante actualizado a "${status}".`;
+                resultText = `Estado del visitante actualizado a "${status}".`;
+                break;
             }
 
             default:
-                 return `No entendí la acción: ${name}.`;
+                resultText = `No entendí la acción: ${name}.`;
+                break;
         }
+
+        isMutation = MUTATION_FUNCTIONS.has(name);
+
     } catch (error: any) {
         console.error(`Error executing function ${name}:`, error);
-        return `Lo siento, no pude completar la operación. Motivo: ${error.message || 'Error desconocido'}`;
-    } finally {
-        if (userProfile && conjuntoInfo) {
-            await initializeChat(userProfile, conjuntoInfo);
+        resultText = `Error al ejecutar ${name}: ${error.message || 'Error desconocido'}`;
+    }
+
+    if (isMutation) {
+        try { window.dispatchEvent(new CustomEvent('data-changed')); } catch {}
+    }
+
+    if (chat) {
+        try {
+            const response = await chat.sendMessage({ message: resultText });
+            if (response.functionCalls && response.functionCalls.length > 0) {
+                return await processFunctionCalls(response.functionCalls, depth + 1);
+            }
+            return response.text || resultText;
+        } catch (error) {
+            console.error("Error sending function result to Gemini:", error);
+            return resultText;
         }
     }
+
+    return resultText;
 };
 
 const generateSubject = async (body: string): Promise<string> => {
