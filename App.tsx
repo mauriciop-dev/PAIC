@@ -231,16 +231,6 @@ const App: React.FC = () => {
       }
   }, [userProfile]);
   
-  // Effect for onboarding
-  useEffect(() => {
-    if (userProfile && !isLoadingSession) {
-      const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
-      if (isConjuntoAdmin && !userProfile.onboardingCompleted) {
-          setShowOnboarding(true);
-      }
-    }
-  }, [userProfile, isLoadingSession]);
-
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
   };
@@ -375,6 +365,7 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
+            onStartTour={() => setShowOnboarding(true)}
             userProfile={userProfile}
             conjuntoInfo={conjuntoInfo} 
             onLogout={handleLogout} 
