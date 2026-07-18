@@ -51,7 +51,7 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick, onStartTour, userProfile, 
         <div className="flex justify-between items-start">
           <div>
             <h1 id="paic-title" className="text-lg md:text-xl font-bold text-gray-800">
-              PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Conjuntos</span>
+              PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Copropiedades</span>
             </h1>
             <div className="flex items-center gap-2 mt-1">
                 <p className="text-md font-semibold text-blue-600">{activeTabName}</p>

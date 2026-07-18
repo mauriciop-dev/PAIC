@@ -13,7 +13,7 @@ interface OnboardingStep {
 }
 
 const steps: OnboardingStep[] = [
-  { step: 1, section: "Introducción", selector: "#paic-title", action: "wait", duration: 5000, audio_text: "Bienvenidos a PAIC, la Plataforma de Administración Inteligente de Copropiedades. PAIC está dirigida para administradores de conjuntos residenciales, torres de oficinas, torres mixtas y complejos de bodegas. Nuestra interfaz tiene dos grandes componentes: el chatbot y la interfaz principal." },
+  { step: 1, section: "Introducción", selector: "#paic-title", action: "wait", duration: 5000, audio_text: "Bienvenidos a PAIC, la Plataforma de Administración Inteligente de Copropiedades. PAIC está dirigida para administradores de copropiedades, torres de oficinas, torres mixtas y complejos de bodegas. Nuestra interfaz tiene dos grandes componentes: el chatbot y la interfaz principal." },
   { step: 2, section: "Chatbot - Apertura", selector: "#btn-chatbot", action: "click", audio_text: "Por favor, haga clic en el botón del chatbot para conocer sus funciones." },
   { step: 3, section: "Chatbot - Opciones", selector: "#chatbot-header-options", action: "wait", duration: 4000, audio_text: "En la parte superior del chat podrá ver el saludo y las opciones principales disponibles para interactuar de forma rápida." },
   { step: 4, section: "Chatbot - Interacción", selector: "#chatbot-input-box", action: "wait", duration: 4000, audio_text: "Aquí abajo encontrará la caja de texto. Podrá interactuar haciendo clic en las opciones sugeridas o escribiendo directamente sus preguntas." },

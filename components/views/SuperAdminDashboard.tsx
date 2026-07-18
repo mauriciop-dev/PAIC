@@ -78,7 +78,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
 
             <main className="p-6 space-y-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <StatCard title="Conjuntos Registrados" value={stats?.totalConjuntos.toString() ?? '...'} icon="briefcase" iconColor="bg-blue-500" />
+                    <StatCard title="Copropiedades Registradas" value={stats?.totalConjuntos.toString() ?? '...'} icon="briefcase" iconColor="bg-blue-500" />
                     <StatCard title="Total Residentes" value={stats?.totalResidents.toString() ?? '...'} icon="users" iconColor="bg-teal-500" />
                     <StatCard title="Suscripciones Activas" value={stats?.paidSubscriptions.toString() ?? '...'} icon="shield-check" iconColor="bg-green-500" />
                     <StatCard title="Ingresos (MRR)" value={stats ? stats.monthlyRecurringRevenue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }) : '...'} icon="dollarSign" iconColor="bg-yellow-500" />
@@ -103,7 +103,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                 
                 <div className="bg-white rounded-lg shadow-md overflow-hidden">
                     <div className="p-4 border-b">
-                        <h2 className="text-lg font-semibold text-gray-700">Gestión de Conjuntos Residenciales</h2>
+                        <h2 className="text-lg font-semibold text-gray-700">Gestión de Copropiedades Residenciales</h2>
                     </div>
                     {isLoading ? (
                         <div className="text-center p-10 text-gray-500">Cargando clientes...</div>
@@ -112,7 +112,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onLo
                             <table className="w-full text-sm text-left text-gray-500">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3">Nombre del Conjunto</th>
+                                        <th scope="col" className="px-6 py-3">Nombre de la Copropiedad</th>
                                         <th scope="col" className="px-6 py-3">Administrador</th>
                                         <th scope="col" className="px-6 py-3">Plan de Suscripción</th>
                                         <th scope="col" className="px-6 py-3 text-right">Acciones</th>
