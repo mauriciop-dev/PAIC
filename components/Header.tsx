@@ -14,7 +14,7 @@ interface HeaderProps {
   activeTabName: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onHelpClick, userProfile, conjuntoInfo, onLogout, onSettingsClick, activeTabName }) => {
+const Header: React.FC<HeaderProps> = ({ onHelpClick, onStartTour, userProfile, conjuntoInfo, onLogout, onSettingsClick, activeTabName }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
