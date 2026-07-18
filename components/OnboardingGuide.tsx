@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { UserProfile } from '../types';
 import { apiService } from '../services/apiService';
+import { analytics } from '../services/analytics';
 
 interface OnboardingStep {
   step: number;
@@ -119,6 +120,9 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose, user
 
   const handleClose = useCallback(async () => {
     cancelSpeech();
+    if (!isFinished) {
+      analytics.trackOnboarding('skipped');
+    }
     if (userProfile) {
       try {
         await apiService.updateUserProfile({ ...userProfile, onboardingCompleted: true } as any);

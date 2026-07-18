@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabaseClient';
 import { Icon } from '../ui/Icon';
 import LoginForm from '../LoginForm';
 import { PlatformUser } from '../../types';
+import { analytics } from '../../services/analytics';
 
 interface LoginViewProps {
   onInternalAuthSuccess: (user: PlatformUser) => void;
@@ -43,6 +44,8 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al iniciar demo');
       if (!data.access_token) throw new Error('No se pudo iniciar sesión demo');
+      analytics.trackSignUp('demo', 'demo');
+      analytics.trackLogin('demo', 'demo');
       await supabase.auth.setSession({
         access_token: data.access_token,
         refresh_token: data.refresh_token,

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import NavBar from './components/NavBar';
@@ -18,6 +18,7 @@ import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
 import OnboardingGuide from './components/OnboardingGuide';
+import { analytics } from './services/analytics';
 
 interface LoginError {
   title: string;
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [notification, setNotification] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<SettingsTab>('Perfil');
+  const loginTrackedRef = useRef(false);
 
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
@@ -55,12 +57,25 @@ const App: React.FC = () => {
     setSession(null);
   }, []);
 
+  // Track UTM/source params on first load
+  useEffect(() => {
+    analytics.trackUTM();
+  }, []);
+
+  // Track section views on tab change
+  useEffect(() => {
+    if (userProfile) {
+      analytics.trackSectionView(activeTab, userProfile.role);
+    }
+  }, [activeTab, userProfile]);
+
   // Effect to catch specific configuration errors from the URL on load
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const errorDescription = params.get('error_description');
 
     if (errorDescription && errorDescription.includes('Database error saving new user')) {
+      analytics.trackError('config_error', 'Database error saving new user');
       setLoginError({
         title: "Error de Configuración del Servidor",
         message: "No se pudo crear el perfil de usuario. Esto suele ocurrir si una cuenta fue eliminada y se intenta registrar de nuevo. Por favor, contacta a soporte técnico e informa del error 'DB_SAVE_USER_CONFLICT' para reactivar tu cuenta.",
@@ -131,6 +146,14 @@ const App: React.FC = () => {
             if (cancelled) return;
 
             if (profile) {
+                if (!loginTrackedRef.current) {
+                  loginTrackedRef.current = true;
+                  if (profile.email !== 'demo@paicai.com.co') {
+                    analytics.trackLogin('google', profile.role);
+                  }
+                }
+                analytics.setUserId(profile.id);
+                analytics.trackPageView(activeTab);
                 setUserProfile(profile);
                 if (profile.conjuntoId) {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
@@ -144,6 +167,7 @@ const App: React.FC = () => {
                     setIsInitialSetupModalOpen(true);
                 }
             } else {
+                analytics.trackError('sync_error', 'Profile not found after retries');
                 console.error("User is logged in but profile data is missing after retries.");
                 setLoginError({
                     title: "Error de Sincronización",
@@ -154,6 +178,7 @@ const App: React.FC = () => {
                 setConjuntoInfo(null);
             }
         } catch (error) {
+            analytics.trackError('fetch_error', 'Error fetching profile data');
             console.error("Error fetching profile data:", error);
             setLoginError({
                 title: "Error de Datos",
@@ -190,6 +215,7 @@ const App: React.FC = () => {
           const updatedProfile = { ...userProfile, role: UserRole.Subscriber };
           await apiService.updateUserProfile(updatedProfile);
           
+          analytics.trackSubscription('Free', 'Paid');
           setConjuntoInfo(updatedConjunto);
           setUserProfile(updatedProfile);
           setNotification('¡Suscripción exitosa! Has mejorado al Plan Pro.');
@@ -232,6 +258,7 @@ const App: React.FC = () => {
   }, [userProfile]);
   
   const handleOnboardingComplete = () => {
+    analytics.trackOnboarding('completed');
     setShowOnboarding(false);
   };
   
@@ -289,6 +316,8 @@ const App: React.FC = () => {
           permissions: permissions,
       };
 
+      analytics.trackLogin('internal', 'internal');
+      analytics.setUserId(profile.id);
       setUserProfile(profile);
 
       if (profile.conjuntoId) {
@@ -365,7 +394,7 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
-            onStartTour={() => setShowOnboarding(true)}
+            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
             userProfile={userProfile}
             conjuntoInfo={conjuntoInfo} 
             onLogout={handleLogout} 
@@ -388,7 +417,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { setIsHelpModalOpen(false); setShowOnboarding(true); }} />}
+      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboarding(true); }} />}
       
       {isInitialSetupModalOpen && (
         <InitialSetupModal 
