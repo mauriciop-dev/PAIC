@@ -156,7 +156,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose, user
   }, [stepIndex, isOpen, currentStep, speak, isFinished]);
 
   useEffect(() => {
-    if (!isOpen || !currentStep || currentStep.action !== 'click' || isFinished) return;
+    if (!isOpen || !currentStep || currentStep.action !== 'click' || isFinished || isSpeaking) return;
     const handler = (e: Event) => {
       const target = e.target as HTMLElement;
       if (target.closest(currentStep.selector)) {
@@ -165,13 +165,13 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose, user
     };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, [stepIndex, isOpen, currentStep, handleNext, isFinished]);
+  }, [stepIndex, isOpen, currentStep, handleNext, isFinished, isSpeaking]);
 
   useEffect(() => {
-    if (!isOpen || !currentStep || currentStep.action !== 'wait' || isFinished) return;
+    if (!isOpen || !currentStep || currentStep.action !== 'wait' || isFinished || isSpeaking) return;
     const timer = setTimeout(() => handleNext(), currentStep.duration || 4000);
     return () => clearTimeout(timer);
-  }, [stepIndex, isOpen, currentStep, handleNext, isFinished]);
+  }, [stepIndex, isOpen, currentStep, handleNext, isFinished, isSpeaking]);
 
   useEffect(() => {
     if (!isOpen || !currentStep || currentStep.action !== 'click' || isFinished) return;
@@ -259,14 +259,20 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose, user
             <span className="text-xs font-bold text-gray-400">{stepIndex + 1} / {steps.length}</span>
           </div>
           <p className="text-sm text-gray-700 mb-3">{currentStep.audio_text}</p>
-          {isSpeaking && (
-            <div className="flex items-center gap-1 mb-2">
+          {isSpeaking ? (
+            <div className="flex items-center gap-2 mb-2 bg-blue-50 rounded-md px-2 py-1.5">
               <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-              <span className="text-xs text-blue-500">Reproduciendo...</span>
+              <span className="text-xs text-blue-600 font-medium">Reproduciendo explicación...</span>
             </div>
-          )}
-          {currentStep.action === 'click' && (
-            <p className="text-xs text-amber-600 font-semibold mb-2">👆 Haz clic en el elemento resaltado</p>
+          ) : (
+            currentStep.action === 'click' ? (
+              <p className="text-xs text-amber-600 font-semibold mb-2">👆 Haz clic en el elemento resaltado</p>
+            ) : (
+              <div className="flex items-center gap-1 mb-2 text-green-700">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <span className="text-xs font-medium">Explicación completada</span>
+              </div>
+            )
           )}
           <div className="flex justify-between items-center border-t pt-2">
             <div className="flex gap-2">
@@ -280,7 +286,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isOpen, onClose, user
               <button onClick={() => { cancelSpeech(); onClose(); }} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">
                 Saltar
               </button>
-              {currentStep.action === 'wait' && (
+              {currentStep.action === 'wait' && !isSpeaking && (
                 <button onClick={handleNext} className="px-3 py-1 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700">
                   Siguiente ▶
                 </button>
