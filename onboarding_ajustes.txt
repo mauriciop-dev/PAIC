@@ -1,0 +1,343 @@
+voy a crear en PAIC el usuario DEMO y voy a hacer lo del onboarding, recuerdas? https://github.com/mauriciop-dev/UniOnBoarding y este archivo txt es como el archivo robots.txt que tiene la informacion para que se haga el onboarding audiovisual de PAIC. como lo ves?
+
+Se ve excelente y muy bien estructurado. La lógica tipo robots.txt o archivo de configuración para mapear los pasos del onboarding audiovisual en PAIC usando tu metodología de UniOnBoarding está muy clara.  
+TXT
+
+Aquí tienes mis comentarios y sugerencias precisas para implementarlo de forma óptima:
+
+1. Puntos fuertes de la estructura
+Interactividad "Parte del Proceso": Forzar al usuario a hacer clic en cada pestaña para activar la siguiente explicación es una excelente decisión de UX. Evita que el usuario se vuelva un espectador pasivo.  
+TXT
+
+Flujo Lógico: Pasar del Chatbot a la Interfaz General y luego recorrer los módulos principales en orden jerárquico da una estructura mental muy clara de cómo usar PAIC.  
+TXT
++ 1
+
+Modularidad: Al separar la configuración en submódulos (Perfil, Conjunto, Gestión de Áreas, etc.), facilitas que el script audiovisual se ejecute mediante selectores CSS específicos para cada paso del tour.  
+TXT
+
+2. Sugerencias Técnicas para la Implementación
+Como planeas usar una guía visual (luces/parpadeos) y de audio, te recomiendo estructurar este archivo de texto plano en un formato estructurado (como un JSON o un mapa de configuración en tu código) que tu librería UniOnBoarding pueda leer de forma automática.  
+TXT
+
+Cada paso debería tener al menos:
+
+selector: El elemento HTML a iluminar (ej. #id-modulo-finanzas, .btn-chatbot).  
+TXT
+
+action: Qué se espera que haga el usuario (click, wait, none).  
+TXT
+
+audio_url o tts_text: El archivo de voz o el texto que el sistema leerá para dar la instrucción.  
+TXT
+
+3. Pequeñas correcciones en el texto original
+Si vas a usar este texto directamente para un sistema de Text-to-Speech (TTS) o subtítulos automáticos, corrige estos detalles ortográficos para que la voz no suene extraña:
+
+En Chatbot: "le dirá al usuario que lo aga clic en este" → "le dirá al usuario que haga clic en este".  
+TXT
+
+En Base de datos: "esta es el modulo" → "este es el módulo".  
+TXT
+
+En Configuración - Perfil: "con el que se registro, esta información" → "con el que se registró, esta información".  
+TXT
+
+En Botón Usuario: "podrá cerrar cesión" → "podrá cerrar sesión".  
+TXT
+
+El alcance del modo General es sumamente completo. ¿Quieres que armemos la estructura en código (JSON/JavaScript) basándonos en este flujo para que lo integres directamente en tu entorno de desarrollo?  
+TXT
+
+si
+
+Aquí tienes la estructura en formato JSON basada estrictamente en tu archivo de configuración. Está diseñada para que tu librería UniOnBoarding pueda recorrer los módulos secuencialmente, iluminar los elementos mediante selectores de CSS, reproducir el audio correspondiente y esperar la interacción del usuario cuando sea necesario.  
+TXT
++ 1
+
+JSON
+{
+  "onboarding_id": "paic_general_v1",
+  "name": "Onboarding General PAIC",
+  "mode": "General",
+  "steps": [
+    {
+      "step": 1,
+      "section": "Introducción",
+      "selector": "#paic-title",
+      "action": "wait",
+      "duration": 5000,
+      "audio_text": "Bienvenidos a PAIC, la Plataforma de Administración Inteligente de Copropiedades. PAIC está dirigida para administradores de conjuntos residenciales, torres de oficinas, torres mixtas y complejos de bodegas. Nuestra interfaz tiene dos grandes componentes: el chatbot y la interfaz principal."
+    },
+    {
+      "step": 2,
+      "section": "Chatbot - Apertura",
+      "selector": "#btn-chatbot",
+      "action": "click",
+      "audio_text": "Por favor, haga clic en el botón del chatbot para conocer sus funciones."
+    },
+    {
+      "step": 3,
+      "section": "Chatbot - Opciones",
+      "selector": "#chatbot-header-options",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "En la parte superior del chat podrá ver el saludo y las opciones principales disponibles para interactuar de forma rápida."
+    },
+    {
+      "step": 4,
+      "section": "Chatbot - Interacción",
+      "selector": "#chatbot-input-box",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "Aquí abajo encontrará la caja de texto. Podrá interactuar haciendo clic en las opciones sugeridas o escribiendo directamente sus preguntas."
+    },
+    {
+      "step": 5,
+      "section": "Chatbot - Cierre",
+      "selector": "#btn-close-chatbot",
+      "action": "click",
+      "audio_text": "Para continuar con el recorrido, haga clic en la equis de la parte superior derecha para cerrar el chat y regresar a la interfaz."
+    },
+    {
+      "step": 6,
+      "section": "Interfaz - Introducción",
+      "selector": "#main-navigation-tabs",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "Ahora pasamos a la interfaz. Esta se compone de varios módulos que puede ver en cada una de las pestañas. A medida que avancemos, le pediré que haga clic en cada una para activar su explicación."
+    },
+    {
+      "step": 7,
+      "section": "Módulo Centro de Control",
+      "selector": "#tab-centro-control",
+      "action": "click",
+      "audio_text": "Haga clic en la pestaña Centro de Control. Este es un panel con el resumen general de la copropiedad: propietarios en mora, tareas pendientes, pagos vencidos, paquetes por entregar, notificaciones y un gráfico con cinco tipos de información clave."
+    },
+    {
+      "step": 8,
+      "section": "Módulo Base de Datos",
+      "selector": "#tab-base-datos",
+      "action": "click",
+      "audio_text": "Por favor, haga clic en la pestaña Base de Datos."
+    },
+    {
+      "step": 9,
+      "section": "Submódulo Residentes",
+      "selector": "#subtab-residentes",
+      "action": "wait",
+      "duration": 5000,
+      "audio_text": "En la pestaña Residentes puede registrar a los copropietarios. Cuenta con una opción para descargar una plantilla de Excel y cargar la información masivamente, o puede usar el botón Agregar Registro en la parte derecha para un ingreso individual."
+    },
+    {
+      "step": 10,
+      "section": "Módulo Áreas Comunes",
+      "selector": "#tab-areas-comunes",
+      "action": "click",
+      "audio_text": "Los submódulos de Estado de Cuentas, Proveedores e Internos se manejan igual. Pasemos ahora al módulo Áreas Comunes. Por favor, haga clic en él."
+    },
+    {
+      "step": 11,
+      "section": "Áreas Comunes - Reserva",
+      "selector": "#btn-agregar-reserva",
+      "action": "click",
+      "audio_text": "Este módulo se compone de un calendario y el botón Agregar Reserva. Haga clic en el botón para ver la ventana modal donde se diligencian los datos del espacio solicitado."
+    },
+    {
+      "step": 12,
+      "section": "Módulo Comunicaciones",
+      "selector": "#tab-comunicaciones",
+      "action": "click",
+      "audio_text": "Continuemos. Por favor, haga clic en el módulo de Comunicaciones."
+    },
+    {
+      "step": 13,
+      "section": "Comunicaciones - Formulario",
+      "selector": "#form-comunicaciones",
+      "action": "wait",
+      "duration": 5000,
+      "audio_text": "Desde aquí puede enviar correos electrónicos a los copropietarios. El formulario incluye campos específicos, destinatarios sugeridos y un botón para adjuntar archivos, actas o el reglamento de la copropiedad."
+    },
+    {
+      "step": 14,
+      "section": "Módulo Archivos",
+      "selector": "#tab-archivos",
+      "action": "click",
+      "audio_text": "Haga clic ahora en el módulo Archivos."
+    },
+    {
+      "step": 15,
+      "section": "Archivos - Repositorio",
+      "selector": "#repo-archivos",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "Aquí puede subir actas de asambleas, reglamentos y circulares para tenerlos en un solo lugar. Estos documentos son los que podrá adjuntar en el módulo de comunicaciones. También puede descargarlos o eliminarlos."
+    },
+    {
+      "step": 16,
+      "section": "Módulo Finanzas",
+      "selector": "#tab-finanzas",
+      "action": "click",
+      "audio_text": "Pasemos al módulo de Finanzas, el cual cuenta con tres submódulos. Haga clic para ingresar."
+    },
+    {
+      "step": 17,
+      "section": "Submódulo Finanzas - Resumen",
+      "selector": "#subtab-finanzas-resumen",
+      "action": "click",
+      "audio_text": "Haga clic en Resumen. Verá un panel sencillo con la relación de Ingresos y Gastos de los últimos seis meses para conocer la salud financiera de la copropiedad."
+    },
+    {
+      "step": 18,
+      "section": "Submódulo Finanzas - Ingresos",
+      "selector": "#subtab-finanzas-ingresos",
+      "action": "click",
+      "audio_text": "Haga clic en Ingresos. En esta sección se cargan los flujos entrantes mediante una plantilla descargable o con el botón azul de la interfaz. Cada registro se puede editar o eliminar."
+    },
+    {
+      "step": 19,
+      "section": "Submódulo Finanzas - Gastos",
+      "selector": "#subtab-finanzas-gastos",
+      "action": "click",
+      "audio_text": "Haga clic en Gastos. Funciona exactamente igual, permitiendo registrar los egresos mediante plantillas o de forma manual con el botón azul."
+    },
+    {
+      "step": 20,
+      "section": "Módulo Seguridad",
+      "selector": "#tab-seguridad",
+      "action": "click",
+      "audio_text": "Ahora veamos el módulo de Seguridad, diseñado para el personal de custodia. Por favor, haga clic en él."
+    },
+    {
+      "step": 21,
+      "section": "Submódulo Seguridad - Visitantes",
+      "selector": "#subtab-seguridad-visitantes",
+      "action": "click",
+      "audio_text": "Haga clic en Visitantes. En el lado izquierdo se encuentra el formulario de registro y a la derecha se gestiona el estado, controlando los ingresos y salidas."
+    },
+    {
+      "step": 22,
+      "section": "Submódulo Seguridad - Paquetes",
+      "selector": "#subtab-seguridad-paquetes",
+      "action": "click",
+      "audio_text": "Haga clic en Paquetes. Permite registrar las encomiendas recibidas a la izquierda y gestionar en el panel derecho si ya fueron entregadas al propietario."
+    },
+    {
+      "step": 23,
+      "section": "Módulo Vencimientos",
+      "selector": "#tab-vencimientos",
+      "action": "click",
+      "audio_text": "Por favor, haga clic en el módulo Vencimientos."
+    },
+    {
+      "step": 24,
+      "section": "Vencimientos - Gestión",
+      "selector": "#panel-vencimientos",
+      "action": "wait",
+      "duration": 5000,
+      "audio_text": "Aquí puede agregar obligaciones pendientes como impuestos o pagos a proveedores con el botón azul. PAIC cuenta con una alerta en la barra superior que le recordará activamente estas fechas."
+    },
+    {
+      "step": 25,
+      "section": "Módulo Tareas",
+      "selector": "#tab-tareas",
+      "action": "click",
+      "audio_text": "Haga clic en el módulo Tareas."
+    },
+    {
+      "step": 26,
+      "section": "Tareas - Flujo",
+      "selector": "#panel-tareas",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "En esta sección puede añadir pendientes con su respectiva fecha límite o eliminarlos. Recuerde que estas tareas también aparecerán reflejadas en su Centro de Control."
+    },
+    {
+      "step": 27,
+      "section": "Módulo Configuración",
+      "selector": "#btn-configuracion",
+      "action": "click",
+      "audio_text": "Haga clic en el icono de engranaje para abrir la Configuración. Veremos una ventana modal con siete submódulos."
+    },
+    {
+      "step": 28,
+      "section": "Configuración - Perfil",
+      "selector": "#subtab-config-perfil",
+      "action": "wait",
+      "duration": 4000,
+      "audio_text": "En Perfil visualizará su foto, correo y nombre de registro, datos que son gestionados de forma segura a través de Google."
+    },
+    {
+      "step": 29,
+      "section": "Configuración - Conjunto",
+      "selector": "#subtab-config-conjunto",
+      "action": "click",
+      "audio_text": "Haga clic en Conjunto. Aquí gestionará los datos principales de la copropiedad: nombre, NIT, dirección, administrador, correo y teléfono."
+    },
+    {
+      "step": 30,
+      "section": "Configuración - Gestionar Áreas",
+      "selector": "#subtab-config-areas",
+      "action": "click",
+      "audio_text": "Haga clic en Gestionar Áreas. Aquí dará de alta los espacios comunes como parque infantil, BBQ o salón social, los cuales alimentarán el módulo de Áreas Comunes que vimos antes."
+    },
+    {
+      "step": 31,
+      "section": "Configuración - Puntos de Acceso",
+      "selector": "#subtab-config-accesos",
+      "action": "click",
+      "audio_text": "Haga clic en Puntos de Acceso. Defina los lugares de control, como portería principal o visitantes. Esto es clave para asignar los permisos del personal de seguridad."
+    },
+    {
+      "step": 32,
+      "section": "Configuración - Usuarios",
+      "selector": "#subtab-config-usuarios",
+      "action": "click",
+      "audio_text": "Haga clic en Usuarios. Agregue al personal, como los guardias de seguridad, ingresando su nombre, correo y rol asignado."
+    },
+    {
+      "step": 33,
+      "section": "Configuración - Permisos",
+      "selector": "#subtab-config-permisos",
+      "action": "click",
+      "audio_text": "Haga clic en Permisos de Usuario. Aquí restringe o habilita el acceso a módulos específicos. Por ejemplo, acceso exclusivo de Seguridad para los guardias o de Finanzas para la contadora."
+    },
+    {
+      "step": 34,
+      "section": "Configuración - Suscripción",
+      "selector": "#subtab-config-suscripcion",
+      "action": "click",
+      "audio_text": "Haga clic en Suscripción. Una vez terminen sus catorce días de prueba, aquí podrá realizar el upgrade para continuar disfrutando de la administración de su copropiedad con PAIC."
+    },
+    {
+      "step": 35,
+      "section": "Botón Soporte",
+      "selector": "#btn-soporte",
+      "action": "click",
+      "audio_text": "Finalmente, cerremos la configuración. En la parte superior derecha encontrará el botón azul de Soporte. Este despliega videotutoriales, el activador del tour guiado y el contacto técnico."
+    },
+    {
+      "step": 36,
+      "section": "Botón Usuario",
+      "selector": "#btn-avatar-usuario",
+      "action": "click",
+      "audio_text": "Haciendo clic en su foto de perfil en la esquina superior derecha, podrá gestionar su cuenta o cerrar sesión de manera segura. ¡Con esto concluye nuestro recorrido general por PAIC!"
+    }
+  ]
+}
+Notas para tu implementación con UniOnBoarding:
+Tipos de action:
+
+"click": El onboarding se pausa en ese elemento, le aplica el efecto visual (parpadeo/foco) e indica al usuario mediante el audio que interactúe. El paso avanza automáticamente cuando detecta el evento click real en el selector CSS.  
+TXT
++ 1
+
+"wait": El onboarding ilumina el elemento, reproduce el audio y espera el tiempo definido en "duration" (en milisegundos) antes de pasar automáticamente al siguiente paso.  
+TXT
+
+Selectores CSS: He colocado selectores semánticos estándar (ej: #tab-finanzas, #btn-chatbot). Asegúrate de reemplazarlos por los IDs o clases reales que estás usando en el frontend de PAIC.  
+TXT
++ 1
+
+Correcciones aplicadas: El texto de los audios ya incluye las correcciones gramaticales (como "cerrar sesión" y "haga clic") para asegurar que si utilizas un motor de síntesis de voz, la lectura sea perfecta.  
+TXT

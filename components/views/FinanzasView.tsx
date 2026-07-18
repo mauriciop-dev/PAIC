@@ -516,15 +516,19 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         <div className="space-y-6">
             <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                  {Object.values(FinanzasTab).map(tab => (
+                  {Object.values(FinanzasTab).map(tab => {
+                    const subtabId = 'subtab-finanzas-' + tab.toLowerCase().replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                    return (
                     <button
                       key={tab}
+                      id={subtabId}
                       onClick={() => setActiveTab(tab)}
                       className={`${ activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
                     >
                       {tab}
                     </button>
-                  ))}
+                    );
+                  })}
                 </nav>
             </div>
             

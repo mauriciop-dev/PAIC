@@ -71,8 +71,8 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Effect #1: Runs ONCE on mount. Its only job is to get the initial session
-  // and set up the listener. It is the single source of truth for the session state.
+  // Effect #1: Runs ONCE on mount. Gets the initial session via getSession()
+  // and sets up the auth listener for subsequent changes.
   useEffect(() => {
     // Do not run if a config error was already detected from the URL
     const params = new URLSearchParams(window.location.hash.slice(1));
@@ -81,9 +81,13 @@ const App: React.FC = () => {
         return;
     }
 
-    // Supabase's onAuthStateChange listener fires immediately with the current session.
-    // This is more reliable than calling getSession() and setting up the listener separately,
-    // as it avoids race conditions.
+    // getSession() explicitly recovers the session from storage or URL hash,
+    // handling the OAuth redirect callback properly.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
     });
@@ -231,19 +235,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (userProfile && !isLoadingSession) {
       const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
-      if (isConjuntoAdmin) {
-        const onboardingCompleted = localStorage.getItem(`onboardingCompleted-${userProfile.id}`);
-        if (!onboardingCompleted) {
-            setShowOnboarding(true);
-        }
+      if (isConjuntoAdmin && !userProfile.onboardingCompleted) {
+          setShowOnboarding(true);
       }
     }
   }, [userProfile, isLoadingSession]);
 
   const handleOnboardingComplete = () => {
-    if (userProfile) {
-      localStorage.setItem(`onboardingCompleted-${userProfile.id}`, 'true');
-    }
     setShowOnboarding(false);
   };
   
@@ -367,7 +365,7 @@ const App: React.FC = () => {
       
       {isConjuntoAdmin && (
         <div className={`fixed top-0 left-0 h-full z-20 transition-opacity duration-300 ease-in-out ${isChatbotOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <button id="chatbot-toggle-button" onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
+          <button id="btn-chatbot" onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
             <Icon name="bot" className="w-6 h-6" />
             <span style={{ writingMode: 'vertical-rl' }} className="font-semibold text-xs tracking-wider">ASISTENTE</span>
           </button>
@@ -425,7 +423,7 @@ const App: React.FC = () => {
         <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
       )}
       
-      <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} />
+      <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} userProfile={userProfile} />
     </div>
   );
 };

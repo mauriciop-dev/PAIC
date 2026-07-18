@@ -172,6 +172,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                 })}
             </div>
             <button
+              id="btn-agregar-reserva"
               onClick={() => setIsBookingModalOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 text-sm"
             >

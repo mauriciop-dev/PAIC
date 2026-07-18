@@ -111,7 +111,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
 
   return (
     <aside className={containerClasses}>
-      <header className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
+      <header id="chatbot-header-options" className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
         <div className="flex items-center gap-3">
             <Icon name="bot" className="w-8 h-8 text-blue-600" />
             <div>
@@ -119,7 +119,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
                 <p className="text-xs text-green-600 font-semibold">● Conectado</p>
             </div>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-gray-800">
+        <button id="btn-close-chatbot" onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-gray-800">
           <Icon name="x" className="w-6 h-6" />
         </button>
       </header>
@@ -158,7 +158,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
+      <div id="chatbot-input-box" className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
           <textarea
             ref={inputRef}

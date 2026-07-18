@@ -132,7 +132,7 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
             </div>
         </div>
       
-        <div className="space-y-3">
+        <div id="panel-tareas" className="space-y-3">
         {isLoading ? (
             <div className="text-center py-10 text-gray-500 bg-white rounded-lg shadow-sm">Cargando tareas...</div>
         ) : sortedTasks.length > 0 ? (

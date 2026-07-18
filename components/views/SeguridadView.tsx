@@ -371,9 +371,12 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
             <div className="mb-4 border-b border-gray-200">
                 <nav className="-mb-px flex justify-between items-center" aria-label="Tabs">
                     <div className="flex space-x-6">
-                        {(['Visitantes', 'Paquetes'] as SeguridadTab[]).map(tab => (
+                        {(['Visitantes', 'Paquetes'] as SeguridadTab[]).map(tab => {
+                            const subtabId = 'subtab-seguridad-' + tab.toLowerCase().replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                            return (
                             <button
                               key={tab}
+                              id={subtabId}
                               onClick={() => setActiveTab(tab)}
                               className={`${
                                 activeTab === tab
@@ -383,7 +386,8 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
                             >
                               {tab}
                             </button>
-                        ))}
+                            );
+                        })}
                     </div>
                     <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
                         <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />

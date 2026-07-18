@@ -522,9 +522,12 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     <div className="space-y-6">
       <div className="mb-4 border-b border-gray-200">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {Object.values(DbTab).map(tab => (
+          {Object.values(DbTab).map(tab => {
+            const subtabId = 'subtab-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+            return (
             <button
               key={tab}
+              id={subtabId}
               onClick={() => setActiveDbTab(tab)}
               className={`${
                 activeDbTab === tab
@@ -534,7 +537,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
             >
               {tab}
             </button>
-          ))}
+            );
+          })}
         </nav>
       </div>
 

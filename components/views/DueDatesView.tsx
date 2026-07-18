@@ -144,7 +144,7 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div id="panel-vencimientos" className="bg-white rounded-lg shadow-md overflow-hidden">
         {isLoading ? (
             <div className="p-6 text-center text-gray-500">Cargando vencimientos...</div>
         ) : (

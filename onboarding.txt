@@ -1,0 +1,76 @@
+Este archivo contiene la información para hacer todo el onboarding de la plataforma PAIC.
+
+PAIC es Plataforma de Administración Inteligente de Copropiedades.
+
+El OnBoarding de PAIC se hara usando la "metodología" del repositorio https://github.com/mauriciop-dev/UniOnBoarding habrá una guía de visual en pantalla y de audio que le irá mostrando al usuario como funciona PAIC.
+
+El onboarding tendrá dos modos: General, Guiado
+
+General: Este sera corto y con interacción minima, se dividirá en 2 partes (Chatbot, Interfaz)
+
+Introducción: iluminara el titulo de la plataforma y mencionara que PAIC esta dirigida para administradores de copropiedades, pueden ser conjuntos residenciales, torres de oficinas, torres mixtas, complejos de bodegas, entre otros.
+
+Tambien menciona que la interfaz tiene dos grandes componentes. el chatbot y la interfaz
+
+Chatbot: 
+
+Aquí iluminara el botón del chatbot y le dirá al usuario que lo aga clic en este. 
+Una vez haga clic en este, iluminara la parte superior del chat en donde muestra el saludo y las opciones (mencionando brevemente cada accion).
+Luego ilumina la parte inferior en la caja de texto y le dice que ella podrá interactuar con las diferentes opciones o escribir sus preguntas. 
+Finalmente le pide que haga clic la x de la parte superior derecha del chat, para cerrar el chat y que se repliegue y quede solo la interfaz expuesta.
+
+
+Luego menciona que ahora pasamos a la interfaz:
+
+Aquí hace una introducción indicando que la interfaz esta compuesta por varios modulos, los cuales  pueden ver en cada una de las pestañas. (a medida que los mencionar los va iluminando y los va mostrando le va diciendo al usuario que haga clic en cada pestaña, para hacerlo parte del proceso) y cuando el usuario hace clic en la pestaña de cada modulo activa o inicia la explicación de cada modulo.
+
+Modulo "Centro de control": es un dashboard con un resumen general de la información de la copropiedad, copropietarios en mora, tareas pendientes, pagos vencidos, paquetes por entregar, un centro de notificaciones y un grafico con 5 tipos diferentes de información. y va iluminando cada uno.
+
+Modulo "Base de datos": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí ilumina la pestaña "Residentes" le muestra que esta es el modulo para agregar a los copropietarios, le muestra iluminando que puede descargar una plantilla de excel para registrar la información y luego cargar la información o que la otra opción es con el botón "Agregar registro" que esta en la parte derecha, mientras lo ilumina.
+
+Luego le dice que los submodulos de "Estado de cuentas", "Proveedores" e "Internos" se maneja de la misma forma, pero como estamos en el recorrido general, vamos a pasar al modulo "Areas Comunes".
+
+Modulo "Areas Comunes": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. aquí le muestras que este modulo se compone de un calendario y del botón "Agregar reserva" en la parte superior derecha. le invitas a que haga clic en el botón y le explicas la ventana modal que aparece rápidamente, indicando que allí diligencia los datos de la reserva.
+
+Modulo "Comunicaciones": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí le cuentas que este es el modulo para enviar comunicaciones por correo electrónico a los copropietarios, le muestras, que cada uno de los campos del formulario, le muestras que tiene algunos destinatarios sugeridos y le muestras el botón para adjuntar un archivo, un acta o reglamenteo de la copropiedad.
+
+Modulo "Archivos": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí le muestras que puede subir archivos como actas de asambleas, reglamentos, circulares, etcetera, para tenerlo todo en un solo lugar y que estos archivos son los que podrá adjuntar en la sección de comunicaciones que acabamos de ver. también los podrá gestionar, descargar o eliminar del repositorio.
+
+Modulo "Finanzas": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Este modulo tiene 3 submodulos:
+
+Submodulo "Resumen": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. es un dashboard sencillo con la relaciones de Ingresos y Gastos del conjunto de los últimos seis meses para que se haga una idea de la salud financiera de la copropiedad.
+
+Submodulo "Ingresos": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. En este submódulo carga la información de los ingresos del conjunto. Tiene la opción de descargar y cargar una plantilla o puede usar el botón azul de la interfaz para agregarlo. también puede gestionar cada ingreso editarlo o eliminarlo.
+
+Submodulo "Gastos": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. En este submódulo carga la información de los Gastos del conjunto. Tiene la opción de descargar y cargar una plantilla o puede usar el botón azul de la interfaz para agregarlo. también puede gestionar cada Gasto editarlo o eliminarlo.
+
+Modulo "Seguridad": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Este modulo es para ser manejado por el personal de seguridad que custodia las entradas de la copropiedad. consta de dos submodulos, Visitantes y Paquetes.
+
+Submodulo "Visitantes": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. consta de un formulario en la parte izquierda para el registro de la visita y en la parte derecha se gestiona la visita, se puede monitorear el Estado y se registra el ingreso y la salida de la misma.
+
+Submodulo "Paquetes": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. consta de un formulario en la parte izquierda para el registro de paquetes y en la parte derecha se gestiona el paquete, se puede monitorear el Estado y se registra si ya fue entregado al copropietario.
+
+Modulo "Vencimientos": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. En este modulo se pueden agregar las obligaciones pendientes como impuestos, pagos a proveedores, etcetera y PAIC tiene una alerta en la parte superior derecha que se va actualizando para recordarle estos pagos. en este modulo puede gestionarlos, agregarlos con el botón azul y monitorearlos, editarlos y eliminarlos.
+
+Modulo "Tareas": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. en este modulo puede agregar tareas y adicionarles una fecha de vencimiento, también puede elimianrlas, estas le aparecerán en el modulo principal de "Centro de control"
+
+Modulo "Configuración": Aquí ilumina ese botón )el símbolo de engranaje) como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. aparece una ventana modal con 7 submodulos
+
+Submodulo "Perfil": Aquí aparece la foto, el correo y el nombre, con el que se registro, esta información es gestionada por Google.
+
+Submodulo "Conjunto": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí gestiona la información del conjunto, nombre, nit, dirección, administrador, correo, teléfono.
+
+Submodulo "Gestionar áreas": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. aquí es donde agregas las areas comunes del conjunto, Parque Infantil, BBQ, Salon social, Parqueaderos etcetera, estas son las que van a aparecer en el modulo de Areas Comunes.
+
+Submodulo "Puntos de Acceso": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. aquí es donde vas a agregar por ejemplo la portería principal, la portería del parqueadero, portería de visitantes, etcetera y eso sera importante para cuando agregues usuarios y permisos de usuarios que son el personal de seguridad que va a gestionar el modulo de seguridad y los submodulos de visitantes y paquetes.
+
+Submodulo "Usuarios": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí agregas la información del usuario -guardia de seguridad- al que le vas a dar acceso a PAIC, nombre, correo, rol.
+
+Submodulo "Permisos de Usuario": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí es donde le das permiso al usuario que acabaste de crear para que use uno o varios modulos de PAIC, por ejemplo, al guardia de seguridad le das permiso solo para el modulo de "Seguridad" otro usuario puede ser la contadora y le das permiso para el modulo "Finanzas" para que actualice la información contable.
+
+Submodulo "Suscripcion": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. Aquí es donde una vez pasados los 14 días de prueba de la plataforma, haces upgrade y te suscribes a PAIC para disfrutes de administrar la copropiedad.
+
+
+Boton "Soporte": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. en la parte superior derecha encontrara un botón azul llamado Soporte, este desplegara una ventana modal con videotutoriales de PAIC, con el activador del tour guiado y con el contacto de soporte de la plataforma.
+
+Boton "Usuario": Aquí ilumina ese botón como parpadeando o con un efecto y le pide al usuario con voz que haga clic en este. en donde esta su foto y nombre puede hacer clic y allí podrá cerrar cesión.

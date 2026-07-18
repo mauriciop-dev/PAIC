@@ -140,7 +140,7 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-lg shadow-md">
-                <form onSubmit={handleSend} className="space-y-4">
+                <form id="form-comunicaciones" onSubmit={handleSend} className="space-y-4">
                     <div>
                         <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
                          <div className="flex flex-wrap gap-2 mb-2">

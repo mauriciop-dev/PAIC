@@ -118,6 +118,7 @@ export interface UserProfile {
   trialExpiresAt?: string; // nullable timestamptz
   conjuntoId?: string; // This will be set after initial setup
   permissions?: Tab[];
+  onboardingCompleted?: boolean;
 }
 
 

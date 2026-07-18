@@ -11,6 +11,7 @@ interface LoginViewProps {
 const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
   const [view, setView] = useState<'admin' | 'internal'>('admin');
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [isMarketingFlow, setIsMarketingFlow] = useState(false);
 
   useEffect(() => {
@@ -30,6 +31,27 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
     });
     if (error) setError(error.message);
   };
+
+  const handleDemoLogin = async () => {
+    setError(null);
+    setIsLoadingDemo(true);
+    try {
+      const response = await fetch(
+        'https://vgmwlzhlpehuvfkgqzja.supabase.co/functions/v1/demo-login',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al iniciar demo');
+      if (!data.access_token) throw new Error('No se pudo iniciar sesión demo');
+      await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Error al iniciar demo');
+      setIsLoadingDemo(false);
+    }
+  };
   
   const TabButton: React.FC<{ active: boolean, onClick: () => void, children: React.ReactNode }> = ({ active, onClick, children }) => (
     <button
@@ -43,14 +65,23 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
   );
 
   const renderAdminView = () => (
-    <div className="mt-8 text-center">
+    <div className="mt-8 text-center space-y-3">
       <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center gap-3 p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
         <svg className="w-5 h-5" viewBox="0 0 48 48">
           <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.222 0-9.519-3.356-11.056-7.923l-6.571 4.819C9.656 39.663 16.318 44 24 44z"></path><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C41.383 36.641 44 31.023 44 24c0-1.341-.138-2.65-.389-3.917z"></path>
         </svg>
         <span className="text-sm font-medium text-gray-700">Continuar con Google</span>
       </button>
-      <p className="text-center text-xs text-gray-500 mt-4">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-gray-200"></div>
+        <span className="text-xs text-gray-400 font-medium">O</span>
+        <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
+      <button id="btn-demo" onClick={handleDemoLogin} disabled={isLoadingDemo} className="w-full flex items-center justify-center gap-3 p-3 border-2 border-green-400 bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50">
+        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span className="text-sm font-semibold text-green-700">{isLoadingDemo ? 'Preparando demo...' : 'Probar Demo Gratis'}</span>
+      </button>
+      <p className="text-center text-xs text-gray-500">
         {isMarketingFlow
           ? "Crea tu cuenta de prueba o inicia sesión con un solo clic."
           : "Usa tu cuenta de Google para registrarte o iniciar sesión de forma segura."

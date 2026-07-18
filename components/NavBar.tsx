@@ -136,10 +136,13 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile, o
 
   return (
     <nav id="main-navbar" className="p-2 md:px-4 border-b border-gray-200 bg-white sticky top-[65px] md:top-[77px] z-10 flex justify-between items-center gap-4">
-      <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-        {visibleTabs.map((tab) => (
+      <div id="main-navigation-tabs" className="flex items-center gap-1 md:gap-2 flex-wrap">
+        {visibleTabs.map((tab) => {
+          const tabId = 'tab-' + tab.id.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+          return (
           <button
             key={tab.id}
+            id={tabId}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               activeTab === tab.id
@@ -149,9 +152,11 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab, userProfile, o
           >
             {tab.label}
           </button>
-        ))}
+          );
+        })}
         {isConjuntoAdmin && (
              <button
+                id="btn-configuracion"
                 onClick={() => onSettingsClick()}
                 className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
                 aria-label="Abrir configuración"

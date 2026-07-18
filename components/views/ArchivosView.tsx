@@ -122,7 +122,7 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div id="repo-archivos" className="bg-white rounded-lg shadow-md overflow-hidden">
         {isLoading ? (
           <div className="p-6 text-center text-gray-500">Cargando archivos...</div>
         ) : (
