@@ -43,7 +43,15 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onStartTour }) => {
             </button>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-700">Documentación</h3>
+            <a href="https://docs.paicai.com.co" target="_blank" rel="noopener noreferrer" className="mt-2 w-full text-left px-4 py-2 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md flex items-center gap-3 font-semibold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                Ir a la Documentación de PAIC
+            </a>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-700">Contacto de Soporte</h3>
             <p className="text-gray-600 mt-2">
                 <strong>Empresa:</strong> ProDig<br/>
