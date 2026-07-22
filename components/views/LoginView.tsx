@@ -110,7 +110,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onInternalAuthSuccess }) => {
             <TabButton active={view === 'internal'} onClick={() => setView('internal')}>Soy Personal Interno</TabButton>
         </div>
 
-        <div className="py-8 px-12">
+        <div className="py-8 px-6 sm:px-8 w-full">
             <div className="flex flex-col items-center">
                 <Icon name="bot" className="w-10 h-10 text-blue-600" />
                 <h1 className="text-xl font-bold text-gray-800 mt-3 text-center">

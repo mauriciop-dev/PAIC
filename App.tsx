@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import NavBar from './components/NavBar';
 import Chatbot from './components/Chatbot';
+import DraggableChatButton from './components/DraggableChatButton';
 import HelpModal from './components/HelpModal';
 import InitialSetupModal from './components/InitialSetupModal';
 import SettingsModal from './components/SettingsModal';
@@ -384,15 +385,13 @@ const App: React.FC = () => {
       )}
       
       {isConjuntoAdmin && (
-        <div className={`fixed top-0 left-0 h-full z-20 transition-opacity duration-300 ease-in-out ${isChatbotOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <button id="btn-chatbot" onClick={() => setIsChatbotOpen(true)} className="absolute top-1/2 -translate-y-1/2 left-0 w-8 h-auto bg-blue-600 text-white py-4 px-1 rounded-r-lg shadow-lg hover:bg-blue-700 flex flex-col items-center gap-2 animate-subtle-pulse" aria-label="Abrir asistente">
-            <Icon name="bot" className="w-6 h-6" />
-            <span style={{ writingMode: 'vertical-rl' }} className="font-semibold text-xs tracking-wider">ASISTENTE</span>
-          </button>
-        </div>
+        <DraggableChatButton 
+          isChatbotOpen={isChatbotOpen} 
+          onClick={() => setIsChatbotOpen(true)} 
+        />
       )}
 
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
+      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
             onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
