@@ -35,6 +35,7 @@ const App: React.FC = () => {
   const [isInitialSetupModalOpen, setIsInitialSetupModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined means "not yet determined"
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -375,7 +376,7 @@ const App: React.FC = () => {
   const needsAdminSetup = isConjuntoAdmin && !conjuntoInfo;
 
   return (
-    <div className="flex h-screen font-sans text-gray-800 bg-gray-50">
+    <div className="flex min-h-screen font-sans text-gray-800 bg-gray-50 overflow-x-hidden">
       <NotificationToast message={notification} onClose={() => setNotification(null)} />
       
       {isConjuntoAdmin && (
@@ -391,7 +392,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
+      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : (isConjuntoAdmin ? 'ml-8' : 'ml-0')}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
             onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
@@ -400,20 +401,35 @@ const App: React.FC = () => {
             onLogout={handleLogout} 
             onSettingsClick={handleSettingsClick} 
             activeTabName={activeTab}
+            onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            isMobileMenuOpen={isMobileMenuOpen}
         />
-        {!needsAdminSetup && <NavBar activeTab={activeTab} setActiveTab={setActiveTab} userProfile={userProfile} onSettingsClick={handleSettingsClick} />}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
-          {needsAdminSetup ? (
-             <div className="text-center p-10 text-gray-600">
-                <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
-                <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
-                <p className="mt-2">
-                    Bienvenido a PAIC. Por favor, completa la información de tu conjunto en el diálogo que ha aparecido.
-                </p>
-            </div>
-          ) : (
-            <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
-          )}
+        {!needsAdminSetup && (
+          <NavBar 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            userProfile={userProfile} 
+            onSettingsClick={handleSettingsClick}
+            isMobileOpen={isMobileMenuOpen}
+            onCloseMobile={() => setIsMobileMenuOpen(false)}
+            onHelpClick={() => setIsHelpModalOpen(true)}
+            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
+          />
+        )}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
+          <div className="max-w-screen-2xl mx-auto w-full">
+            {needsAdminSetup ? (
+               <div className="text-center p-10 text-gray-600 bg-white rounded-xl shadow-sm border border-gray-200">
+                  <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
+                  <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
+                  <p className="mt-2">
+                      Bienvenido a PAIC. Por favor, completa la información de tu conjunto en el diálogo que ha aparecido.
+                  </p>
+              </div>
+            ) : (
+              <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
+            )}
+          </div>
         </div>
       </main>
 

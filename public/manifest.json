@@ -1,0 +1,17 @@
+{
+  "short_name": "PAIC",
+  "name": "PAIC - Plataforma de Administración Inteligente de Copropiedades",
+  "description": "Solución integral para la gestión y administración inteligente de copropiedades, conjuntos residenciales y edificios.",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "display": "standalone",
+  "orientation": "any"
+}
