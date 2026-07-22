@@ -341,6 +341,18 @@ begin
 end;
 $$;
 
+CREATE OR REPLACE FUNCTION public.update_user_password(new_password text, user_id integer)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.users
+  SET password = new_password
+  WHERE id = user_id;
+END;
+$$;
+
 -- ============================================
 -- TRIGGERS
 -- ============================================
