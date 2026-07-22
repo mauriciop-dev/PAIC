@@ -269,8 +269,8 @@ const NavBar: React.FC<NavBarProps> = ({
 
       {/* 2. Horizontal Navbar for Tablet (768px+) and Desktop (> 1024px) */}
       <nav id="main-navbar" className="hidden md:block border-b border-gray-200 bg-white sticky top-[65px] z-10">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-2 flex justify-between items-center gap-4 overflow-x-auto scroller-smooth">
-          <div id="main-navigation-tabs" className="flex items-center gap-1.5 lg:gap-2 flex-wrap">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-2 flex justify-between items-center gap-4 overflow-x-auto">
+          <div id="main-navigation-tabs" className="flex items-center gap-1.5 lg:gap-2 min-w-max">
             {visibleTabs.map((tab) => {
               const tabId = 'tab-' + tab.id.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
               const isSelected = activeTab === tab.id;

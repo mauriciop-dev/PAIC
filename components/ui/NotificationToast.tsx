@@ -29,12 +29,12 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ message, onClose 
 
   return (
     <div
-      className={`fixed top-6 right-6 z-50 transition-all duration-300 ease-in-out ${
+      className={`fixed top-6 right-6 z-[9999] pointer-events-none transition-all duration-300 ease-in-out ${
         isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
       }`}
     >
       {message && (
-        <div className="flex items-start gap-3 bg-white p-4 rounded-lg shadow-2xl border border-gray-100 max-w-sm">
+        <div className="flex items-start gap-3 bg-white p-4 rounded-lg shadow-2xl border border-gray-100 max-w-lg break-words pointer-events-auto">
           <div className="p-2 bg-blue-100 rounded-full flex-shrink-0">
             <Icon name="package" className="w-5 h-5 text-blue-600" />
           </div>

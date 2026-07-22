@@ -377,9 +377,10 @@ const App: React.FC = () => {
   const needsAdminSetup = isConjuntoAdmin && !conjuntoInfo;
 
   return (
-    <div className="flex min-h-screen font-sans text-gray-800 bg-gray-50 overflow-x-hidden">
+    <>
       <NotificationToast message={notification} onClose={() => setNotification(null)} />
-      
+      <div className="flex min-h-screen font-sans text-gray-800 bg-gray-50 overflow-x-hidden">
+        
       {isConjuntoAdmin && (
           <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
       )}
@@ -460,6 +461,7 @@ const App: React.FC = () => {
       
       <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} userProfile={userProfile} />
     </div>
+    </>
   );
 };
 
