@@ -351,8 +351,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
         
         return (
-            <div className="flex justify-between items-center p-4 border-b">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 border-b">
+                <div className="flex flex-wrap items-center gap-3">
                     {canManageData && (
                         <>
                             <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
@@ -368,7 +368,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                         </p>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar en tabla..." />
                     <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
                         <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -520,8 +520,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 border-b border-gray-200">
-        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+      <div className="mb-4 border-b border-gray-200 overflow-x-auto">
+        <nav className="-mb-px flex space-x-6 min-w-max" aria-label="Tabs">
           {Object.values(DbTab).map(tab => {
             const subtabId = 'subtab-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
             return (
