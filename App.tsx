@@ -19,6 +19,9 @@ import NotificationToast from './components/ui/NotificationToast';
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
 import OnboardingGuide from './components/OnboardingGuide';
+import OnboardingModal from './components/OnboardingModal';
+import DetailedOnboarding from './components/DetailedOnboarding';
+import { useOnboardingProgress } from './hooks/useOnboardingProgress';
 import { analytics } from './services/analytics';
 
 interface LoginError {
@@ -46,8 +49,15 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState<LoginError | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [activeDetailedTour, setActiveDetailedTour] = useState<number | null>(null);
   const [initialSettingsTab, setInitialSettingsTab] = useState<SettingsTab>('Perfil');
   const loginTrackedRef = useRef(false);
+
+  const onboardingProgress = useOnboardingProgress(userProfile?.id || '');
+  const showAnimatedButton = userProfile?.role === UserRole.Trial ||
+    (userProfile?.role === UserRole.Subscriber && conjuntoInfo?.registrationDate && 
+      (new Date().getTime() - new Date(conjuntoInfo.registrationDate).getTime()) < 44 * 24 * 60 * 60 * 1000);
 
   const handleLogout = useCallback(async () => {
     supabase.removeAllChannels();
@@ -263,6 +273,31 @@ const App: React.FC = () => {
     analytics.trackOnboarding('completed');
     setShowOnboarding(false);
   };
+
+  const handleOpenOnboarding = () => {
+    analytics.trackOnboarding('started');
+    setShowOnboardingModal(true);
+  };
+
+  const handleSelectOption = (optionId: number) => {
+    setShowOnboardingModal(false);
+    if (optionId === 1) {
+      setShowOnboarding(true);
+    } else {
+      setActiveDetailedTour(optionId);
+    }
+  };
+
+  const handleDetailedTourComplete = (optionId: number) => {
+    onboardingProgress.markComplete(optionId);
+    setActiveDetailedTour(null);
+    setShowOnboardingModal(true);
+  };
+
+  const handleDetailedTourClose = () => {
+    setActiveDetailedTour(null);
+    setShowOnboardingModal(true);
+  };
   
   const handleSaveSetup = async (info: ConjuntoInfo) => {
     if (!userProfile) return;
@@ -395,7 +430,9 @@ const App: React.FC = () => {
       <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
         <Header 
             onHelpClick={() => setIsHelpModalOpen(true)} 
-            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
+            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
+            onOpenOnboarding={handleOpenOnboarding}
+            showAnimatedButton={showAnimatedButton}
             userProfile={userProfile}
             conjuntoInfo={conjuntoInfo} 
             onLogout={handleLogout} 
@@ -413,7 +450,7 @@ const App: React.FC = () => {
             isMobileOpen={isMobileMenuOpen}
             onCloseMobile={() => setIsMobileMenuOpen(false)}
             onHelpClick={() => setIsHelpModalOpen(true)}
-            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboarding(true); }}
+            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
           />
         )}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
@@ -433,7 +470,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboarding(true); }} />}
+      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboardingModal(true); }} />}
       
       {isInitialSetupModalOpen && (
         <InitialSetupModal 
@@ -460,6 +497,43 @@ const App: React.FC = () => {
       )}
       
       <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} userProfile={userProfile} />
+
+      <OnboardingModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+        onSelectOption={handleSelectOption}
+        options={[
+          { id: 1, label: 'Tour guiado', description: 'Recorrido general por toda la plataforma', icon: 'play', completed: false, glowing: false },
+          ...onboardingProgress.getAll().map(p => ({
+            id: p.id,
+            label: [
+              'Configuraciones Iniciales', 'Base de Datos', 'Áreas Comunes', 'Comunicaciones',
+              'Archivos', 'Finanzas', 'Seguridad', 'Vencimientos', 'Tareas'
+            ][p.id - 2],
+            description: [
+              'Configura tu copropiedad y crea usuarios',
+              'Crea un nuevo residente o copropietario',
+              'Realiza tu primera reserva de área común',
+              'Envía tu primer comunicado a residentes',
+              'Sube tu primer archivo al repositorio',
+              'Agrega un ingreso a la contabilidad',
+              'Registra un visitante y un paquete',
+              'Agrega un vencimiento importante',
+              'Crea una tarea y recibe alertas'
+            ][p.id - 2],
+            icon: 'check',
+            completed: p.completed,
+            glowing: !p.completed && onboardingProgress.getNextPending() === p.id,
+          }))
+        ]}
+      />
+
+      <DetailedOnboarding
+        optionId={activeDetailedTour}
+        onComplete={handleDetailedTourComplete}
+        onClose={handleDetailedTourClose}
+        userProfile={userProfile}
+      />
     </div>
     </>
   );
