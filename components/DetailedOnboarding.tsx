@@ -114,43 +114,76 @@ const DetailedOnboarding: React.FC<DetailedOnboardingProps> = ({ optionId, onCom
   const [stepIndex, setStepIndex] = useState(0);
   const [targetPosition, setTargetPosition] = useState<TargetPosition | null>(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const pulseIntervalRef = useRef<number | null>(null);
+  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const steps = optionId ? stepsByOption[optionId] : [];
   const label = optionId ? optionLabels[optionId] : '';
   const currentStep = steps[stepIndex];
   const isOpen = optionId !== null;
 
+  const getSpanishVoice = useCallback(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    return voices.find(v => v.lang.startsWith('es')) || voices.find(v => v.lang.startsWith('es-')) || null;
+  }, []);
+
+  const speak = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-CO';
+    utterance.rate = 0.9;
+    const spanishVoice = getSpanishVoice();
+    if (spanishVoice) utterance.voice = spanishVoice;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    speechSynthRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [getSpanishVoice]);
+
+  const cancelSpeech = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  }, []);
+
   const handleNext = useCallback(() => {
+    cancelSpeech();
     if (stepIndex < steps.length - 1) {
       setStepIndex(i => i + 1);
     } else {
       setIsFinished(true);
     }
-  }, [stepIndex, steps.length]);
+  }, [stepIndex, steps.length, cancelSpeech]);
 
   const handlePrev = useCallback(() => {
+    cancelSpeech();
     if (stepIndex > 0) {
       setStepIndex(i => i - 1);
     }
-  }, []);
+  }, [cancelSpeech]);
 
   const handleClose = useCallback(() => {
+    cancelSpeech();
     setStepIndex(0);
     setTargetPosition(null);
     setIsFinished(false);
     onClose();
-  }, [onClose]);
+  }, [cancelSpeech, onClose]);
 
   const handleFinish = useCallback(() => {
+    cancelSpeech();
     if (optionId) {
       onComplete(optionId);
     }
     setIsFinished(false);
     setStepIndex(0);
     setTargetPosition(null);
-  }, [optionId, onComplete]);
+  }, [cancelSpeech, optionId, onComplete]);
 
   useLayoutEffect(() => {
     if (!isOpen || !currentStep || isFinished || !currentStep.selector) return;
@@ -168,6 +201,12 @@ const DetailedOnboarding: React.FC<DetailedOnboardingProps> = ({ optionId, onCom
     window.addEventListener('resize', updatePosition);
     return () => { clearTimeout(timer); window.removeEventListener('resize', updatePosition); };
   }, [stepIndex, isOpen, currentStep, handleNext, isFinished]);
+
+  useEffect(() => {
+    if (!isOpen || !currentStep || isFinished) return;
+    const timer = setTimeout(() => speak(currentStep.text), 400);
+    return () => clearTimeout(timer);
+  }, [stepIndex, isOpen, currentStep, speak, isFinished]);
 
   useEffect(() => {
     if (!isOpen || !currentStep || currentStep.action !== 'click' || isFinished || !currentStep.selector) return;
@@ -200,11 +239,12 @@ const DetailedOnboarding: React.FC<DetailedOnboardingProps> = ({ optionId, onCom
 
   useEffect(() => {
     if (!isOpen) {
+      cancelSpeech();
       setStepIndex(0);
       setTargetPosition(null);
       setIsFinished(false);
     }
-  }, [isOpen]);
+  }, [isOpen, cancelSpeech]);
 
   if (!isOpen) return null;
 
@@ -266,8 +306,15 @@ const DetailedOnboarding: React.FC<DetailedOnboardingProps> = ({ optionId, onCom
             <span className="text-xs font-bold text-gray-400">{stepIndex + 1} / {steps.length}</span>
           </div>
           <p className="text-sm text-gray-700 mb-3">{currentStep.text}</p>
-          {currentStep.action === 'click' && (
-            <p className="text-xs text-amber-600 font-semibold mb-2">Haz clic en el elemento resaltado</p>
+          {isSpeaking ? (
+            <div className="flex items-center gap-2 mb-2 bg-green-50 rounded-md px-2 py-1.5">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-xs text-green-600 font-medium">Reproduciendo explicación...</span>
+            </div>
+          ) : (
+            currentStep.action === 'click' && (
+              <p className="text-xs text-amber-600 font-semibold mb-2">Haz clic en el elemento resaltado</p>
+            )
           )}
           <div className="flex justify-between items-center border-t pt-2">
             <div className="flex gap-2">
