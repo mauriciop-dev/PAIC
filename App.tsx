@@ -215,14 +215,16 @@ const App: React.FC = () => {
   
   // Effect to handle post-payment redirection
   useEffect(() => {
-    const handlePaymentSuccess = async () => {
+    const handlePaymentReturn = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const paymentStatus = urlParams.get('collection_status');
 
+      if (!paymentStatus) return;
+
+      window.history.replaceState({}, document.title, window.location.pathname);
+
       if (paymentStatus === 'approved' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
         try {
-          window.history.replaceState({}, document.title, window.location.pathname);
-
           const pending = getPendingPlan();
           const planName = pending?.name || null;
           const planPrice = pending?.price ?? 140000;
@@ -244,11 +246,14 @@ const App: React.FC = () => {
             console.error("Failed to update subscription status:", error);
             setNotification('Error al actualizar tu suscripción. Contacta a soporte.');
         }
+      } else if (paymentStatus === 'rejected') {
+        clearPendingPlan();
+        setNotification('El pago fue rechazado. Inténtalo nuevamente.');
       }
     };
 
     if(userProfile && conjuntoInfo) {
-      handlePaymentSuccess();
+      handlePaymentReturn();
     }
   }, [userProfile, conjuntoInfo]);
 
