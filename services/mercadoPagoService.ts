@@ -8,7 +8,7 @@ interface PreferenceResponse {
 }
 
 export const mercadoPagoService = {
-  async createPreference(conjuntoInfo: ConjuntoInfo): Promise<string | null> {
+  async createPreference(conjuntoInfo: ConjuntoInfo, planName?: string, planPrice?: number): Promise<string | null> {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -24,7 +24,7 @@ export const mercadoPagoService = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ conjuntoInfo }),
+        body: JSON.stringify({ conjuntoInfo, planName, planPrice }),
       });
 
       if (!response.ok) {

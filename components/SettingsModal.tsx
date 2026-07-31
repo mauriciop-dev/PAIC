@@ -363,7 +363,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           onConfirm={() => { confirmAction?.onConfirm(); setConfirmAction(null); }}
           onCancel={() => setConfirmAction(null)}
         />
-        <PlansModal isOpen={isPlansModalOpen} onClose={() => setIsPlansModalOpen(false)} />
+        <PlansModal isOpen={isPlansModalOpen} onClose={() => setIsPlansModalOpen(false)} conjuntoInfo={conjuntoInfo} />
       </div>
     </div>
   );

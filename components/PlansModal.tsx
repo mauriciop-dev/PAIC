@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Icon } from './ui/Icon';
 import { PLANS, PAICPlan, formatCOP, getPlanCapacityText, getMonthlyEquivalent } from '../services/plans';
+import { mercadoPagoService } from '../services/mercadoPagoService';
+import { ConjuntoInfo } from '../types';
 
 interface PlansModalProps {
   isOpen: boolean;
   onClose: () => void;
+  conjuntoInfo: ConjuntoInfo;
 }
 
 export interface PendingPlan {
@@ -32,16 +35,36 @@ export const clearPendingPlan = () => {
   localStorage.removeItem(PENDING_PLAN_KEY);
 };
 
-const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose }) => {
+const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, conjuntoInfo }) => {
   const [selectedPlan, setSelectedPlan] = useState<PAICPlan | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handlePay = (plan: PAICPlan, billing: 'monthly' | 'annual') => {
+  const handlePay = async (plan: PAICPlan, billing: 'monthly' | 'annual') => {
     const link = billing === 'monthly' ? plan.monthlyLink : plan.annualLink;
-    if (!link || plan.monthlyPrice === null || plan.annualPrice === null) return;
-    savePendingPlan({ name: plan.name, billing, price: billing === 'monthly' ? plan.monthlyPrice : plan.annualPrice });
-    window.location.href = link;
+    if (plan.monthlyPrice === null || plan.annualPrice === null) return;
+    const price = billing === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+    const key = `${plan.name}-${billing}`;
+    setLoadingPlan(key);
+    setError(null);
+    savePendingPlan({ name: plan.name, billing, price });
+    try {
+      const initPoint = await mercadoPagoService.createPreference(conjuntoInfo, plan.name, price);
+      if (initPoint) {
+        window.location.href = initPoint;
+        return;
+      }
+      throw new Error('No se pudo iniciar el pago.');
+    } catch (err: any) {
+      if (link) {
+        window.location.href = link;
+        return;
+      }
+      setError(err.message || 'Ocurrió un error al procesar el pago.');
+      setLoadingPlan(null);
+    }
   };
 
   const handleWhatsApp = (plan: PAICPlan) => {
@@ -99,15 +122,17 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose }) => {
                     <div className="space-y-2 mt-auto">
                       <button
                         onClick={() => handlePay(plan, 'monthly')}
-                        className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                        disabled={loadingPlan !== null}
+                        className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
                       >
-                        {formatCOP(plan.monthlyPrice)} / mes
+                        {loadingPlan === `${plan.name}-monthly` ? 'Procesando...' : `${formatCOP(plan.monthlyPrice)} / mes`}
                       </button>
                       <button
                         onClick={() => handlePay(plan, 'annual')}
-                        className="w-full px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors border border-blue-200"
+                        disabled={loadingPlan !== null}
+                        className="w-full px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors border border-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {formatCOP(plan.annualPrice)} / año
+                        {loadingPlan === `${plan.name}-annual` ? 'Procesando...' : `${formatCOP(plan.annualPrice)} / año`}
                       </button>
                       <p className="text-[11px] text-green-700 font-medium text-center">
                         Equivale a {formatCOP(getMonthlyEquivalent(plan.annualPrice))}/mes — Ahorras 15%
@@ -136,6 +161,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-4 border-t border-gray-100 flex-shrink-0">
+          {error && <p className="text-sm text-red-600 text-center mb-2">{error}</p>}
           <p className="text-xs text-gray-400 text-center">
             Al hacer clic en un plan serás redirigido a Mercado Pago para completar el pago de forma segura.
           </p>
