@@ -3,11 +3,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile, ConjuntoInfo, AccessPoint, UserRole, CommonArea, PlatformUser, UserRoleDefinition, Tab } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
-import { mercadoPagoService } from '../services/mercadoPagoService';
 import { SettingsTab } from '../App';
 import ConfirmModal from './ConfirmModal';
 import UserModal from './UserModal';
 import RoleModal from './RoleModal';
+import PlansModal from './PlansModal';
+import { findPlanByName, getPlanCapacityText } from '../services/plans';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -48,8 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [editingUserPermissions, setEditingUserPermissions] = useState<PlatformUser | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
 
-  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   
   const [isLoadingTabData, setIsLoadingTabData] = useState(false);
@@ -174,20 +175,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // --- Subscription Logic ---
-  const handleUpgradeClick = async () => {
-    setIsRedirectingToPayment(true);
+  const handleUpgradeClick = () => {
     setPaymentError(null);
-    try {
-      const initPoint = await mercadoPagoService.createPreference(conjuntoInfo);
-      if (initPoint) {
-        window.location.href = initPoint;
-      } else {
-        throw new Error("No se pudo obtener el punto de inicio del pago.");
-      }
-    } catch (error: any) {
-      setPaymentError(error.message || "Ocurrió un error al procesar el pago.");
-      setIsRedirectingToPayment(false);
-    }
+    setIsPlansModalOpen(true);
   };
 
 
@@ -287,34 +277,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const renderSubscriptionTab = () => {
       const isPaid = conjuntoInfo.subscriptionPlan === 'Paid';
+      const currentPlan = findPlanByName(conjuntoInfo.planName);
       return (
           <div className="space-y-6">
               <div className={`p-6 rounded-lg border ${isPaid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
                   <h3 className="text-lg font-bold">Estado de tu Suscripción</h3>
-                  <p className={`text-2xl font-extrabold mt-2 ${isPaid ? 'text-green-700' : 'text-yellow-700'}`}>
-                      {isPaid ? 'Plan Pro' : 'Periodo de Prueba'}
-                  </p>
                   {isPaid ? (
-                      <p className="mt-2 text-green-600">Tu suscripción está activa. ¡Gracias por confiar en PAIC!</p>
+                      <>
+                          <p className={`text-2xl font-extrabold mt-2 ${isPaid ? 'text-green-700' : 'text-yellow-700'}`}>
+                              {currentPlan ? `Plan ${currentPlan.name}` : 'Plan Pro'}
+                          </p>
+                          {currentPlan && (
+                              <p className="mt-1 text-sm text-green-700 font-medium">
+                                  {getPlanCapacityText(currentPlan)}
+                              </p>
+                          )}
+                          <p className="mt-2 text-green-600">Tu suscripción está activa. ¡Gracias por confiar en PAIC!</p>
+                      </>
                   ) : (
-                      <p className="mt-2 text-yellow-600">Disfruta de todas las funciones Pro durante tu periodo de prueba.</p>
+                      <>
+                          <p className={`text-2xl font-extrabold mt-2 ${isPaid ? 'text-green-700' : 'text-yellow-700'}`}>
+                              Plan Gratis
+                          </p>
+                          <p className="mt-1 text-sm text-yellow-700 font-medium">
+                              {currentPlan ? getPlanCapacityText(currentPlan) : 'Este plan te permite administrar una copropiedad con PAIC.'}
+                          </p>
+                          <p className="mt-2 text-yellow-600">Disfruta de todas las funciones Pro durante tu periodo de prueba.</p>
+                      </>
                   )}
               </div>
-              {!isPaid && (
-                  <div className="p-6 bg-white rounded-lg shadow-md border">
-                      <h3 className="text-lg font-bold text-gray-800">Mejora al Plan Pro</h3>
-                      <p className="mt-2 text-gray-600">Obtén acceso ilimitado a todas las funciones, soporte prioritario y actualizaciones continuas por solo <span className="font-bold text-blue-600">$140,000 COP/mes</span>.</p>
-                      <button 
-                          onClick={handleUpgradeClick}
-                          disabled={isRedirectingToPayment}
-                          className="mt-4 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-blue-300 flex items-center justify-center gap-2"
-                      >
-                          <Icon name="credit-card" className="w-5 h-5"/>
-                          {isRedirectingToPayment ? 'Redirigiendo a la pasarela...' : 'Mejorar a Pro Ahora'}
-                      </button>
-                      {paymentError && <p className="text-sm text-red-600 text-center mt-3">{paymentError}</p>}
-                  </div>
-              )}
+              <div className="p-6 bg-white rounded-lg shadow-md border">
+                  <h3 className="text-lg font-bold text-gray-800">Mejora tu plan</h3>
+                  <p className="mt-2 text-gray-600">Dependiendo de la cantidad de unidades a administrar, selecciona el plan ideal para tu copropiedad. Todos los planes incluyen acceso a todos los módulos.</p>
+                  <button
+                      onClick={handleUpgradeClick}
+                      className="mt-4 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                      <Icon name="credit-card" className="w-5 h-5" />
+                      Mejorar plan ahora
+                  </button>
+                  {paymentError && <p className="text-sm text-red-600 text-center mt-3">{paymentError}</p>}
+              </div>
           </div>
       );
   };
@@ -360,6 +363,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           onConfirm={() => { confirmAction?.onConfirm(); setConfirmAction(null); }}
           onCancel={() => setConfirmAction(null)}
         />
+        <PlansModal isOpen={isPlansModalOpen} onClose={() => setIsPlansModalOpen(false)} />
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ import OnboardingModal from './components/OnboardingModal';
 import DetailedOnboarding from './components/DetailedOnboarding';
 import { useOnboardingProgress } from './hooks/useOnboardingProgress';
 import { analytics } from './services/analytics';
+import { getPendingPlan, clearPendingPlan } from './components/PlansModal';
 
 interface LoginError {
   title: string;
@@ -51,6 +52,7 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [activeDetailedTour, setActiveDetailedTour] = useState<number | null>(null);
+  const [welcomePlanName, setWelcomePlanName] = useState<string | null>(null);
   const [initialSettingsTab, setInitialSettingsTab] = useState<SettingsTab>('Perfil');
   const loginTrackedRef = useRef(false);
 
@@ -221,16 +223,22 @@ const App: React.FC = () => {
         try {
           window.history.replaceState({}, document.title, window.location.pathname);
 
-          const updatedConjunto = { ...conjuntoInfo, subscriptionPlan: 'Paid' as const, planPrice: 140000 };
+          const pending = getPendingPlan();
+          const planName = pending?.name || null;
+          const planPrice = pending?.price ?? 140000;
+
+          const updatedConjunto = { ...conjuntoInfo, subscriptionPlan: 'Paid' as const, planName: planName || undefined, planPrice };
           await apiService.updateConjuntoInfo(updatedConjunto);
           
           const updatedProfile = { ...userProfile, role: UserRole.Subscriber };
           await apiService.updateUserProfile(updatedProfile);
           
-          analytics.trackSubscription('Free', 'Paid');
+          analytics.trackSubscription('Free', planName || 'Paid');
           setConjuntoInfo(updatedConjunto);
           setUserProfile(updatedProfile);
-          setNotification('¡Suscripción exitosa! Has mejorado al Plan Pro.');
+          clearPendingPlan();
+          setWelcomePlanName(planName || 'Pro');
+          setNotification(`¡Suscripción exitosa! Tu plan ${planName || 'Pro'} está activo.`);
 
         } catch (error) {
             console.error("Failed to update subscription status:", error);
@@ -534,6 +542,26 @@ const App: React.FC = () => {
         onClose={handleDetailedTourClose}
         userProfile={userProfile}
       />
+
+      {welcomePlanName && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setWelcomePlanName(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+              <Icon name="check" className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="mt-4 text-2xl font-bold text-gray-800">¡Bienvenido al Plan {welcomePlanName}!</h2>
+            <p className="mt-3 text-gray-600">
+              Tu pago fue aprobado y tu suscripción ya está activa. Ahora tienes acceso completo a todos los módulos de PAIC para tu copropiedad.
+            </p>
+            <button
+              onClick={() => setWelcomePlanName(null)}
+              className="mt-6 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
+            >
+              ¡Empezar a usar PAIC!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

@@ -138,6 +138,7 @@ export interface ConjuntoInfo {
     adminEmail: string;
     adminPhone: string;
     subscriptionPlan: 'Free' | 'Paid';
+    planName?: string;
     planPrice?: number;
     registrationDate?: string;
 }
