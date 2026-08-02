@@ -33,6 +33,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [profileData, setProfileData] = useState<UserProfile>(userProfile);
   const [conjuntoData, setConjuntoData] = useState<ConjuntoInfo>(conjuntoInfo);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Detectar si el trial expiró
+  const isTrialExpired = userProfile.role === UserRole.Trial 
+    && userProfile.trialExpiresAt 
+    && new Date(userProfile.trialExpiresAt).getTime() < Date.now()
+    && conjuntoInfo.subscriptionPlan === 'Free';
   
   // States for different tabs
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
@@ -280,6 +286,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const currentPlan = findPlanByName(conjuntoInfo.planName);
       return (
           <div className="space-y-6">
+              {isTrialExpired && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-amber-800">Tu periodo de prueba ha terminado</p>
+                      <p className="text-sm text-amber-700 mt-0.5">No te preocupes, puedes elegir cualquiera de nuestros planes para seguir disfrutando de PAIC.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className={`p-6 rounded-lg border ${isPaid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
                   <h3 className="text-lg font-bold">Estado de tu Suscripción</h3>
                   {isPaid ? (
@@ -292,7 +309,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                   {getPlanCapacityText(currentPlan)}
                               </p>
                           )}
-                          <p className="mt-2 text-green-600">Tu suscripción está activa. ¡Gracias por confiar en PAIC!</p>
+                          <p className="mt-2 text-green-600">
+                              {conjuntoInfo.planExpiresAt
+                                  ? conjuntoInfo.preapprovalId
+                                      ? `Tu suscripción se renueva automáticamente cada mes/año mediante Mercado Pago. El periodo actual vence el ${new Date(conjuntoInfo.planExpiresAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+                                      : `Tu plan vence el ${new Date(conjuntoInfo.planExpiresAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+                                  : 'Tu suscripción está activa. ¡Gracias por confiar en PAIC!'}
+                          </p>
                       </>
                   ) : (
                       <>

@@ -173,9 +173,23 @@ const App: React.FC = () => {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
                     if (cancelled) return;
                     if (info) {
-                        setConjuntoInfo(info);
+                        let effectiveInfo = info;
+                        if (info.subscriptionPlan === 'Paid' && info.planExpiresAt && new Date(info.planExpiresAt).getTime() < Date.now()) {
+                            effectiveInfo = { ...info, subscriptionPlan: 'Free' as const, planName: undefined, planPrice: undefined };
+                            apiService.updateConjuntoInfo(effectiveInfo).catch(() => {});
+                        }
+                        setConjuntoInfo(effectiveInfo);
                     } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                         setIsInitialSetupModalOpen(true);
+                    }
+
+                    // Auto-abrir modal de suscripción si el trial expiró
+                    const isTrialExpired = profile.role === UserRole.Trial 
+                      && profile.trialExpiresAt 
+                      && new Date(profile.trialExpiresAt).getTime() < Date.now();
+                    if (isTrialExpired && info?.subscriptionPlan === 'Free') {
+                      setInitialSettingsTab('Suscripción');
+                      setIsSettingsModalOpen(true);
                     }
                 } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                     setIsInitialSetupModalOpen(true);
@@ -228,8 +242,20 @@ const App: React.FC = () => {
           const pending = getPendingPlan();
           const planName = pending?.name || null;
           const planPrice = pending?.price ?? 140000;
+          const paymentId = urlParams.get('payment_id');
+          const preapprovalId = urlParams.get('preapproval_id');
+          const durationDays = pending?.billing === 'annual' ? 365 : 30;
+          const planExpiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-          const updatedConjunto = { ...conjuntoInfo, subscriptionPlan: 'Paid' as const, planName: planName || undefined, planPrice };
+          const updatedConjunto: ConjuntoInfo = {
+            ...conjuntoInfo,
+            subscriptionPlan: 'Paid' as const,
+            planName: planName || undefined,
+            planPrice,
+            planExpiresAt,
+            preapprovalId: preapprovalId || conjuntoInfo.preapprovalId || undefined,
+            lastPaymentId: paymentId || conjuntoInfo.lastPaymentId || undefined,
+          };
           await apiService.updateConjuntoInfo(updatedConjunto);
           
           const updatedProfile = { ...userProfile, role: UserRole.Subscriber };

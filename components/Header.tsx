@@ -116,17 +116,6 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Right section: Trial badge, Support, Tour & User Profile */}
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            {isTrialActive && daysRemaining > 0 && (
-              <div className="hidden sm:block text-center">
-                <button
-                  onClick={() => onSettingsClick('Suscripción')}
-                  className="px-3 py-2 min-h-[44px] bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition-colors text-xs shadow-sm"
-                >
-                  Actualiza a Pro
-                </button>
-                <p className="text-xs text-gray-500 mt-0.5">{daysRemaining} días restantes</p>
-              </div>
-            )}
             <button
               id="btn-soporte"
               onClick={onHelpClick}
@@ -134,6 +123,17 @@ const Header: React.FC<HeaderProps> = ({
             >
               Soporte
             </button>
+            {isTrialActive && daysRemaining >= 0 && (
+              <button
+                onClick={() => onSettingsClick('Suscripción')}
+                className="hidden lg:flex flex-col items-center px-3 py-2 min-h-[44px] bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all text-xs cursor-pointer"
+                title={`${daysRemaining} días restantes de prueba`}
+              >
+                <span className="font-bold text-green-700 leading-tight">Disfruta</span>
+                <span className="font-extrabold text-green-800 text-lg leading-none">{daysRemaining}</span>
+                <span className="font-medium text-green-600 leading-tight">días</span>
+              </button>
+            )}
             {showAnimatedButton && onOpenOnboarding ? (
               <button
                 id="btn-inicia-aqui"
