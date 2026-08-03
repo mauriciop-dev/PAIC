@@ -14,8 +14,6 @@ interface HeaderProps {
   onLogout: () => void;
   onSettingsClick: (tab?: SettingsTab) => void;
   activeTabName: string;
-  onMobileMenuToggle?: () => void;
-  isMobileMenuOpen?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -27,9 +25,7 @@ const Header: React.FC<HeaderProps> = ({
   conjuntoInfo, 
   onLogout, 
   onSettingsClick, 
-  activeTabName,
-  onMobileMenuToggle,
-  isMobileMenuOpen 
+  activeTabName 
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -87,18 +83,8 @@ const Header: React.FC<HeaderProps> = ({
     <header className="bg-white sticky top-0 z-20 shadow-sm border-b border-gray-200">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 md:py-4">
         <div className="flex justify-between items-center gap-2">
-          {/* Left section: Hamburger button + Title */}
+          {/* Left section: Title */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {onMobileMenuToggle && (
-              <button
-                id="btn-mobile-menu"
-                onClick={onMobileMenuToggle}
-                className="md:hidden p-2.5 min-h-[48px] min-w-[48px] rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-colors border border-gray-200"
-                aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              >
-                <Icon name={isMobileMenuOpen ? "x" : "menu"} className="w-6 h-6 text-gray-700" />
-              </button>
-            )}
             <div className="min-w-0">
               <h1 id="paic-title" className="text-base sm:text-lg md:text-xl font-bold text-gray-800 truncate">
                 PAIC <span className="hidden sm:inline">- Plataforma de Administración Inteligente de Copropiedades</span>

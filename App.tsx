@@ -41,7 +41,6 @@ const App: React.FC = () => {
   const [isInitialSetupModalOpen, setIsInitialSetupModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined means "not yet determined"
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -478,8 +477,6 @@ const App: React.FC = () => {
             onLogout={handleLogout} 
             onSettingsClick={handleSettingsClick} 
             activeTabName={activeTab}
-            onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            isMobileMenuOpen={isMobileMenuOpen}
         />
         {!needsAdminSetup && (
           <NavBar 
@@ -487,10 +484,6 @@ const App: React.FC = () => {
             setActiveTab={setActiveTab} 
             userProfile={userProfile} 
             onSettingsClick={handleSettingsClick}
-            isMobileOpen={isMobileMenuOpen}
-            onCloseMobile={() => setIsMobileMenuOpen(false)}
-            onHelpClick={() => setIsHelpModalOpen(true)}
-            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
           />
         )}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
@@ -516,6 +509,8 @@ const App: React.FC = () => {
           onTabSelect={setActiveTab}
           isConjuntoAdmin={isConjuntoAdmin}
           onSettingsClick={handleSettingsClick}
+          onHelpClick={() => setIsHelpModalOpen(true)}
+          onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
         />
       )}
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboardingModal(true); }} />}

@@ -11,10 +11,6 @@ interface NavBarProps {
   setActiveTab: (tab: Tab) => void;
   userProfile: UserProfile;
   onSettingsClick: (tab?: SettingsTab) => void;
-  isMobileOpen?: boolean;
-  onCloseMobile?: () => void;
-  onHelpClick?: () => void;
-  onStartTour?: () => void;
 }
 
 const allTabs = [
@@ -33,11 +29,7 @@ const NavBar: React.FC<NavBarProps> = ({
   activeTab, 
   setActiveTab, 
   userProfile, 
-  onSettingsClick,
-  isMobileOpen = false,
-  onCloseMobile,
-  onHelpClick,
-  onStartTour
+  onSettingsClick
 }) => {
   const [sliderItems, setSliderItems] = useState<{ text: string; color: 'red' | 'yellow' | 'green' }[]>([]);
   const [currentItem, setCurrentItem] = useState(0);
@@ -147,127 +139,9 @@ const NavBar: React.FC<NavBarProps> = ({
       }[sliderItems[currentItem].color] || 'bg-gray-500'
     : 'bg-gray-500';
 
-  const handleTabClick = (tabId: Tab) => {
-    setActiveTab(tabId);
-    if (onCloseMobile) onCloseMobile();
-  };
-
   return (
     <>
-      {/* 1. Mobile Drawer (Slide-over with Backdrop Blur) - < 768px */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out" 
-            onClick={onCloseMobile} 
-            aria-hidden="true"
-          />
-
-          {/* Drawer Container */}
-          <div className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white z-50 flex flex-col shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-gray-200">
-            {/* Drawer Header */}
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                  P
-                </div>
-                <div>
-                  <h2 className="font-bold text-gray-800 text-base">PAIC</h2>
-                  <p className="text-xs text-gray-500">Menú Principal</p>
-                </div>
-              </div>
-              <button
-                onClick={onCloseMobile}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-200 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Cerrar menú"
-              >
-                <Icon name="x" className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Drawer Links List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              <p className="text-xs font-semibold text-gray-400 px-3 uppercase tracking-wider mb-2">Módulos</p>
-              {visibleTabs.map((tab) => {
-                const isSelected = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabClick(tab.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all min-h-[48px] ${
-                      isSelected
-                        ? 'bg-blue-600 text-white shadow-md font-semibold'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                    }`}
-                  >
-                    <Icon name={tab.icon} className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-white' : 'text-gray-500'}`} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-
-              {isConjuntoAdmin && (
-                <>
-                  <hr className="my-3 border-gray-200" />
-                  <p className="text-xs font-semibold text-gray-400 px-3 uppercase tracking-wider mb-2">Herramientas</p>
-                  <button
-                    onClick={() => {
-                      onSettingsClick();
-                      if (onCloseMobile) onCloseMobile();
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 min-h-[48px]"
-                  >
-                    <Icon name="settings" className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                    <span>Configuración</span>
-                  </button>
-                </>
-              )}
-
-              {(onHelpClick || onStartTour) && (
-                <>
-                  <hr className="my-3 border-gray-200" />
-                  <p className="text-xs font-semibold text-gray-400 px-3 uppercase tracking-wider mb-2">Ayuda y Guía</p>
-                  {onHelpClick && (
-                    <button
-                      onClick={() => {
-                        onHelpClick();
-                        if (onCloseMobile) onCloseMobile();
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 min-h-[48px]"
-                    >
-                      <Icon name="user" className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                      <span>Soporte Técnico</span>
-                    </button>
-                  )}
-                  {onStartTour && (
-                    <button
-                      onClick={() => {
-                        onStartTour();
-                        if (onCloseMobile) onCloseMobile();
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 min-h-[48px]"
-                    >
-                      <Icon name="bot" className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                      <span>Tour Guiado por Voz</span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Drawer Footer */}
-            {isConjuntoAdmin && sliderItems.length > 0 && (
-              <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${trafficLightColor} flex-shrink-0`} />
-                <p className="text-xs text-gray-700 truncate">{sliderItems[currentItem].text}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 2. Horizontal Navbar for Tablet (768px+) and Desktop (> 1024px) */}
+      {/* Horizontal Navbar for Tablet (768px+) and Desktop (> 1024px) */}
       <nav id="main-navbar" className="hidden md:block border-b border-gray-200 bg-white sticky top-[65px] z-10">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-2 flex justify-between items-center gap-4 overflow-x-auto">
           <div id="main-navigation-tabs" className="flex items-center gap-1.5 lg:gap-2 min-w-max">
