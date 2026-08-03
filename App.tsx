@@ -21,6 +21,7 @@ import { Session } from '@supabase/supabase-js';
 import OnboardingGuide from './components/OnboardingGuide';
 import OnboardingModal from './components/OnboardingModal';
 import DetailedOnboarding from './components/DetailedOnboarding';
+import BottomNav from './components/BottomNav';
 import { useOnboardingProgress } from './hooks/useOnboardingProgress';
 import { analytics } from './services/analytics';
 import { getPendingPlan, clearPendingPlan } from './components/PlansModal';
@@ -509,6 +510,14 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {!needsAdminSetup && isConjuntoAdmin && (
+        <BottomNav
+          activeTab={activeTab}
+          onTabSelect={setActiveTab}
+          isConjuntoAdmin={isConjuntoAdmin}
+          onSettingsClick={handleSettingsClick}
+        />
+      )}
       {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboardingModal(true); }} />}
       
       {isInitialSetupModalOpen && (

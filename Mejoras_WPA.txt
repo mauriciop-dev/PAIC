@@ -1,0 +1,119 @@
+Mejoras para la interfaz móvil WPA de PAIC
+
+Para que PAIC pase de ser una herramienta funcional a un producto que venda solo en tus visitas comerciales, es crucial profesionalizar su interfaz móvil. El objetivo es que cualquier parroquiano (copropietario, arrendatario o miembro del consejo), sin conocimientos técnicos, sienta que la app es moderna, fácil e intuitiva.
+
+Teniendo en cuenta tu directiva anterior de "Aislamiento UI en PWA" para no afectar la versión de escritorio, estas sugerencias deben aplicarse exclusivamente a la vista móvil mediante CSS Module scoped o selectores responsivos específicos.Aquí tienes un análisis y sugerencias de mejora, módulo por módulo, para profesionalizar la UI:
+
+1. Mejoras Transversales (Afectan a toda la App)
+
+Navegación Principal (Imagen 3):
+
+Elimina el menú lateral de hamburguesa. En móvil, este menú "esconde" las funciones y añade clics innecesarios.
+
+Sugerencia: Implementa una barra de navegación inferior (bottom navigation bar) con los 4-5 iconos más usados: Panel, Reservas, Finanzas, Comunicaciones y Mi Perfil. Esto es estándar en aplicaciones móviles y mejora drásticamente la usabilidad con una sola mano.
+
+Tipografía y Espaciado:
+
+La tipografía actual es muy básica. Sugiero usar una fuente sans-serif más moderna y legible en pantallas pequeñas (como Inter o Lato).
+
+Aumenta el espaciado (padding) entre elementos y dentro de las tarjetas. Esto da "respiro" a la interfaz y reduce la fatiga visual.
+
+Esquinas Redondeadas (Border Radius):
+
+Aumenta el radio de las esquinas de todas las tarjetas y botones (ej: de 4px a 8px o 12px). Los bordes más suaves se perciben como más amigables y menos "técnicos".
+
+Iconografía:
+
+Usa un pack de iconos más profesional, consistente y moderno (ej: Heroicons o Phosphor Icons) en lugar de iconos genéricos de material.
+
+2. Análisis por Módulo
+
+A. Panel de Control y Alertas (Imágenes 0 y 1)
+
+Dashboard (Imagen 0):Jerarquía: Las 4 tarjetas de recuento son iguales. Sugiero reemplazar los números estáticos por widgets visuales.
+
+Tareas Pendientes: Un anillo de progreso con el porcentaje.
+
+Pagos Vencidos / Residents en Mora: Tarjetas con un "resumen" numérico más grande y un icono de "alerta" de color.
+
+Alertas (Imagen 0 y 1):
+
+Color: El rojo actual es muy agresivo. Usa un tono de rojo más suave (como rojo pastel) para el fondo de la tarjeta de alerta.
+
+Contenido: El texto es técnico ("Pago Vigilancia", "Pago Aseadoras"). Cámbialo por un lenguaje más humano: "Cuota de Vigilancia Pendiente", "Recordatorio: Cuota de Aseo".
+
+Gráfico (Imagen 1):
+El gráfico de líneas es difícil de interpretar en móvil. Sugiero cambiarlo por un gráfico de barras apiladas (Ingresos vs Gastos) que se escala mejor en pantallas pequeñas.
+
+Ilegibilidad: Las etiquetas de fecha ("Ene 26", "Feb 26") son confusas. Acláralas y hazlas más grandes (ej: "ENE '26", "FEB '26").
+
+B. Asistente PAIC (Chatbot - Imagen 2)
+
+Este es el módulo de mayor potencial para visitas comerciales. Debe ser impecable.
+
+Visuales:
+Burbujas: Redondea mucho más las esquinas de las burbujas de chat.
+Avatar: Reemplaza el icono genérico de robot por un avatar amable de un personaje (ej: un pequeño conserje robot sonriente). Esto añade personalidad.
+
+Interactividad:
+
+Chips de Respuesta Sugerida (CRUCIAL): No obligues al usuario a escribir. Debajo de la burbuja del asistente, añade botones de respuesta rápida (chips) con las opciones sugeridas.Ej: "Salón Social", "Gimnasio", "Zona BBQ". El usuario solo toca, no escribe. Esto reduce la fricción drásticamente.
+
+Acortar Respuestas: El texto del asistente es muy largo para móvil. Resúmelo: "Hola. Elige qué área común te gustaría consultar o dinos una fecha."
+
+C. Reservas (Áreas Comunes - Imagen 5)
+
+Instrucciones Confusas: El texto "Consulta las reservas. Puedes agendar manualmente o usar el asistente de IA" es demasiado detallado.
+
+Mejoras:
+Reemplaza el texto por botones claros debajo del título. Ej: dos botones: [Agendar Manualmente] y [Hablar con el Asistente].
+Indicadores de Color: Los puntos de color son muy pequeños. Usa tarjetas visuales para las áreas comunes (ej: una tarjeta con un icono de piscina para "Piscina").
+Calendario: Moderniza el diseño del calendario. Los números deben ser más grandes y el día seleccionado ("3") debe tener un borde más definido y un color más vibrante.
+
+D. Base de Datos y Archivos (Imágenes 4 y 7)
+
+PECADO CAPITAL EN MÓVIL (Imagen 4 y 9): LAS TABLAS.
+Las tablas son ilegibles en móvil. Los datos están cortados (carlos.me..., maria.lop...).
+
+Sugerencia: Reemplaza TODAS las tablas por vistas de lista de tarjetas.
+Cada tarjeta es un residente con su avatar/foto, número de apartamento, nombre y correo en grande. Poner acciones comunes con iconos (Llamar, Enviar Correo, Eliminar).
+Estado Vacío (Imagen 7): Cuando no hay archivos, muestra una ilustración amigable y un botón grande y centrado que diga [Subir tu primer documento].
+
+E. Finanzas (Imágenes 8 y 9)
+Dashboard Financiero (Imagen 8):
+
+El gráfico circular está cortado. Debe ser el elemento visual principal y ocupar la mayor parte de la pantalla.
+
+Reemplaza las tarjetas cuadradas por widgets más ricos visualmente. Ej: una tarjeta compacta para "Total Ingresos" con el valor en grande.
+
+Tabla de Transacciones (Imagen 9):
+
+Nuevamente, reemplaza por una vista de lista de tarjetas.
+Cada tarjeta representa una transacción: con un icono claro de categoría (ej: un icono de edificio para "Cuota de Administración"), el valor y la fecha. Usa un color verde para ingresos y rojo para gastos. El botón "Eliminar Todos" debe estar oculto en un menú de "tres puntos" para evitar toques accidentales.
+
+Resumen para el "Parroquiano":Elemento ActualMejora Sugerida para el ParroquianoTabla densa de residentesUna lista de tarjetas legibles con fotos de vecinos.Chat que te obliga a escribirUn asistente que te ofrece botones rápidos con opciones.Gráficos pequeños y feosWidgets financieros claros y atractivos.Calendario aburridoUn calendario interactivo fácil de agendar.Menú lateral ocultoNavegación inferior con acceso rápido a lo importante.
+
+para la ventana de configuración
+
+¡Definitivamente sí hay que rediseñarlo! Esa ventana emergente actual tiene un layout de escritorio (dos columnas divididas) metido a la fuerza en móvil, lo que hace que la información se corte, se amontone y sea muy difícil de tocar con el dedo.
+
+Para la versión móvil/PWA, la regla de oro en configuración es usar el 100% del ancho de la pantalla.
+
+Aquí tienes la mejor forma de reestructurarlo para que se vea como una app nativa (estilo iOS/Android):
+
+Opción 2: Pestañas Horizontales Arriba (Scrollable Tabs)
+Si prefieres que todo se mantenga dentro de la misma pantalla sin cambiar de vista:
+
+Menú Superior Deslizable: Pasa las opciones de la izquierda a una barra de pestañas horizontales en la parte superior que se pueda deslizar con el dedo:
+[ Perfil ] [ Conjunto ] [ Áreas ] [ Usuarios ] ...
+
+Tarjeta de Contenido Abajo: El formulario (foto, nombre, correo y el botón Guardar Cambios) se despliega abajo ocupando todo el ancho de la tarjeta.
+
+Por qué esto enamora al cliente en una demo:
+Legibilidad: El botón "Guardar Cambios" y los campos de texto no quedan apretados ni cortados.
+
+Ergonomía: Todo queda al alcance del pulgar, sin necesidad de hacer zoom ni scroll horizontal incómodo.
+
+Aspecto Profesional: Pasa de verse como un "sitio web adaptado" a una aplicación móvil moderna.
+
+Recordatorio técnico: Aplica esta vista en pantalla completa/pestañas únicamente para viewports móviles (por ejemplo @media (max-width: 768px)), para que en pantalla de escritorio se conserve el panel de dos columnas que funciona muy bien allá.

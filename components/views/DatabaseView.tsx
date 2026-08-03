@@ -401,6 +401,53 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       switch (activeDbTab) {
           case DbTab.Residents:
               return (
+                <>
+                  {/* Mobile: Card view */}
+                  <div className="md:hidden space-y-3 p-4">
+                    {residents.filter(r => !searchQuery || `${r.apartment} ${r.name} ${r.email} ${r.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((resident) => (
+                      <div key={resident.apartment} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <Icon name="user" className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{resident.name}</p>
+                            <p className="text-xs text-gray-500">Apto {resident.apartment}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 text-sm text-gray-700 mb-3">
+                          {resident.email && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="mail" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate text-xs">{resident.email}</span>
+                            </div>
+                          )}
+                          {resident.phone && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="phone" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs">{resident.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                          <button onClick={() => handleResidentModalOpen(resident)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">
+                            Editar
+                          </button>
+                          <button onClick={() => setConfirmAction({ title: 'Eliminar Residente', message: `¿Estás seguro de que quieres eliminar al residente del apartamento ${resident.apartment}?`, onConfirm: () => handleDeleteResident(resident.apartment) })} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {residents.filter(r => !searchQuery || `${r.apartment} ${r.name} ${r.email} ${r.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="users" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron residentes</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block">
                   <table className="w-full text-sm text-left text-gray-500">
                       <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                           <tr>
@@ -421,11 +468,13 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleResidentModalOpen(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
                                      <button onClick={() => setConfirmAction({ title: 'Eliminar Residente', message: `¿Estás seguro de que quieres eliminar al residente del apartamento ${resident.apartment}?`, onConfirm: () => handleDeleteResident(resident.apartment) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
-                                  </td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+                                   </td>
+                               </tr>
+                           ))}
+                       </tbody>
+                   </table>
+                   </div>
+                </>
               );
           case DbTab.AccountStatus:
               return (

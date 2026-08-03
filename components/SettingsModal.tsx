@@ -352,17 +352,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="bg-white rounded-lg shadow-2xl w-11/12 md:w-2/3 lg:w-[48rem] relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
         <header className="p-6 border-b"><button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button><h2 className="text-2xl font-bold text-gray-800">Configuración</h2></header>
 
-        <div className="flex flex-1 overflow-hidden">
-            <nav className="w-48 border-r p-4">
-                <ul className="space-y-1">
-                    {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
-                        const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
-                        return (
-                        <li key={tab}><button id={subtabId} onClick={() => handleTabClick(tab)} className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button></li>
-                        );
-                    })}
-                </ul>
-            </nav>
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+<div className="md:hidden w-full border-b border-gray-200 overflow-x-auto">
+                 <nav className="flex space-x-2 px-4 py-2 min-w-max" aria-label="Tabs de configuración">
+                     {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
+                         const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                         return (
+                         <button key={tab} id={subtabId} onClick={() => handleTabClick(tab)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button>
+                         );
+                     })}
+                 </nav>
+                </div>
+                <nav className="hidden md:block w-48 border-r p-4">
+                    <ul className="space-y-1">
+                        {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
+                            const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                            return (
+                            <li key={tab}><button id={subtabId} onClick={() => handleTabClick(tab)} className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button></li>
+                            );
+                        })}
+                    </ul>
+                </nav>
             <main className="flex-1 flex flex-col overflow-hidden">
                 <div className="p-6 overflow-y-auto">
                     {renderContent()}

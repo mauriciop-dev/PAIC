@@ -103,6 +103,41 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
     }
   };
 
+  const handleChipClick = (chipText: string) => {
+    if (isLoading) return;
+    setInput(chipText);
+    // Allow state to settle, then send
+    setTimeout(() => {
+      const userMessage: Message = { sender: 'user', text: chipText };
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setIsLoading(true);
+      (async () => {
+        try {
+          const aiResponseText = await geminiService.runChat(chipText, userProfile, conjuntoInfo);
+          const aiMessage: Message = { sender: 'ai', text: aiResponseText };
+          setMessages(prev => [...prev, aiMessage]);
+        } catch {
+          setMessages(prev => [...prev, { sender: 'ai', text: 'Lo siento, ocurrió un error.' }]);
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }, 50);
+  };
+
+  const extractChips = (msg: Message): string[] => {
+    if (msg.sender !== 'ai') return [];
+    const text = msg.text;
+    // Check if it has numbered options (e.g., "1. Base de datos\n2. ...")
+    const numberedPattern = /^\d+\.\s+(.+)$/gm;
+    const matches = text.match(numberedPattern);
+    if (matches && matches.length >= 2 && matches.length <= 8) {
+      return matches.map(m => m.replace(/^\d+\.\s+/, '').trim()).slice(0, 5);
+    }
+    return [];
+  };
+
   const containerClasses = `
     fixed top-0 h-full bg-white shadow-2xl z-30 flex flex-col font-sans border-r border-gray-200
     transition-all duration-300 ease-in-out
@@ -125,24 +160,46 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, setIsOpen, userProfile, conju
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => (
-          <div key={index} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-            {msg.sender === 'ai' && <Icon name="bot" className="w-8 h-8 p-1.5 bg-gray-100 text-gray-600 rounded-full flex-shrink-0" />}
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl break-words ${
-                msg.sender === 'ai'
-                  ? 'bg-gray-100 text-gray-800 rounded-tl-none'
-                  : 'bg-blue-600 text-white rounded-br-none'
-              }`}
-            >
-              {msg.sender === 'user' 
-                ? <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
-                : <MarkdownRenderer content={msg.text} />
-              }
+        {messages.map((msg, index) => {
+          const chips = extractChips(msg);
+          return (
+            <div key={index}>
+              <div className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
+                {msg.sender === 'ai' && (
+                  <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm">
+                    🤖
+                  </div>
+                )}
+                <div className={`max-w-[85%] md:max-w-md px-4 py-3 break-words ${
+                    msg.sender === 'ai'
+                      ? 'bg-gray-100 text-gray-800 rounded-[18px] rounded-tl-md'
+                      : 'bg-blue-600 text-white rounded-[18px] rounded-br-md'
+                  }`}
+                >
+                  {msg.sender === 'user' 
+                    ? <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+                    : <MarkdownRenderer content={msg.text} />
+                  }
+                </div>
+                {msg.sender === 'user' && userProfile && userProfile.avatarUrl && <img src={userProfile.avatarUrl} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
+              </div>
+              {chips.length > 0 && (
+                <div className="ml-10 mt-2 flex flex-wrap gap-2">
+                  {chips.map((chip, ci) => (
+                    <button
+                      key={ci}
+                      onClick={() => handleChipClick(chip)}
+                      disabled={isLoading}
+                      className="px-3 py-1.5 bg-white border border-blue-200 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {/* FIX: Property 'picture' does not exist on type 'UserProfile'. Use 'avatarUrl' instead. */}
-            {msg.sender === 'user' && userProfile && userProfile.avatarUrl && <img src={userProfile.avatarUrl} alt="User" className="w-8 h-8 rounded-full flex-shrink-0" />}
-          </div>
-        ))}
+          );
+        })}
         {isLoading && (
             <div className="flex items-start gap-3">
                 <Icon name="bot" className="w-8 h-8 p-1.5 bg-gray-100 text-gray-600 rounded-full flex-shrink-0" />
