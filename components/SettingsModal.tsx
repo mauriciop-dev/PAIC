@@ -384,8 +384,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </main>
         </div>
         {/* Mobile: bottom scrollable tabs */}
-        <div className="md:hidden border-t border-gray-200 bg-white">
-             <nav className="flex space-x-2 px-4 py-2 overflow-x-auto min-w-max" aria-label="Tabs de configuración">
+        <div className="md:hidden border-t border-gray-200 bg-white overflow-x-auto touch-pan-x pb-[env(safe-area-inset-bottom)]">
+             <nav className="flex space-x-2 px-4 py-2 w-max" aria-label="Tabs de configuración">
                  {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
                      const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
                      return (
