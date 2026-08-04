@@ -207,14 +207,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   
   const renderProfileTab = () => (
     <div className="space-y-4">
-        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-            {profileData.avatarUrl ? <img src={profileData.avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full" /> : <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center"><Icon name="user" className="w-8 h-8 text-gray-600" /></div>}
-            <div>
+        <div className="flex flex-col items-center gap-3 p-5 bg-gray-50 rounded-xl">
+            {profileData.avatarUrl ? <img src={profileData.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full" /> : <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center"><Icon name="user" className="w-10 h-10 text-gray-600" /></div>}
+            <div className="text-center">
                 <p className="font-bold text-lg text-gray-800">{profileData.fullName}</p>
                 <p className="text-sm text-gray-600">{profileData.email}</p>
             </div>
         </div>
-        <p className="text-xs text-gray-500">Tu nombre, correo y foto son gestionados por tu proveedor de autenticación (ej. Google).</p>
+        <div>
+            <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700">Nombre</label>
+            <input id="profile-name" type="text" value={profileData.fullName} onChange={(e) => {setProfileData(prev => ({...prev, fullName: e.target.value})); setHasChanges(true);}} className="mt-1 w-full p-2 border rounded" />
+        </div>
+        <div>
+            <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700">Correo</label>
+            <input id="profile-email" type="email" value={profileData.email} readOnly disabled className="mt-1 w-full p-2 border rounded bg-gray-50 text-gray-500" />
+        </div>
+        <p className="text-xs text-gray-500">Tu correo y foto son gestionados por tu proveedor de autenticación (ej. Google).</p>
     </div>
   );
 
@@ -348,21 +356,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-2xl w-11/12 md:w-2/3 lg:w-[48rem] relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <header className="p-6 border-b"><button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button><h2 className="text-2xl font-bold text-gray-800">Configuración</h2></header>
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-end md:items-center" onClick={onClose}>
+      <div className="bg-white rounded-t-2xl md:rounded-lg shadow-2xl w-full md:w-2/3 lg:w-[48rem] relative flex flex-col max-h-[95vh] md:max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <header className="p-4 md:p-6 border-b"><button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button><h2 className="text-xl md:text-2xl font-bold text-gray-800">Configuración</h2></header>
 
-        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-<div className="md:hidden w-full border-b border-gray-200 overflow-x-auto">
-                 <nav className="flex space-x-2 px-4 py-2 min-w-max" aria-label="Tabs de configuración">
-                     {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
-                         const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
-                         return (
-                         <button key={tab} id={subtabId} onClick={() => handleTabClick(tab)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button>
-                         );
-                     })}
-                 </nav>
-                </div>
+        <div className="flex flex-1 overflow-hidden md:flex-row">
                 <nav className="hidden md:block w-48 border-r p-4">
                     <ul className="space-y-1">
                         {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
@@ -374,7 +372,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </ul>
                 </nav>
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-6 overflow-y-auto">
+                <div className="p-4 md:p-6 overflow-y-auto">
                     {renderContent()}
                 </div>
                 {(activeTab === 'Perfil' || activeTab === 'Conjunto') && (
@@ -385,6 +383,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
             </main>
         </div>
+        {/* Mobile: bottom scrollable tabs */}
+        <div className="md:hidden border-t border-gray-200 bg-white">
+             <nav className="flex space-x-2 px-4 py-2 overflow-x-auto min-w-max" aria-label="Tabs de configuración">
+                 {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
+                     const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                     return (
+                     <button key={tab} id={subtabId} onClick={() => handleTabClick(tab)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button>
+                     );
+                 })}
+             </nav>
+            </div>
         
         {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} error={modalError} />}
         {isRoleModalOpen && editingUserPermissions && <RoleModal isOpen={isRoleModalOpen} onClose={() => {setIsRoleModalOpen(false); setEditingUserPermissions(null);}} onSave={handleSaveRole} userToEdit={editingUserPermissions} allRoles={roles} error={modalError} />}
