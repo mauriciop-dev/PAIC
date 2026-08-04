@@ -4,10 +4,19 @@ import { apiService } from '../../services/apiService';
 // FIX: Imported missing types to resolve reference errors and improve type safety.
 import { ChartData, DashboardSummary, NotificationItem, Tab, UserProfile, DueDate, Task, PackageLog, IncomeCategory, ExpenseCategory, VisitorLog, AccessPoint } from '../../types';
 import { Icon } from '../ui/Icon';
+import { humanizeDueDateLabel } from '../../utils/notifications';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import ProgressRing from '../ProgressRing';
 
 interface DashboardViewProps {
     setActiveTab: (tab: Tab) => void;
     userProfile: UserProfile;
+}
+
+interface DashboardSummaryWithProgress extends DashboardSummary {
+    stats: DashboardSummary['stats'] & {
+        taskProgress: { completed: number; total: number };
+    };
 }
 
 interface TooltipData {
@@ -28,13 +37,42 @@ const StatCard: React.FC<{ title: string; value: number | string; icon: string; 
     </div>
 );
 
+const AlertStatCard: React.FC<{ title: string; value: number | string; subtitle?: string }> = ({ title, value, subtitle }) => (
+    <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
+        <div className="p-3 rounded-full bg-red-100">
+            <Icon name="alert-triangle" className="w-6 h-6 text-red-500" />
+        </div>
+        <div>
+            <p className="text-4xl font-extrabold text-gray-800 leading-none">{value}</p>
+            <h3 className="text-sm font-semibold text-gray-500 mt-1">{title}</h3>
+            {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+        </div>
+    </div>
+);
+
+const TasksStatCard: React.FC<{ title: string; pending: number; completed: number; total: number }> = ({ title, pending, completed, total }) => {
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return (
+        <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
+            <ProgressRing percentage={pct}>
+                <span className="text-lg font-bold text-gray-800">{pct}%</span>
+            </ProgressRing>
+            <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-gray-500">{title}</h3>
+                <p className="text-sm text-gray-600 mt-0.5">{completed} de {total} completadas</p>
+                <p className="text-xs text-yellow-600 font-medium mt-0.5">{pending} pendientes</p>
+            </div>
+        </div>
+    );
+};
+
 const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) => void }> = ({ item, onClick }) => {
     const urgencyConfig = {
         high: {
             icon: 'alert-triangle',
-            bgColor: 'bg-red-50',
-            textColor: 'text-red-800',
-            borderColor: 'border-red-200'
+            bgColor: 'bg-rose-50',
+            textColor: 'text-rose-700',
+            borderColor: 'border-rose-200'
         },
         medium: {
             icon: 'clock',
@@ -74,7 +112,7 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
 
 
 const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile }) => {
-    const [summary, setSummary] = useState<DashboardSummary | null>(null);
+    const [summary, setSummary] = useState<DashboardSummaryWithProgress | null>(null);
     const [chartData, setChartData] = useState<{ 
         monthlyIncomeVsExpense: ChartData[], 
         expensesByCategory: ChartData[],
@@ -84,6 +122,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     const [isLoading, setIsLoading] = useState(true);
     const [currentChartIndex, setCurrentChartIndex] = useState(0);
     const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+    const isMobile = useMediaQuery('(max-width: 767px)');
 
     useEffect(() => {
         const fetchDataAndProcess = async () => {
@@ -120,6 +159,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
 
             const residentsInDebt = accountStatusData.filter(a => a.outstandingBalance > 0);
             const pendingTasks = tasksData.filter(t => !t.completed);
+            const completedTasks = tasksData.filter(t => t.completed);
             const overduePayments = dueDatesData.filter(d => {
                 if (d.status === 'Vencido') return true;
                 if (d.status === 'Pendiente') {
@@ -144,14 +184,19 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
                     let urgency: 'high' | 'medium' = 'medium';
                     let details = `Vence el ${d.dueDate}.`;
+                    let overdue = false;
+                    let dueSoon = false;
                     if (dayDiff < 0) {
                         urgency = 'high';
                         details = `Venció hace ${Math.abs(dayDiff)} día(s).`;
+                        overdue = true;
                     } else if (dayDiff <= 3) {
                         urgency = 'high';
                         details = `Vence en ${dayDiff} día(s).`;
+                        dueSoon = true;
                     }
-                    return { id: `d-${d.id}`, type: 'due-date', text: d.item, details, urgency, linkTo: Tab.DueDates };
+                    const text = humanizeDueDateLabel(d.item, { overdue, dueSoon });
+                    return { id: `d-${d.id}`, type: 'due-date', text, details, urgency, linkTo: Tab.DueDates };
                 });
 
             const taskNotifications: NotificationItem[] = pendingTasks
@@ -187,6 +232,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     pendingTasks: { count: pendingTasks.length, details: pendingTasks.slice(0, 10).map(t => t.text) },
                     overduePayments: { count: overduePayments.length, details: overduePayments.slice(0, 10).map(p => p.item) },
                     packagesToDeliver: { count: packagesToDeliver.length, details: packagesToDeliver.slice(0, 10).map(p => `Apto ${p.apartment} de ${p.courier}`) },
+                    taskProgress: { completed: completedTasks.length, total: tasksData.length },
                 },
                 notifications: allNotifications,
             });
@@ -288,20 +334,43 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     
     const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
+    const compactFormatter = (value: number | string) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number);
+    const moneyFormatter = (value: number | string) => `$${(value as number).toLocaleString()}`;
+
+    const incomeExpenseLine = (data: ChartData[], months: number, dot: boolean) => (
+        <LineChart data={data.slice(-months)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis dataKey="name" fontSize={12} />
+            <YAxis fontSize={12} tickFormatter={compactFormatter} />
+            <Tooltip formatter={moneyFormatter} />
+            <Legend wrapperStyle={{fontSize: "12px"}}/>
+            <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#2563eb" strokeWidth={2} dot={dot} />
+            <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} dot={dot} />
+        </LineChart>
+    );
+
+    const incomeExpenseBar = (data: ChartData[], months: number) => (
+        <BarChart data={data.slice(-months)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis dataKey="name" fontSize={12} />
+            <YAxis fontSize={12} tickFormatter={compactFormatter} />
+            <Tooltip formatter={moneyFormatter} />
+            <Legend wrapperStyle={{fontSize: "12px"}}/>
+            <Bar dataKey="ingresos" name="Ingresos" stackId="a" fill="#2563eb" />
+            <Bar dataKey="gastos" name="Gastos" stackId="a" fill="#ef4444" />
+        </BarChart>
+    );
+
+    const hasExpensesByCategory = chartData ? chartData.expensesByCategory.length > 0 : false;
+    const hasPackageVolume = chartData ? chartData.packageVolume.length > 0 : false;
+    const hasVisitorTraffic = chartData ? chartData.visitorTraffic.length > 0 : false;
+    const hasMonthly = chartData ? chartData.monthlyIncomeVsExpense.length > 0 : false;
+
     const charts = chartData ? [
         {
-            title: 'Ingresos vs Gastos (Últimos 6 meses)',
-            component: (
-                 <LineChart data={chartData.monthlyIncomeVsExpense.slice(-6)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
-                    <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                    <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#2563eb" strokeWidth={2} />
-                    <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} />
-                </LineChart>
-            )
+            title: isMobile ? 'Ingresos vs Gastos · 6m' : 'Ingresos vs Gastos (Últimos 6 meses)',
+            component: isMobile ? incomeExpenseBar(chartData.monthlyIncomeVsExpense, 6) : incomeExpenseLine(chartData.monthlyIncomeVsExpense, 6, true),
+            show: hasMonthly,
         },
         {
             title: 'Gastos del Mes por Categoría',
@@ -310,10 +379,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     <Pie data={chartData.expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
                         {chartData.expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
+                    <Tooltip formatter={moneyFormatter} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
                 </PieChart>
-            )
+            ),
+            show: hasExpensesByCategory,
         },
         {
             title: 'Volumen de Paquetes (Últimos 6 meses)',
@@ -326,7 +396,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
                     <Bar dataKey="value" name="Paquetes" fill="#82ca9d" />
                 </BarChart>
-            )
+            ),
+            show: hasPackageVolume,
         },
         {
             title: 'Tráfico de Visitantes por Portería',
@@ -338,29 +409,15 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     <Tooltip formatter={(value) => `${value} visitantes`} />
                     <Legend wrapperStyle={{fontSize: "12px"}}/>
                 </PieChart>
-            )
+            ),
+            show: hasVisitorTraffic,
         },
         {
             title: 'Comportamiento Histórico (Últimos 12 meses)',
-            component: (
-                <LineChart data={chartData.monthlyIncomeVsExpense.slice(-12)} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value as number)} />
-                    <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
-                    <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#2563eb" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2} dot={false} />
-                </LineChart>
-            )
+            component: isMobile ? incomeExpenseBar(chartData.monthlyIncomeVsExpense, 12) : incomeExpenseLine(chartData.monthlyIncomeVsExpense, 12, false),
+            show: hasMonthly,
         },
-    ].filter(chart => {
-        if (chart.title.includes('Gastos') && chartData.expensesByCategory.length === 0) return false;
-        if (chart.title.includes('Paquetes') && chartData.packageVolume.length === 0) return false;
-        if (chart.title.includes('Visitantes') && chartData.visitorTraffic.length === 0) return false;
-        if (chart.title.includes('Ingresos') && chartData.monthlyIncomeVsExpense.length === 0) return false;
-        return true;
-    }) : [];
+    ].filter(chart => chart.show).map(({ title, component }) => ({ title, component })) : [];
 
     const handleNextChart = () => {
         if (charts.length === 0) return;
@@ -377,13 +434,18 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
     <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div onMouseEnter={(e) => handleMouseEnter(stats.residentsInDebt.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Residentes en Mora" value={stats.residentsInDebt.count} icon="users" iconColor="bg-red-500" />
+                <AlertStatCard title="Residentes en Mora" value={stats.residentsInDebt.count} />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.pendingTasks.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Tareas Pendientes" value={stats.pendingTasks.count} icon="checkSquare" iconColor="bg-yellow-500" />
+                <TasksStatCard
+                    title="Tareas Pendientes"
+                    pending={stats.pendingTasks.count}
+                    completed={stats.taskProgress.completed}
+                    total={stats.taskProgress.total}
+                />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.overduePayments.details, e)} onMouseLeave={handleMouseLeave}>
-                <StatCard title="Pagos Vencidos" value={stats.overduePayments.count} icon="alert-triangle" iconColor="bg-orange-500" />
+                <AlertStatCard title="Pagos Vencidos" value={stats.overduePayments.count} />
             </div>
             <div onMouseEnter={(e) => handleMouseEnter(stats.packagesToDeliver.details, e)} onMouseLeave={handleMouseLeave}>
                 <StatCard title="Paquetes por Entregar" value={stats.packagesToDeliver.count} icon="package" iconColor="bg-blue-500" />
@@ -412,21 +474,36 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
                     </div>
                 ) : (
                     <>
-                        <div className="flex justify-between items-center mb-4">
+                        <div className={`${isMobile ? 'text-center mb-3' : 'flex justify-between items-center mb-4'}`}>
                             <h3 className="text-lg font-semibold text-gray-700">{charts[currentChartIndex].title}</h3>
-                            <div className="flex items-center gap-2">
-                                <button onClick={handlePrevChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                            {!isMobile && (
+                                <div className="flex items-center gap-2">
+                                    <button onClick={handlePrevChart} aria-label="Gráfico anterior" className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                        &lt;
+                                    </button>
+                                    <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
+                                    <button onClick={handleNextChart} aria-label="Gráfico siguiente" className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                        &gt;
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                {charts[currentChartIndex].component}
+                            </ResponsiveContainer>
+                        </div>
+                        {isMobile && (
+                            <div className="flex items-center justify-center gap-4 mt-3">
+                                <button onClick={handlePrevChart} aria-label="Gráfico anterior" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 min-h-[40px] min-w-[40px]">
                                     &lt;
                                 </button>
-                                <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
-                                <button onClick={handleNextChart} className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                <span className="text-xs text-gray-500 font-medium">{currentChartIndex + 1} / {charts.length}</span>
+                                <button onClick={handleNextChart} aria-label="Gráfico siguiente" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 min-h-[40px] min-w-[40px]">
                                     &gt;
                                 </button>
                             </div>
-                        </div>
-                        <ResponsiveContainer width="100%" height="100%">
-                            {charts[currentChartIndex].component}
-                        </ResponsiveContainer>
+                        )}
                     </>
                 )}
             </div>
