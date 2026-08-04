@@ -478,6 +478,52 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               );
           case DbTab.AccountStatus:
               return (
+                <>
+                  {/* Mobile: Card view */}
+                  <div className="md:hidden space-y-3 p-4">
+                    {accountStatus.filter(a => !searchQuery || `${a.apartment} ${a.lastPaymentDate} ${a.adminFeeValue} ${a.outstandingBalance}`.toLowerCase().includes(searchQuery.toLowerCase())).map((account) => (
+                      <div key={account.apartment} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <Icon name="home" className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-900 text-sm">Apto {account.apartment}</p>
+                              <p className="text-xs text-gray-500 truncate">Último pago: {account.lastPaymentDate || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm font-bold text-red-600 flex-shrink-0">${account.outstandingBalance.toLocaleString()}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                          <div className="bg-gray-50 rounded-lg p-2">
+                            <p className="text-xs text-gray-500">Valor cuota</p>
+                            <p className="font-medium text-gray-800">${account.adminFeeValue.toLocaleString()}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-2">
+                            <p className="text-xs text-gray-500">Cuotas pend.</p>
+                            <p className="font-medium text-gray-800">{account.pendingInstallments}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-2 col-span-2">
+                            <p className="text-xs text-gray-500">Otros cargos</p>
+                            <p className="font-medium text-gray-800">${account.otherCharges.toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                          <button onClick={() => handleAccountStatusModalOpen(account)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">Editar</button>
+                          <button onClick={() => setConfirmAction({ title: 'Eliminar Estado de Cuenta', message: `¿Estás seguro de que quieres eliminar el estado de cuenta del apartamento ${account.apartment}?`, onConfirm: () => handleDeleteAccountStatus(account.apartment) })} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">Eliminar</button>
+                        </div>
+                      </div>
+                    ))}
+                    {accountStatus.filter(a => !searchQuery || `${a.apartment} ${a.lastPaymentDate} ${a.adminFeeValue} ${a.outstandingBalance}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="credit-card" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron estados de cuenta</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block">
                   <table className="w-full text-sm text-left text-gray-500">
                       <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                           <tr>
@@ -507,9 +553,54 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           ))}
                       </tbody>
                   </table>
+                  </div>
+                </>
               );
             case DbTab.Providers:
               return (
+                <>
+                  {/* Mobile: Card view */}
+                  <div className="md:hidden space-y-3 p-4">
+                    {providers.filter(p => !searchQuery || `${p.company} ${p.specialty} ${p.email} ${p.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((provider) => (
+                      <div key={provider.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                            <Icon name="briefcase" className="w-5 h-5 text-indigo-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{provider.company}</p>
+                            <p className="text-xs text-gray-500 truncate">{provider.specialty}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 text-sm text-gray-700 mb-3">
+                          {provider.email && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="mail" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate text-xs">{provider.email}</span>
+                            </div>
+                          )}
+                          {provider.phone && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="phone" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs">{provider.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                          <button onClick={() => handleProviderModalOpen(provider)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">Editar</button>
+                          <button onClick={() => setConfirmAction({ title: 'Eliminar Proveedor', message: '¿Estás seguro de que quieres eliminar este proveedor?', onConfirm: () => handleDeleteProvider(provider.id) })} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">Eliminar</button>
+                        </div>
+                      </div>
+                    ))}
+                    {providers.filter(p => !searchQuery || `${p.company} ${p.specialty} ${p.email} ${p.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="briefcase" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron proveedores</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block">
                    <table className="w-full text-sm text-left text-gray-500">
                       <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                           <tr>
@@ -535,9 +626,54 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           ))}
                       </tbody>
                   </table>
+                  </div>
+                </>
               );
             case DbTab.Internal:
               return (
+                <>
+                  {/* Mobile: Card view */}
+                  <div className="md:hidden space-y-3 p-4">
+                    {internalStaff.filter(s => !searchQuery || `${s.name} ${s.position} ${s.email} ${s.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).map((staff) => (
+                      <div key={staff.name} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                            <Icon name="user" className="w-5 h-5 text-emerald-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{staff.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{staff.position}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 text-sm text-gray-700 mb-3">
+                          {staff.email && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="mail" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate text-xs">{staff.email}</span>
+                            </div>
+                          )}
+                          {staff.phone && (
+                            <div className="flex items-center gap-2">
+                              <Icon name="phone" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs">{staff.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                          <button onClick={() => handleStaffModalOpen(staff)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">Editar</button>
+                          <button onClick={() => setConfirmAction({ title: 'Eliminar Personal', message: '¿Estás seguro de que quieres eliminar a este miembro del personal?', onConfirm: () => handleDeleteStaff(staff.name) })} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">Eliminar</button>
+                        </div>
+                      </div>
+                    ))}
+                    {internalStaff.filter(s => !searchQuery || `${s.name} ${s.position} ${s.email} ${s.phone}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="users" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron miembros del personal</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block">
                    <table className="w-full text-sm text-left text-gray-500">
                       <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                           <tr>
@@ -563,6 +699,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           ))}
                       </tbody>
                   </table>
+                  </div>
+                </>
               );
       }
   };

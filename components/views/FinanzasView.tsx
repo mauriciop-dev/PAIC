@@ -484,7 +484,31 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                         </button>
                     </div>
                 </div>
-                 <div className="overflow-x-auto">
+                 <div className="md:hidden space-y-3 p-4">
+                    {data.map((item: any) => (
+                      <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-gray-900 text-sm truncate flex-1">{item.description}</p>
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 flex-shrink-0">{item.category}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">{item.date}</p>
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                          <p className={`text-base font-bold ${type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(item.amount)}</p>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 transition-colors">Editar</button>
+                            <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 transition-colors">Eliminar</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {data.length === 0 && (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="dollarSign" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron {type === 'income' ? 'ingresos' : 'gastos'}</p>
+                      </div>
+                    )}
+                 </div>
+                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
@@ -507,7 +531,7 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                 </div>
             </div>
         );
     }

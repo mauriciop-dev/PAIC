@@ -269,7 +269,51 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     
     const renderVisitorsTable = () => (
          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Mobile: Card view */}
+            <div className="md:hidden space-y-3 p-4">
+                {visitorLogs.map(log => (
+                    <div key={log.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{log.visitorName}</p>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${getStatusChipStyle(log.status)}`}>
+                                {log.status}
+                            </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">Apto {log.apartment} · {log.date}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-600 mb-3">
+                            <span className="flex items-center gap-1"><Icon name="log-in" className="w-3.5 h-3.5 text-gray-400" /> {log.entryTime || 'N/A'}</span>
+                            <span className="flex items-center gap-1"><Icon name="log-in" className="w-3.5 h-3.5 text-gray-400 rotate-180" /> {log.exitTime || 'N/A'}</span>
+                        </div>
+                        {log.status === 'Autorizado' && (
+                            <button
+                                onClick={() => handleRegisterEntry(log.id)}
+                                disabled={updatingLogId === log.id}
+                                className="w-full text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-wait">
+                                {updatingLogId === log.id ? 'Registrando...' : 'Registrar Ingreso'}
+                            </button>
+                        )}
+                        {log.status === 'Ingresó' && (
+                            <button
+                                onClick={() => handleRegisterExit(log.id)}
+                                disabled={updatingLogId === log.id}
+                                className="w-full text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-wait">
+                                {updatingLogId === log.id ? 'Registrando...' : 'Registrar Salida'}
+                            </button>
+                        )}
+                        {log.status === 'Salió' && (
+                            <p className="text-center text-xs text-gray-500 font-medium py-2">Visita Completada</p>
+                        )}
+                    </div>
+                ))}
+                {visitorLogs.length === 0 && (
+                    <div className="text-center py-12 text-gray-400">
+                        <Icon name="user" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No hay visitas registradas</p>
+                    </div>
+                )}
+            </div>
+            {/* Desktop: Table */}
+            <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
@@ -326,7 +370,38 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     
     const renderPackagesTable = () => (
          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Mobile: Card view */}
+            <div className="md:hidden space-y-3 p-4">
+                {packageLogs.map(log => (
+                    <div key={log.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-semibold text-gray-900 text-sm truncate">Apto {log.apartment}</p>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${getStatusChipStyle(log.status)}`}>
+                                {log.status}
+                            </span>
+                        </div>
+                        <p className="text-sm text-gray-700 mb-1">{log.courier}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                            <span className="flex items-center gap-1"><Icon name="clock" className="w-3.5 h-3.5 text-gray-400" /> {new Date(log.receivedDate).toLocaleString('es-CO')}</span>
+                            {log.trackingNumber && <span className="truncate">Guía: {log.trackingNumber}</span>}
+                        </div>
+                        <button
+                            onClick={() => handleMarkDelivered(log.id)}
+                            disabled={log.status === 'Entregado'}
+                            className="w-full text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                            {log.status === 'Entregado' ? 'Entregado' : 'Marcar Entregado'}
+                        </button>
+                    </div>
+                ))}
+                {packageLogs.length === 0 && (
+                    <div className="text-center py-12 text-gray-400">
+                        <Icon name="package" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No hay paquetes registrados</p>
+                    </div>
+                )}
+            </div>
+            {/* Desktop: Table */}
+            <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>

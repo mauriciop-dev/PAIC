@@ -126,7 +126,36 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
         {isLoading ? (
           <div className="p-6 text-center text-gray-500">Cargando archivos...</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: Card view */}
+          <div className="md:hidden space-y-3 p-4">
+            {files.length > 0 ? files.map(file => (
+              <div key={file.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                    <Icon name="file-text" className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{file.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{bytesToSize(file.size)} · {new Date(file.createdAt).toLocaleDateString('es-CO')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                  <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">
+                    Descargar
+                  </a>
+                  <button onClick={() => setDeleteTarget(file.name)} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">Eliminar</button>
+                </div>
+              </div>
+            )) : (
+              <div className="text-center py-12 text-gray-400">
+                <Icon name="file-text" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm">No hay archivos. ¡Sube tu primer documento!</p>
+              </div>
+            )}
+          </div>
+          {/* Desktop: Table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-500">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
@@ -164,6 +193,7 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
       <ConfirmModal
