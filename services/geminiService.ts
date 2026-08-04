@@ -455,6 +455,15 @@ const resetSession = () => {
     conversationHistory = [];
 };
 
+// Pushes a synthetic entry into the conversation history so the model stays
+// aware of actions performed directly by the UI (without making an API call).
+const notifyAction = (text: string) => {
+    conversationHistory.push({ role: 'model', text: `[Acción ejecutada por la aplicación] ${text}` });
+    if (conversationHistory.length > MAX_HISTORY_LENGTH) {
+        conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
+    }
+};
+
 const loadHistory = async (userProfile: UserProfile, conjuntoInfo: ConjuntoInfo): Promise<{ role: 'user' | 'model'; text: string }[]> => {
     if (!userProfile?.id || !conjuntoInfo?.id) return [];
     const messages = await apiService.loadChatHistory(userProfile.id, conjuntoInfo.id);
@@ -469,4 +478,5 @@ export const geminiService = {
     improveWriting,
     resetSession,
     loadHistory,
+    notifyAction,
 };

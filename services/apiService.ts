@@ -319,6 +319,20 @@ export const apiService = {
         this.sendCommunicationEmail([reservation.email], 'Confirmación de Reserva de Área Común', content, [], info.adminName, info.adminEmail);
     }
   },
+  async updateReservation(conjuntoId: string, reservation: T.Reservation): Promise<void> {
+    const { error } = await supabase.from('reservations').update(toSupabase(reservation)).eq('conjunto_id', conjuntoId).eq('id', reservation.id);
+    if (error) {
+      console.error('Error updating reservation:', error);
+      throw error;
+    }
+  },
+  async deleteReservation(conjuntoId: string, id: number): Promise<void> {
+    const { error } = await supabase.from('reservations').delete().eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error deleting reservation:', error);
+      throw error;
+    }
+  },
   async createReservationFromChat(conjuntoId: string, payload: { commonAreaName: string; apartment: string; date: string; startTime: string; endTime: string; }): Promise<void> {
     const { data: area, error: areaError } = await supabase
         .from('common_areas')
