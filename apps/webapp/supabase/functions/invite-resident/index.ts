@@ -21,7 +21,7 @@ Deno.serve(async req => {
     const token = `${crypto.randomUUID()}${crypto.randomUUID()}${crypto.randomUUID()}`;
     const { data: profile, error: profileError } = await admin.from('user_profiles').select('id,conjunto_id,role').eq('id', user.id).maybeSingle();
     if (profileError) return json({ error: `Perfil: ${profileError.message}` }, 500);
-    if (!profile || profile.conjunto_id !== conjuntoId || !['admin', 'subscriber', 'internal'].includes(profile.role)) return json({ error: 'Sin permisos para este conjunto' }, 403);
+    if (!profile || profile.conjunto_id !== conjuntoId || !['admin', 'trial', 'subscriber', 'internal'].includes(profile.role)) return json({ error: 'Sin permisos para este conjunto' }, 403);
     const { data: resident, error: residentError } = await admin.from('residents').select('name,email,pwa_status').eq('conjunto_id', conjuntoId).eq('apartment', apartment).maybeSingle();
     if (residentError) return json({ error: `Residente: ${residentError.message}` }, 500);
     if (!resident || !resident.email || resident.email.trim().toLowerCase() !== email.trim().toLowerCase()) return json({ error: 'Residente o correo no válido' }, 400);
