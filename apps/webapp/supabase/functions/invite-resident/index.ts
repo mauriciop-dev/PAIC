@@ -30,7 +30,7 @@ Deno.serve(async req => {
     if (invitationError) return json({ error: `Invitación: ${invitationError.message}` }, 500);
     const { error: updateError } = await admin.from('residents').update({ pwa_status: 'invited', pwa_invited_at: new Date().toISOString(), pwa_revoked_at: null }).eq('conjunto_id', conjuntoId).eq('apartment', apartment);
     if (updateError) return json({ error: `Estado residente: ${updateError.message}` }, 500);
-    const url = `${Deno.env.get('PWA_RESIDENTS_URL') ?? 'https://usuarios.paicai.com.co'}/invitacion?token=${encodeURIComponent(token)}`;
+    const url = `${Deno.env.get('PWA_RESIDENTS_URL') ?? 'https://usuarios.paicai.com.co'}/?token=${encodeURIComponent(token)}`;
     const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
     const sent = await resend.emails.send({
       from: `Administración PAIC <${Deno.env.get('SENDER_EMAIL')!}>`, to: [email],
