@@ -8,6 +8,7 @@ import AccountStatusModal from '../AccountStatusModal';
 import ConfirmModal from '../ConfirmModal';
 import SearchBar from '../SearchBar';
 import { Icon } from '@paic/ui';
+import { supabase } from '../../services/supabaseClient';
 
 declare var XLSX: any;
 
@@ -48,6 +49,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [invitingApartment, setInvitingApartment] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +87,19 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
       window.removeEventListener('data-changed', handleDataChange);
     };
   }, [fetchData]);
+
+  const inviteResident = async (resident: Resident) => {
+    if (!resident.email || !userProfile.conjuntoId) return;
+    setInvitingApartment(resident.apartment);
+    try {
+      const { error } = await supabase.functions.invoke('invite-resident', { body: { conjuntoId: userProfile.conjuntoId, apartment: resident.apartment, email: resident.email, residentName: resident.name } });
+      if (error) throw error;
+      setFeedbackMessage({ type: 'success', text: `Invitación enviada a ${resident.email}.` });
+      await fetchData();
+    } catch (error) {
+      setFeedbackMessage({ type: 'error', text: error instanceof Error ? error.message : 'No se pudo enviar la invitación.' });
+    } finally { setInvitingApartment(null); }
+  };
 
   // Modal Handlers
   const handleResidentModalOpen = (resident: Resident | null) => { setSelectedResident(resident); setIsResidentModalOpen(true); };
@@ -433,6 +448,9 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                           <button onClick={() => handleResidentModalOpen(resident)} className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">
                             Editar
                           </button>
+                          {resident.email && <button disabled={invitingApartment === resident.apartment} onClick={() => void inviteResident(resident)} className="flex-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-lg py-2 px-3 text-center transition-colors">
+                            {invitingApartment === resident.apartment ? 'Enviando…' : 'Invitar PWA'}
+                          </button>}
                           <button onClick={() => setConfirmAction({ title: 'Eliminar Residente', message: `¿Estás seguro de que quieres eliminar al residente del apartamento ${resident.apartment}?`, onConfirm: () => handleDeleteResident(resident.apartment) })} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">
                             Eliminar
                           </button>
@@ -467,6 +485,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                   <td className="px-6 py-4">{resident.phone}</td>
                                   <td className="px-6 py-4 text-right space-x-2">
                                      <button onClick={() => handleResidentModalOpen(resident)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                     {resident.email && <button disabled={invitingApartment === resident.apartment} onClick={() => void inviteResident(resident)} className="font-medium text-emerald-700 hover:underline disabled:opacity-50">{invitingApartment === resident.apartment ? 'Enviando…' : 'Invitar PWA'}</button>}
                                      <button onClick={() => setConfirmAction({ title: 'Eliminar Residente', message: `¿Estás seguro de que quieres eliminar al residente del apartamento ${resident.apartment}?`, onConfirm: () => handleDeleteResident(resident.apartment) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                    </td>
                                </tr>

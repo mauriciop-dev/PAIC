@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
 import { analytics } from '@paic/analytics';
-import { getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
+import { consumeResidentInvitation, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { subscribeToPush } from './services/pwaPush';
 import './App.css';
@@ -29,6 +29,7 @@ export default function UsuariosApp() {
   const { addToast } = useToast();
   const registrationConjunto = new URLSearchParams(window.location.search).get('conjunto') || '';
   const registrationMode = new URLSearchParams(window.location.search).get('registro') === '1';
+  const invitationToken = new URLSearchParams(window.location.search).get('token');
 
   useEffect(() => {
     analytics.init();
@@ -37,7 +38,12 @@ export default function UsuariosApp() {
       try {
         const session = await getSession();
         if (!session) return;
-        const membership = await getMembership(session.user);
+        let membership = await getMembership(session.user);
+        if (invitationToken && !membership) {
+          const activation = await consumeResidentInvitation(invitationToken);
+          membership = activation.membership;
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
         if (active && membership) { setUser({ id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role }); setPwaData(await loadPwaData(membership)); }
         if (active && !membership) setAuthError('Tu cuenta aún no tiene una unidad vinculada. Solicita aprobación a la administración.');
       } catch (error) {
@@ -47,7 +53,7 @@ export default function UsuariosApp() {
     void loadAuth();
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });
     return () => { active = false; subscription?.data.subscription.unsubscribe(); };
-  }, []);
+  }, [invitationToken]);
 
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;

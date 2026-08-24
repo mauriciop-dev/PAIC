@@ -25,6 +25,13 @@ export async function signInWithGoogle() {
   return supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
 }
 
+export async function consumeResidentInvitation(token: string) {
+  if (!supabase) throw new Error('La PWA no tiene configuradas las variables de Supabase.');
+  const { data, error } = await supabase.functions.invoke('consume-resident-invitation', { body: { token } });
+  if (error) throw error;
+  return data as { ok: boolean; membership: PwaMembership };
+}
+
 export async function getMembership(user: User): Promise<PwaMembership | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
