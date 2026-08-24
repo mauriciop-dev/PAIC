@@ -1,0 +1,10 @@
+{
+  "name": "PAIC Residentes",
+  "short_name": "PAIC",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#f9fafb",
+  "lang": "es-CO",
+  "icons": [{ "src": "/logo-paic.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

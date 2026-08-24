@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@paic/ui": ["../../packages/ui/index.ts"],
+      "@paic/ui/*": ["../../packages/ui/*"],
+      "@paic/types": ["../../packages/types/index.ts"],
+      "@paic/types/*": ["../../packages/types/*"],
+      "@paic/supabase": ["../../packages/supabase/index.ts"],
+      "@paic/supabase/*": ["../../packages/supabase/*"],
+      "@paic/config": ["../../packages/config/index.ts"],
+      "@paic/analytics": ["../../packages/analytics/index.ts"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "supabase"
+  ]
+}

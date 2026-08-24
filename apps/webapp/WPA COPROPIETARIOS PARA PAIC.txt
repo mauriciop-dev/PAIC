@@ -1,0 +1,188 @@
+WPA COPROPIETARIOS PARA PAIC
+
+Objetivo: /goal
+Construir la WPA para PAIC para que los copropietarios puedan interactuar con PAIC
+
+Repositorio: https://github.com/mauriciop-dev/PAIC
+Carpeta local: C:\Users\micnu\OneDrive\PROYECTOS\PAIC
+carpeta local aplicación copropietarios: C:\Users\micnu\OneDrive\PROYECTOS\PAIC\appcop
+
+Funcionalidad: la WPA recibirá notificaciones de asunto ateniente a su apartamento, por ejemplo procedentes del modulo de seguridad cuando llegan paquetes y visitantes o procedentes del modulo de comunicaciones, cuando el administrador envíe una comunicación o actualice alguna sección de la WPA de usuarios.
+  
+Módulos de la aplicación móvil:
+
+Módulo principal: en vista de acordeón mostrará cada uno de los módulos de la WPA:
+
+- Comunicados
+- Estado de Cuenta
+- Portería
+- Reservas
+- PQRs
+- Documentos
+- Votaciones
+- Directorio
+- Configuración
+
+
+Modulo	PAIC Módulo WPA, admin	PAIC WPA, users
+Comunicados	Formulario con campos:
+Titulo, Mensaje, adjuntar (pdf, imagen) y botón enviar.
+
+Programar: opción de programar comunicados, por ejemplo los 30 de cada mes, enviar comunicado con enlace de pago de la administración.	Tarjeta con campos: Titulo en negrilla, Fecha, Mensaje, adjunto (si es imagen se muestra dentro de la tarjeta - posibilidad de ampliación a toda la pantalla. Ahora, si es un pdf muestra el enlace)
+Estado de cuenta	1. Tabla con información de estado de cuenta (Puede descargar  plantilla y cargar archivo "Apartamento, Estado - (al día, Pendiente, En Mora) Saldo, Observaciones") o editar los datos en la tabla. Nota: Tabla simnilar a la que hey en el modulo de base de datos. 
+2. recordatorio de días sin actualizar la información.
+3. Fecha automatica de la ultima actualizacion de ese registro.	Tarjeta con estado de cuenta actualizado:
+1. Apartamento en negrilla
+2. Estado
+3. Saldo pendiente
+3. Observaciones
+4. Fecha de ultima actualización
+Nota:Poner  una nota que diga, que es informacion de referencia, que si cree que no esta actualizada comunicarse con la admisnitración.
+Portería	Tabla que muestra El Estado por cada portería de visitantes y paquetes.	Tarjeta que muestra el Estado por portería de visitantes y paquetes para el apartamento.
+
+Nota: Poner  una nota que diga, que es información de referencia, si desea validar la información acérquese a la portería respectiva.
+Reservas	1. Tabla que muestra el estado de la reserva:
+
+- Apartamento
+- Zona (BBQ, Salón, Gimnasio, etc.)
+- Fecha
+- Hora inicio
+- Hora fin
+- Estado (Pendiente, aprobada)
+
+Nota: El estado pendiente dura 24 horas desde que se abre la reserva, si no hace el pago en este tiempo, se abrirá el espacio a la comunidad
+
+Botón, de ver calendario y aparecerá como una ventana modal, el mismo calendario del modulo "Areas Comunes", que consolida la información de la WPA y de las reservas que se hacen en la oficina de administración a traves de la WebApp. 	Tarjeta con formulario:
+
+- Apartamento (lo trae por defecto)
+- Zona a reservar
+- Fecha
+- Hora inicio
+- Hora fin
+- Estado (Inicia en "Pendiente" y cuando la administración cambie el estado a "aprobado" se actualiza en la WPA)
+- Adjunto: pantallazo o imagen del pago.
+
+Nota: al botón de Enviar no se actualiza si no adjunta el pantallazo o imagen o pdf del pago realizado.
+
+Nota1: Una vez enviado aparecerá en la parte inferior de la tarjeta una nota que diga algo como "Estamos verificando la transacción una vez confirmada, se hará cambio de estado a Aprobada"
+PQRs	Tabla con listado de los PQRs con las siguientes columnas:
+
+- Tipo (Petición, queja, etc.)
+- Apartamento
+- Nombre
+- Teléfono
+- Correo
+- Titulo
+- Descripción
+- Adjunto
+- Estado (Pendiente, Respondido)
+- Fecha Pendiente
+- Fecha Respondido
+- Contador días desde que se recibió
+- botón responder (Despliega ventana modal con formulario con campos de titulo y descripción, botón de adjuntar pdf y botón de enviar.) 	1. Tarjeta con formulario con los campos:
+
+- desplegable con opciones: Petición, Queja, Reclamo, Felicitación, Información, otros
+- nombre
+- teléfono
+- correo
+- Apto
+- Fecha
+- Titulo
+- Descripción
+- Adjunto (pdf o imagen) si lo hubiere.
+- Estado (Por defecto el estado es Pendiente)
+
+2. Consultas: si el usuario quiere ver el estado de su PQR podre ver una tarjeta con el estado de mismo.
+
+3. La respuesta se vera en la mis tarjeta con:
+
+- el Estado actualizado
+- Titulo respuesta
+- Cuerpo de la respuesta
+- Enlace a documento si lo hubiere.
+Documentos	Repositorio de documentos del conjunto que serán los mismo que el Modulo Archivos de la WebApp (Reglamentos, actas, etcetera)
+
+Formulario con campos de:
+
+- nombre del documento
+- Descripción corta
+- botón de adjuntar pdf	Tarjeta con listado de documentos en acordeón
+
+- Nombre documento (da clic y lo abre la descripción del documento y el enlace en pdf)
+Votaciones	- El administrador podrá enviar hasta 3 preguntas simultaneas con respuesta de selección multiple (máximo 5 opciones por respuesta)
+
+- Formulario con los campos:
+
+- Pregunta
+- hasta 5 opciones de respuesta
+- botón de enviar respuesta por cada pregunta.
+
+- Tarjeta de resultados por cada pregunta
+
+Nota: Solo se habilita para usuarios principales
+	Nota: una tarjeta que solo se activa cuando el administrador envía una encuesta.
+
+Nota: Solo se habilita para usuarios principales
+Directorio	Nota: podre crear hasta directorios por categorías:
+
+Categorías sugeridas:
+
+emergencias: policía cuadrante, bomberos, ambulancias etc.
+
+Comercio: Ferretería, Cerrajero, supermercado, Papelería etc.
+
+Administración: Administrador, portería, etc.
+
+y las demás que el administrador quiera crear, editar, eliminar.
+
+- botón agregar directorio
+
+ventana modal con formulario con los campos: (Primero crea o selecciona el directorio)
+
+- Nombre directorio
+- Nombre/Entidad
+- Teléfono
+- botón agregar	Tarjetas cada una con la información de un directorio.
+
+al hacer clic en el numero de teléfono lo debería llevar a la aplicación del teléfono para marcar el numero.
+Usuario	tipos de usuario:
+
+Principal: Es la persona responsable del grupo familiar en lo relacionado a la aplicación, también es el usuario que participa en las asambleas y se activa el modulo de Votaciones.
+
+Adicionales: Las personas que conviven con el usuario principal.
+
+Propietario: en caso de que el principal sea un arrendatario y el propietario no viva en el conjunto.
+
+- Activación de usuarios principales:
+
+La persona descarga la aplicación con el enlace o el código QR dispuesto en la administración o en las porterías.
+
+Cuando la persona sea registrada en la pestaña Base de datos el sistema de la administración, entonces se enviara un correo de bienvenida incluyendo el enlace para descargar la PWA de PAIC en el celular	Aparecerá un formulario para incluir hasta a 4 usuarios adicionales. (solo debe incluir el correo de Gmail de cada uno) y el botón enviar
+
+Cada usuario recibe el correo del usuario principal con el enlace para descargar la aplicación con la cuenta de Gmail con la que fue invitado.
+
+Si a alguno de los usuarios adicionales deben restablecer la aplicación, instalarla de nuevo etcetera, este podrá enviar nuevamente el correo de activación.
+
+Siempre recordar la responsabilidad del usuario principal.
+
+Este submódulo de Usuario, no aparece a la WPA de los usuarios adicionales.
+
+Si el usuario principal pierde la app, el teléfono o debe restablecer, debe hacerlo desde la administración o portería según corresponda.
+
+
+
+MODULO WEBAPP PAIC 
+
+Objetivo: Agregar un nuevo modulo llamado PWA a la panel de administración para que el administrador del conjunto gestione la información que enviara a los residentes.
+
+Este modulo tendrá los siguientes submodulos:
+
+- Comunicados
+- Estado de Cuenta
+- Porteria
+- Reservas
+- PQRs
+- Documentos
+- Votaciones
+- Directorio
+- Configuración

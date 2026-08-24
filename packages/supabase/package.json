@@ -1,0 +1,23 @@
+{
+  "name": "@paic/supabase",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./client": "./client.ts",
+    "./admin": "./admin.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "2"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2",
+    "typescript": "~5.8.2"
+  }
+}

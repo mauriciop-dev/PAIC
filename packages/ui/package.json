@@ -1,0 +1,37 @@
+{
+  "name": "@paic/ui",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./Button": "./Button.tsx",
+    "./Modal": "./Modal.tsx",
+    "./Icon": "./Icon.tsx",
+    "./Input": "./Input.tsx",
+    "./Toast": "./Toast.tsx",
+    "./Card": "./Card.tsx",
+    "./Badge": "./Badge.tsx",
+    "./Avatar": "./Avatar.tsx",
+    "./ProgressRing": "./ProgressRing.tsx",
+    "./SearchBar": "./SearchBar.tsx",
+    "./Header": "./Header.tsx",
+    "./Footer": "./Footer.tsx",
+    "./BottomNav": "./BottomNav.tsx",
+    "./NavBar": "./NavBar.tsx"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
