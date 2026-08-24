@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
 import { analytics } from '@paic/analytics';
 import { getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
-import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
+import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { subscribeToPush } from './services/pwaPush';
 import './App.css';
 
@@ -25,7 +25,7 @@ export default function UsuariosApp() {
   const [user, setUser] = useState<{ id: string; membershipId: string; conjuntoId: string; name: string; email: string; apt: string; avatar?: string; role: PwaMembership['role'] } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [pwaData, setPwaData] = useState<{ communications: Communication[]; account: AccountStatus | null; reservations: PwaReservation[]; packages: GateEvent[]; visitors: GateEvent[]; pqrs: Pqr[]; documents: PwaDocument[]; directories: DirectoryEntry[]; votes: PwaVote[] } | null>(null);
+  const [pwaData, setPwaData] = useState<{ communications: Communication[]; account: AccountStatus | null; reservations: PwaReservation[]; packages: GateEvent[]; visitors: GateEvent[]; authorizations: VisitAuthorization[]; pqrs: Pqr[]; documents: PwaDocument[]; directories: DirectoryEntry[]; votes: PwaVote[] } | null>(null);
   const { addToast } = useToast();
   const registrationConjunto = new URLSearchParams(window.location.search).get('conjunto') || '';
   const registrationMode = new URLSearchParams(window.location.search).get('registro') === '1';
@@ -143,13 +143,9 @@ export default function UsuariosApp() {
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Autorizar Visitas</h2>
-              <Button variant="primary" onClick={() => addToast('Autorizar visita próximamente', 'info')}>
-                <Icon name="user-plus" className="w-4 h-4" /> Autorizar
-              </Button>
+              <VisitAuthorizationForm user={user} onCreated={() => void getSession().then(async session => { if (session) { const membership = await getMembership(session.user); if (membership) setPwaData(await loadPwaData(membership)); } })} />
             </div>
-            <Card className="p-4">
-              {(pwaData?.visitors || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay visitas registradas</p> : <div className="space-y-3">{pwaData!.visitors.map((v) => <div key={v.id} className="flex justify-between"><span>{v.visitor_name}</span><Badge variant="info">{v.status}</Badge></div>)}</div>}
-            </Card>
+            <Card className="p-4"><h3 className="font-semibold">Autorizaciones enviadas</h3>{(pwaData?.authorizations || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p> : <div className="space-y-3">{pwaData!.authorizations.map((v) => <div key={v.id} className="flex justify-between"><div><span>{v.visitor_name}</span><p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p></div><Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge></div>)}</div>}</Card>
           </div>
         );
       case 'comunicados':
@@ -242,6 +238,8 @@ export default function UsuariosApp() {
 }
 
 function InvitationForm({ membershipId }: { membershipId: string }) { const [email, setEmail] = useState(''); const [message, setMessage] = useState(''); const submit = async (e: React.FormEvent) => { e.preventDefault(); try { await inviteAdditionalUser(membershipId, email); setMessage('Invitación registrada.'); setEmail(''); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo enviar la invitación.'); } }; return <Card className="p-4"><h3 className="font-semibold">Invitar usuario adicional</h3><p className="mt-1 text-sm text-gray-600">Puedes tener hasta cuatro invitaciones pendientes.</p><form onSubmit={submit} className="mt-3 flex gap-2"><Input type="email" placeholder="correo Gmail" value={email} onChange={e => setEmail(e.target.value)} required/><Button type="submit">Invitar</Button></form>{message && <p className="mt-2 text-sm text-gray-600">{message}</p>}</Card>; }
+
+function VisitAuthorizationForm({ user, onCreated }: { user: { id: string; conjuntoId: string; apt: string }; onCreated: () => void }) { const [form,setForm]=useState({visitorName:'',visitorPhone:'',visitDate:'',notes:''}); const [message,setMessage]=useState(''); const [open,setOpen]=useState(false); const submit=async(e:React.FormEvent)=>{e.preventDefault();try{await createVisitAuthorization({conjuntoId:user.conjuntoId,apartment:user.apt,userId:user.id,...form});setMessage('Autorización enviada a portería.');setForm({visitorName:'',visitorPhone:'',visitDate:'',notes:''});setOpen(false);onCreated()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo registrar la visita.')}};return <details className="rounded-xl border bg-white p-4" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary className="cursor-pointer font-semibold">Autorizar nueva visita</summary><form onSubmit={submit} className="mt-3 grid gap-3"><Input placeholder="Nombre del visitante" value={form.visitorName} onChange={e=>setForm({...form,visitorName:e.target.value})} required/><Input type="tel" placeholder="Teléfono (opcional)" value={form.visitorPhone} onChange={e=>setForm({...form,visitorPhone:e.target.value})}/><input className="rounded border p-2" type="date" min={new Date().toISOString().slice(0,10)} value={form.visitDate} onChange={e=>setForm({...form,visitDate:e.target.value})} required/><textarea className="min-h-20 rounded border p-2" placeholder="Observaciones (opcional)" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/><Button type="submit">Enviar autorización</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</form></details>; }
 
 function ReservationForm({ user, onCreated }: { user: { id: string; conjuntoId: string; apt: string }; onCreated: () => void }) {
   const [form, setForm] = useState({ areaName: '', date: '', startTime: '', endTime: '' }); const [file, setFile] = useState<File | null>(null); const [message, setMessage] = useState('');
