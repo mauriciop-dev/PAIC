@@ -1,33 +1,26 @@
 {
-  "name": "paic---plataforma-de-administración-inteligente-de-conjuntos",
+  "name": "paic-monorepo",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@google/genai": "^1.27.0",
-    "@supabase/supabase-js": "2",
-    "marked": "13.0.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "recharts": "^3.3.0"
+    "dev:webapp": "pnpm --filter webapp dev",
+    "dev:marketing": "pnpm --filter marketing dev",
+    "dev:usuarios": "pnpm --filter usuarios dev",
+    "dev:docs": "pnpm --filter docs dev",
+    "build:all": "pnpm -r build",
+    "build:webapp": "pnpm --filter webapp build",
+    "build:marketing": "pnpm --filter marketing build",
+    "build:usuarios": "pnpm --filter usuarios build",
+    "build:docs": "pnpm --filter docs build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "types": "pnpm -r types"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "jsdom": "^29.1.1",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "vitest": "^4.1.10"
-  }
+    "typescript": "~5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.12.0"
 }
