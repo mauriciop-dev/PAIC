@@ -20,7 +20,7 @@
     "typescript": "~5.8.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "packageManager": "pnpm@9.12.0"
 }
