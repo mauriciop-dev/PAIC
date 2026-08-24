@@ -93,7 +93,10 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
     setInvitingApartment(resident.apartment);
     try {
       const { error } = await supabase.functions.invoke('invite-resident', { body: { conjuntoId: userProfile.conjuntoId, apartment: resident.apartment, email: resident.email, residentName: resident.name } });
-      if (error) throw error;
+      if (error) {
+        const detail = error.context instanceof Response ? await error.context.json().catch(() => null) : null;
+        throw new Error(detail?.error || error.message);
+      }
       setFeedbackMessage({ type: 'success', text: `Invitación enviada a ${resident.email}.` });
       await fetchData();
     } catch (error) {

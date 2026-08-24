@@ -14,13 +14,22 @@ Deno.serve(async req => {
   try {
     const authorization = req.headers.get('Authorization');
     if (!authorization) return json({ error: 'No autenticado' }, 401);
-    const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authorization } } });
-    const { data: { user } } = await client.auth.getUser();
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: { user } } = await admin.auth.getUser(authorization.replace(/^Bearer\s+/i, ''));
     if (!user) return json({ error: 'No autenticado' }, 401);
     const { conjuntoId, apartment, email, residentName, conjuntoName } = await req.json();
     const token = `${crypto.randomUUID()}${crypto.randomUUID()}${crypto.randomUUID()}`;
-    const result = await client.rpc('pwa_issue_resident_invitation', { target_conjunto: conjuntoId, target_apartment: apartment, target_email: email, target_token_hash: await sha256(token) });
-    if (result.error) return json({ error: result.error.message }, 400);
+    const { data: profile, error: profileError } = await admin.from('user_profiles').select('id,conjunto_id,role').eq('id', user.id).maybeSingle();
+    if (profileError) return json({ error: `Perfil: ${profileError.message}` }, 500);
+    if (!profile || profile.conjunto_id !== conjuntoId || !['admin', 'subscriber', 'internal'].includes(profile.role)) return json({ error: 'Sin permisos para este conjunto' }, 403);
+    const { data: resident, error: residentError } = await admin.from('residents').select('name,email,pwa_status').eq('conjunto_id', conjuntoId).eq('apartment', apartment).maybeSingle();
+    if (residentError) return json({ error: `Residente: ${residentError.message}` }, 500);
+    if (!resident || !resident.email || resident.email.trim().toLowerCase() !== email.trim().toLowerCase()) return json({ error: 'Residente o correo no válido' }, 400);
+    await admin.from('pwa_resident_invitations').update({ revoked_at: new Date().toISOString() }).eq('conjunto_id', conjuntoId).eq('apartment', apartment).is('used_at', null).is('revoked_at', null);
+    const { data: invitation, error: invitationError } = await admin.from('pwa_resident_invitations').insert({ conjunto_id: conjuntoId, apartment, email_normalized: email.trim().toLowerCase(), token_hash: await sha256(token), created_by: user.id }).select('id').single();
+    if (invitationError) return json({ error: `Invitación: ${invitationError.message}` }, 500);
+    const { error: updateError } = await admin.from('residents').update({ pwa_status: 'invited', pwa_invited_at: new Date().toISOString(), pwa_revoked_at: null }).eq('conjunto_id', conjuntoId).eq('apartment', apartment);
+    if (updateError) return json({ error: `Estado residente: ${updateError.message}` }, 500);
     const url = `${Deno.env.get('PWA_RESIDENTS_URL') ?? 'https://usuarios.paicai.com.co'}/invitacion?token=${encodeURIComponent(token)}`;
     const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
     const sent = await resend.emails.send({
@@ -29,6 +38,6 @@ Deno.serve(async req => {
       html: `<h2>Hola ${residentName ?? 'residente'}</h2><p>Te invitamos a ingresar a la PWA de ${conjuntoName ?? 'tu conjunto'}.</p><p>Unidad: ${apartment}</p><p><a href="${url}">Ingresar a PAIC Residentes</a></p><p>Esta invitación vence en 7 días.</p>`
     });
     if (sent.error) return json({ error: sent.error.message }, 502);
-    return json({ ok: true, invitationId: result.data?.invitation_id });
+    return json({ ok: true, invitationId: invitation.id });
   } catch (error) { return json({ error: error instanceof Error ? error.message : 'Error interno' }, 500); }
 });
