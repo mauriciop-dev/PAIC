@@ -12,7 +12,6 @@ const sections: Array<{ id: Section; icon: string }> = [
 export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfile: UserProfile; conjuntoInfo: ConjuntoInfo }) {
   const [active, setActive] = useState<Section>('Comunicados');
   return <div className="space-y-5">
-    <div><p className="text-sm font-medium text-blue-600">Módulo PWA</p><h1 className="text-2xl font-bold">Portal de residentes</h1></div>
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex min-w-max gap-1 p-2" role="tablist" aria-label="Submódulos PWA">
         {sections.map(s => <button key={s.id} role="tab" aria-selected={active === s.id} onClick={() => setActive(s.id)} className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${active === s.id ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'}`}><Icon name={s.icon} className="h-4 w-4"/>{s.id}</button>)}
