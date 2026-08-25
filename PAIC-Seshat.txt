@@ -1,0 +1,69 @@
+PAIC Seshat
+
+Esta es la plataforma maestra que administrará PAIC https://paicai.com.co u https://app.paicai.com.co y se ingresara desde el subdominio https://seshat.paicai.com.co
+
+https://seshat.paicai.com.co no se indexara a buscadores ni inteligencias artificiales.
+
+https://seshat.paicai.com.co usara la seguridad de registro implementada en la plataforma PAIC, para entrar con la cuenta de google. Pero únicamente podrá acceder con el correo hmauricio.pineda@gmail.com
+
+Con seshat se administrará todo PAIC y tendrá las siguientes secciones:
+
+1. MODULO PANEL
+
+Panel: mostrara tarjetas en pantalla con información de: 
+
+Suscriptores: (por plan) incluido el gratis de 14 días. y cuantos usos del demo hemos tenido.
+
+Finanzas: ingresos por plan
+
+Vencimientos: Usuarios próximos a vencer en sus planes
+
+Seguridad: reportes de fallas, bugs, tiempo de respuesta
+
+Ranking: Conjuntos que mas se mueven en PAIC y que modulos son los que mas se mueven
+
+WPA: Descargas de WPA, secciones que mas se usan en WPA
+
+2. MODULO MARKETING
+
+En esta sección gestionaremos el marketing para leads. tendremos submodulos para:
+
+Submódulo Publicaciones: Tenemos pagina de PAIC en LinkedIn y Facebook, asi que desde allí podremos enviar publicaciones a estos perfiles con foto generada por IA.
+
+Submódulo estadísticas redes: Tambien podremos ver cuantos clics y cuantas personas llegaron de las publicaciones a https://paicai.com.co y cuantos llegaron a https://app.paicai.com.co y cuantos de estos usan el demo o la prueba de 14 días.
+
+Submódulo emails: vincular archivo de google sheet. envió de emails con formato html a los email de google sheet.
+
+Cuando un usuarios esta en la prueba de 14 días:
+
+- mandamos el correo de bienvenida - día 1
+- mandamos correo de como configurar PAIC - día 1
+- mandamos correo con varios videos de como usar PAIC - día 5
+- mandamos correo solicitando retroalimentación e invitando a elegir un plan - día 13
+
+Estos correos serán automáticos y en el submódulo email, se podrán editar.
+
+3. TECNICO
+
+- Submódulo Issues: tabla con listado de issues, bugs, diagnostico, sugerencia de como resolverlo y botón de aprobar solución.
+
+- Submódulo notificaciones: Para enviar notificaciones a todos los usuarios, por ejemplo por mantenimiento de la app, notificaciones por planes, notificaciones por módulos
+
+- submódulo mejoras: tabla con el listado de posible mejoras identificadas, diagnostico, sugerencia de implementación.
+
+- Submódulo de recomendaciones PQRs enviadas por suscriptores, notificaciones de capacitación o mantenimiento.
+
+4. AGENTES
+
+- PAIC tendrá dos agentes:
+
+Agente Tundama: Se encarga de todo lo técnico y de traer la información para el modulo TECNICO y sus submódulos con el monitoreo de issues y bugs, también sugiere mejoras
+
+Agente Tequendama: se encarga de todo el monitoreo de PAIC, hábitos de uso, alimenta la información de los módulos 1, 2 y 3 también sugiere mejoras, ayuda a redactar en marketing y a crear las fotos y las publicaciones
+
+Ambos agentes se conversan y se coordinan
+
+Para el cumplimiento de sus funciones se podrán crear funcionalidades de Python con mi aprobación que ayuden a los agentes a automatizar muchas de sus tareas y así evitar uso excesivo de tokens.
+
+
+

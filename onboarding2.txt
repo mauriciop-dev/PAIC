@@ -1,0 +1,88 @@
+Estos cambios aplican cuando el usuario entra a la prueba de 14 días
+
+El botón de tour guiado, con ondas suaves y vibrando levemente- este comportamiento se mantendrá durante los 14 días de prueba y durante el primer mes de uso
+
+Cambiar el nombre del botón "Tour guiado", por "Inicia aquí" -- se desplega una ventana modal
+
+ventana modal:
+
+1. Tour guiado -onboarding general-
+- Se activa el tour guiado normal
+
+
+
+-onboaridng detallado-
+
+2. Configuraciones iniciales -- abres la ventana modal de configuraciones -el icono de engranaje- y lo vas llevando por cada una de las opciones hasta terminar:
+
+Conjunto: llenan cada uno de los espacios y guardan los cambios
+Gestion de areas: debe agregar por lo menos un area común (en ves de que diga "Nombre del área" que diga Salón comunal, Parque, BBQ, etc
+Punto de acceso: debe agregar por lo menos un punto de acceso (en ves de que diga "Nombre del punto de acceso" que diga Entrada principal, Entrada parqueadero, Entrada peatonal, etc
+Usuarios: poner debajo del titulo "Agrega datos, rol y contraseña del nuevo usuario
+Permisos de usuario: ledas editar y aparece la ventana con los módulos a los que darás acceso al usuario que acabas de crear
+Suscripción: Le muestras el plan actual y le muestras los planes a los que puede acceder o hacer upgrade, con su respectivo botón.
+
+3. Modulo "Base de datos"
+
+Guia para que el usuario haga cree un nuevo Residente o Copropietario
+- clic en el modulo "Base de datos" 
+- Ahora clic en "Residentes", 
+- ahora a la derecha de la pantalla veras un botón de color azul, clic en "Agregar registro"
+- Ahora diligencias los campos de Apartamento, Nombre, Correo Electrónico y Teléfono, luego hacer clic en el botón azul que dice "Guardar"
+- Listo, haz creado un nuevo residente o copropietario
+
+4. Modulo Áreas comunes
+- clic en el modulo "Áreas comunes"
+- Ala  derecha verá un botón azul que dice "Agregar Reserva"
+- diligencia todos los campos y clic en botón azul de "Confirmar reserva"
+- Listo! haz reservado un área común.
+
+5. Modulo "Comunicaciones"
+- clic en el modulo "Comunicaciones"
+- clic en todos los residentes - veras que aparecen los correos de todos los residentes.
+- Escribes un asunto
+- escribes el mensaje -también puedes pedir a la IA que te ayude a mejorar la redacción, con el botón Mejorar redacción-
+- Si quires puedes agregar un archivo de tu repositorio, en el botón "Adjuntar desde Archivos"
+- Clic en enviar
+- Listo, ya enviaste tu primer comunicado, Felicitaciones.
+
+6. Modulo "Archivos"
+- Clic en el modulo "Archivos"
+- Clic en el botonazul "Subir archivo"
+- Cargas el archivo
+- Listo, ya tienes tu primer archivo cargado en PAIC para anexarlo a las comunicaciones
+
+7. Modulo Finanzas
+- Clic en modulo "Finanzas"
+- Clic en "Ingresos"
+- Clic a la derecha de la pantalla en botón "Agregar Ingreso"
+- Diligencias todos los campos
+- clic en botón "Guardar"
+- Listo, ya agregaste un ingreso a PAIC. Para agregar un gasto sigue el mismo procedimiento.
+
+8. Modulo Seguridad
+- Clic en el modulo "Seguridad"
+- Clic en "Visitantes"
+- Registra información del formulario"
+- Clic en "Autorizar Ingreso"
+- Listo haz registrado un visitante!
+
+Submodulo "Paquetes"
+- clic en "Paquetes"
+- Diligencia el formulario en su totalidad
+- clic en Registrar recepción
+- Listo haz registrado un paquete
+
+9. Vecimientos
+- clic en modulo "Vencimientos"
+- Diligenciar la información del formulario
+- clic en "Guardar"
+- Listo haz agregado un nuevo vencimiento
+
+10. Tareas
+- Clic en modulo Tareas
+- diligencia el formulario, tarea y selecciona una fecha
+- clic en "Agregar"
+- Listo haz agregado una nueva tarea, revisa las alertas en el Centro de control y en las notificaciones bajo tu nombre
+
+

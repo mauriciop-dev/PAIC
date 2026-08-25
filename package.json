@@ -17,6 +17,7 @@
     "types": "pnpm -r types"
   },
   "devDependencies": {
+    "supabase": "^2.115.0",
     "typescript": "~5.8.2"
   },
   "engines": {

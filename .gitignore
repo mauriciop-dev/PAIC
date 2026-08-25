@@ -7,3 +7,11 @@ dist/
 .env.*.local
 .vercel/
 tmp/
+.temp/
+**/.temp/
+.next/
+**/.next/
+# Legacy standalone web (tiene su propio repo git) — pendiente archivar/eliminar
+/PAIC_web/
+# Base de datos de leads (datos personales) — no subir a git
+/Marketing/
