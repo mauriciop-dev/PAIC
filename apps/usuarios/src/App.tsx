@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
 import { analytics } from '@paic/analytics';
-import { consumeResidentInvitation, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
+import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { subscribeToPush } from './services/pwaPush';
 import './App.css';
@@ -30,13 +30,20 @@ export default function UsuariosApp() {
   const registrationConjunto = new URLSearchParams(window.location.search).get('conjunto') || '';
   const registrationMode = new URLSearchParams(window.location.search).get('registro') === '1';
   const invitationToken = new URLSearchParams(window.location.search).get('token');
+  const authLoadInFlight = useRef(false);
 
   useEffect(() => {
     analytics.init();
     let active = true;
     const loadAuth = async () => {
+      // Evita consumir la invitación dos veces en paralelo (efecto + onAuthStateChange)
+      if (authLoadInFlight.current) return;
+      authLoadInFlight.current = true;
       try {
-        const session = await getSession();
+        // Con invitación, renueva la sesión primero: un JWT caducado de una sesión
+        // anterior (p.ej. la sesión administrativa del mismo origen) hacía fallar
+        // la edge function con "non-2xx status code".
+        const session = invitationToken ? await ensureFreshSession() : await getSession();
         if (!session) return;
         let membership = await getMembership(session.user);
         if (invitationToken && !membership) {
@@ -48,7 +55,7 @@ export default function UsuariosApp() {
         if (active && !membership) setAuthError('Tu cuenta aún no tiene una unidad vinculada. Solicita aprobación a la administración.');
       } catch (error) {
         if (active) setAuthError(error instanceof Error ? error.message : 'No fue posible validar la cuenta.');
-      } finally { if (active) setAuthLoading(false); }
+      } finally { authLoadInFlight.current = false; if (active) setAuthLoading(false); }
     };
     void loadAuth();
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });

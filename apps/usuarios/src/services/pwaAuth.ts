@@ -25,10 +25,32 @@ export async function signInWithGoogle() {
   return supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
 }
 
+function extractFunctionError(error: unknown): string {
+  // FunctionsHttpError / FunctionsRelayError exponen el cuerpo de la respuesta en `context`
+  const ctx = (error as { context?: { error?: string; message?: string } }).context;
+  if (ctx?.error) return ctx.error;
+  if (ctx?.message) return ctx.message;
+  return error instanceof Error ? error.message : 'No fue posible activar el acceso.';
+}
+
+export async function ensureFreshSession(): Promise<Session | null> {
+  if (!supabase) return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
+  // Renueva el access token: evita usar un JWT caducado de una sesión anterior
+  // (p.ej. la sesión administrativa que quedó en localStorage del mismo origen).
+  const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+  if (error || !refreshed) {
+    await supabase.auth.signOut();
+    return null;
+  }
+  return refreshed;
+}
+
 export async function consumeResidentInvitation(token: string) {
   if (!supabase) throw new Error('La PWA no tiene configuradas las variables de Supabase.');
   const { data, error } = await supabase.functions.invoke('consume-resident-invitation', { body: { token } });
-  if (error) throw error;
+  if (error) throw new Error(extractFunctionError(error));
   return data as { ok: boolean; membership: PwaMembership };
 }
 
