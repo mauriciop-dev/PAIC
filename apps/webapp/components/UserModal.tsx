@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { PlatformUser, UserRole, UserRoleDefinition } from '../types';
-import { Icon } from './ui/Icon';
+﻿import React, { useState, useEffect } from "react";
+import { PlatformUser, UserRole, UserRoleDefinition, AccessPoint } from "../types";
+import { Icon } from "./ui/Icon";
 
 interface UserModalProps {
   isOpen: boolean;
@@ -8,16 +8,27 @@ interface UserModalProps {
   onSave: (user: PlatformUser) => void;
   userToEdit: PlatformUser | null;
   availableRoles: UserRoleDefinition[];
+  accessPoints: AccessPoint[]; // New prop for access point selector
   error?: string | null;
 }
 
-const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEdit, availableRoles, error }) => {
+const UserModal: React.FC<UserModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  userToEdit,
+  availableRoles,
+  accessPoints,
+  error,
+}) => {
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
-    name: '',
-    email: '',
-    phoneNumber: '',
-    role: 'Guard',
-    password: '',
+    name: "",
+    email: "",
+    phoneNumber: "",
+    role: "Guard",
+    password: "",
+    accessPointId: undefined, // New field for access point linkage
+    pin: "", // New field for operational PIN
   });
 
   const isNewUser = !userToEdit || !userToEdit.id;
@@ -28,18 +39,22 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         id: userToEdit.id,
         name: userToEdit.name,
         email: userToEdit.email,
-        phoneNumber: userToEdit.phoneNumber || '',
+        phoneNumber: userToEdit.phoneNumber || "",
         role: userToEdit.role,
-        password: '', // Password field is for changing, not displaying
+        accessPointId: userToEdit.accessPointId, // Load existing access point linkage
+        pin: "", // Never load existing PIN for security
+        password: "", // Password field is for changing, not displaying
       });
     } else {
       // Reset for new user
       setFormData({
-        name: '',
-        email: '',
-        phoneNumber: '',
-        role: 'Guard',
-        password: '',
+        name: "",
+        email: "",
+        phoneNumber: "",
+        role: "Guard",
+        password: "",
+        accessPointId: undefined,
+        pin: "",
       });
     }
   }, [userToEdit, isOpen]);
@@ -48,30 +63,39 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isNewUser && (!formData.password || formData.password.trim().length === 0)) {
-        alert("La contraseña es obligatoria para usuarios nuevos.");
-        return;
+      alert("La contraseña es obligatoria para usuarios nuevos.");
+      return;
     }
     if (formData.password && formData.password.length > 0 && formData.password.length < 6) {
-        alert("La contraseña debe tener al menos 6 caracteres.");
-        return;
+      alert("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    // Validate Guard role has access point selected
+    if ((formData.role === "Guard" || formData.role === "Punto de Acceso") && !formData.accessPointId) {
+      alert("Debe seleccionar un punto de acceso para roles de Guardia/Portería.");
+      return;
     }
     onSave(formData as PlatformUser);
   };
-  
+
   // Filter out custom roles that are just for permissions to not clutter the dropdown
-  const predefinedRoles = availableRoles.filter(r => !r.name.startsWith('Personalizado para'));
+  const predefinedRoles = availableRoles.filter((r) => !r.name.startsWith("Personalizado para"));
 
   const allRoleOptions = [
-      { name: 'Guard' },
-      { name: 'Contador' },
-      ...predefinedRoles,
+    { name: "Guard" },
+    { name: "Contador" },
+    ...predefinedRoles,
   ];
+
+  // Determine if we should show access point selector and PIN field
+  const showAccessPointSelector = formData.role === "Guard" || formData.role === "Punto de Acceso";
+  const showPinField = formData.role === "Guard" || formData.role === "Punto de Acceso";
 
   return (
     <div
@@ -83,51 +107,155 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, userToEd
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-          <Icon name="x" className="w-6 h-6"/>
+          <Icon name="x" className="w-6 h-6" />
         </button>
         <h2 className="text-2xl font-bold text-gray-800 mb-6">
-          {isNewUser ? 'Agregar Nuevo Usuario' : 'Editar Usuario'}
+          {isNewUser ? "Agregar Nuevo Usuario" : "Editar Usuario"}
         </h2>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre Completo</label>
-              <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                Nombre Completo
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+                required
+              />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
-              <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" required />
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+                required
+              />
             </div>
             <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Teléfono</label>
-              <input type="tel" id="phoneNumber" name="phoneNumber" value={formData.phoneNumber || ''} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md" />
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                name="phoneNumber"
+                value={formData.phoneNumber || ""}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+              />
             </div>
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</label>
-              <select id="role" name="role" value={formData.role} onChange={handleChange} className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white" required>
-                {allRoleOptions.map(role => (
-                    <option key={role.name} value={role.name}>{role.name}</option>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                Rol
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white"
+                required
+              >
+                {allRoleOptions.map((role) => (
+                  <option key={role.name} value={role.name}>
+                    {role.name}
+                  </option>
                 ))}
               </select>
-               <p className="text-xs text-gray-500 mt-1">Para asignar permisos personalizados, hazlo desde la pestaña 'Permisos de usuario'.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Para asignar permisos personalizados, hazlo desde la pestaña "Permisos de usuario".
+              </p>
             </div>
-             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">Contraseña</label>
-              <input 
-                type="password" 
-                id="password" 
-                name="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                className="mt-1 w-full p-2 border border-gray-300 rounded-md" 
+
+            {/* Access Point Selector for Guard/Portería roles */}
+            {showAccessPointSelector && (
+              <div>
+                <label htmlFor="accessPointId" className="block text-sm font-medium text-gray-700">
+                  Punto de Acceso Asociado <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="accessPointId"
+                  name="accessPointId"
+                  value={formData.accessPointId || ""}
+                  onChange={handleChange}
+                  className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white"
+                  required
+                >
+                  <option value="">Seleccionar punto de acceso...</option>
+                  {accessPoints.map((ap) => (
+                    <option key={ap.id} value={ap.id}>
+                      {ap.name} {ap.usuario_id ? `(Usuario técnico: ${ap.usuario_id})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Seleccione el punto de acceso (portería) donde operará este guardia.
+                </p>
+              </div>
+            )}
+
+            {/* PIN Field for operational staff */}
+            {showPinField && (
+              <div>
+                <label htmlFor="pin" className="block text-sm font-medium text-gray-700">
+                  PIN Operativo (4-6 dígitos)
+                </label>
+                <input
+                  type="password"
+                  id="pin"
+                  name="pin"
+                  value={formData.pin}
+                  onChange={handleChange}
+                  className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="Dejar en blanco para no cambiar"
+                  maxLength={6}
+                  minLength={4}
+                  pattern="[0-9]*"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  PIN para firma rápida de turnos y eventos operativos. Dejar en blanco para no cambiar.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border border-gray-300 rounded-md"
                 placeholder={isNewUser ? "Contraseña (obligatoria)" : "Dejar en blanco para no cambiar"}
               />
             </div>
-             {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                {error}
+              </p>
+            )}
           </div>
           <div className="mt-8 flex justify-end gap-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
               Cancelar
             </button>
             <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">

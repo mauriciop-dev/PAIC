@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Header, Button, Card, Badge, Icon } from '@paic/ui';
+﻿import React, { useState } from 'react';
+import { Button, Card, Badge, Icon } from '@paic/ui';
 import { PLANS, formatCOP, getPlanCapacityText } from '@paic/types/plans';
 import { analytics } from '@paic/analytics';
 import './App.css';
@@ -33,7 +33,7 @@ export default function MarketingApp() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans antialiased">
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Navegación principal">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="NavegaciÃ³n principal">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <img src="/logo-paic.png" alt="Logo PAIC" className="w-8 h-8" />
@@ -55,7 +55,7 @@ export default function MarketingApp() {
 
             <div className="hidden md:flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => scrollTo('planes')}>
-                Prueba Gratis 14 días
+                Prueba Gratis 14 dÃ­as
               </Button>
               <Button variant="primary" size="sm" onClick={() => scrollTo('planes')}>
                 Iniciar Prueba
@@ -65,7 +65,7 @@ export default function MarketingApp() {
             <button
               className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100"
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              aria-label="Menú"
+              aria-label="MenÃº"
               aria-expanded={showMobileMenu}
             >
               <Icon name={showMobileMenu ? 'x' : 'menu'} className="w-6 h-6" />
@@ -87,7 +87,7 @@ export default function MarketingApp() {
                 ))}
                 <div className="flex flex-col gap-2 pt-2">
                   <Button variant="ghost" className="w-full" onClick={() => scrollTo('planes')}>
-                    Prueba Gratis 14 días
+                    Prueba Gratis 14 dÃ­as
                   </Button>
                   <Button variant="primary" className="w-full" onClick={() => scrollTo('planes')}>
                     Iniciar Prueba
@@ -112,14 +112,14 @@ export default function MarketingApp() {
                   {' '}Recupera tu Tiempo.
                 </h1>
                 <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0">
-                  PAIC es su Plataforma de Administración Inteligente de Copropiedades.
-                  Deje de hacer Excel, empiece a hacer gestión.
+                  PAIC es su Plataforma de AdministraciÃ³n Inteligente de Copropiedades.
+                  Deje de hacer Excel, empiece a hacer gestiÃ³n.
                 </p>
                 <ul className="space-y-3 mb-8 max-w-xl mx-auto lg:mx-0">
                   {[
-                    'Cero Mora — Comunicaciones automáticas y precisas.',
-                    'Informes al Instante — Pregunte y obtenga respuestas en segundos.',
-                    'Gestión 24/7 — Reservas, seguridad y vencimientos centralizados.',
+                    'Cero Mora â€” Comunicaciones automÃ¡ticas y precisas.',
+                    'Informes al Instante â€” Pregunte y obtenga respuestas en segundos.',
+                    'GestiÃ³n 24/7 â€” Reservas, seguridad y vencimientos centralizados.',
                   ].map((benefit, i) => (
                     <li key={i} className="flex items-center gap-3 text-gray-700 text-base justify-center lg:justify-start">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
@@ -137,7 +137,7 @@ export default function MarketingApp() {
                     onClick={() => scrollTo('planes')}
                     rightIcon={<Icon name="send" className="w-4 h-4" />}
                   >
-                    Iniciar Prueba Gratuita Ahora — 14 días
+                    Iniciar Prueba Gratuita Ahora â€” 14 dÃ­as
                   </Button>
                 </div>
               </div>
@@ -186,23 +186,23 @@ export default function MarketingApp() {
                 />
               </div>
               <div className="text-center lg:text-left">
-                <Badge variant="warning" className="mb-4 inline-flex" dot>Módulo: Cobro</Badge>
+                <Badge variant="warning" className="mb-4 inline-flex" dot>MÃ³dulo: Cobro</Badge>
                 <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-tight mb-4">
-                  ¿Mora que Ahorca? Deje que la <span className="text-blue-600">IA cobre por usted.</span>
+                  Â¿Mora que Ahorca? Deje que la <span className="text-blue-600">IA cobre por usted.</span>
                 </h2>
                 <p className="text-lg text-gray-600 mb-6">
-                  El cobro es incómodo, consume tiempo y deteriora relaciones.
-                  PAIC transforma la obligación en un proceso profesional y automatizado.
+                  El cobro es incÃ³modo, consume tiempo y deteriora relaciones.
+                  PAIC transforma la obligaciÃ³n en un proceso profesional y automatizado.
                 </p>
                 <h3 className="text-xl font-bold text-gray-800 mb-3">Funcionalidad Clave: Comunicaciones de Cobro Inteligentes</h3>
                 <p className="text-gray-600 mb-6">
-                  PAIC identifica deudores y genera avisos con la formalidad exacta vía correo o WhatsApp,
-                  liberándolo de la confrontación.
+                  PAIC identifica deudores y genera avisos con la formalidad exacta vÃ­a correo o WhatsApp,
+                  liberÃ¡ndolo de la confrontaciÃ³n.
                 </p>
                 <ul className="space-y-3 mb-8">
                   {[
                     'Reduce la cartera vencida en un 30% promedio.',
-                    'Documentación automática para procesos legales.',
+                    'DocumentaciÃ³n automÃ¡tica para procesos legales.',
                   ].map((benefit, i) => (
                     <li key={i} className="flex items-center gap-3 text-gray-700">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
@@ -213,15 +213,15 @@ export default function MarketingApp() {
                   ))}
                 </ul>
                 <Button variant="primary" size="lg" onClick={() => scrollTo('planes')}>
-                  ¡Prueba PAIC Gratis por 14 Días!
+                  Â¡Prueba PAIC Gratis por 14 DÃ­as!
                 </Button>
               </div>
             </div>
 
             <div className="mt-16 grid md:grid-cols-2 gap-6">
               {[
-                { title: 'Comunicación Automática', desc: 'Mensajes con tono y formalidad adecuados según la etapa del cobro.', icon: 'mail' },
-                { title: 'Histórico y Evidencia', desc: 'Registro completo para auditar y usar en procesos legales.', icon: 'file-text' },
+                { title: 'ComunicaciÃ³n AutomÃ¡tica', desc: 'Mensajes con tono y formalidad adecuados segÃºn la etapa del cobro.', icon: 'mail' },
+                { title: 'HistÃ³rico y Evidencia', desc: 'Registro completo para auditar y usar en procesos legales.', icon: 'file-text' },
               ].map((feature, i) => (
                 <Card key={i} className="h-full" padding="lg" hover>
                   <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
@@ -238,18 +238,18 @@ export default function MarketingApp() {
         <section id="tareas" className="py-20 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <Badge variant="info" className="mb-4 inline-flex" dot>Módulo: Tareas</Badge>
+              <Badge variant="info" className="mb-4 inline-flex" dot>MÃ³dulo: Tareas</Badge>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
-                Gestión de <span className="text-blue-600">Tareas y Seguimiento</span>
+                GestiÃ³n de <span className="text-blue-600">Tareas y Seguimiento</span>
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Crea, asigna y da seguimiento a tareas del día a día. Recibe alertas automáticas y mantén todo bajo control.
+                Crea, asigna y da seguimiento a tareas del dÃ­a a dÃ­a. Recibe alertas automÃ¡ticas y mantÃ©n todo bajo control.
               </p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { title: 'Creación Rápida', desc: 'Agrega tareas en segundos desde el dashboard o el chatbot.', icon: 'checkSquare' },
-                { title: 'Alertas Inteligentes', desc: 'Notificaciones automáticas por vencimiento y prioridad.', icon: 'alert-triangle' },
+                { title: 'CreaciÃ³n RÃ¡pida', desc: 'Agrega tareas en segundos desde el dashboard o el chatbot.', icon: 'checkSquare' },
+                { title: 'Alertas Inteligentes', desc: 'Notificaciones automÃ¡ticas por vencimiento y prioridad.', icon: 'alert-triangle' },
                 { title: 'Historial Completo', desc: 'Visualiza tareas completadas, pendientes y por responsable.', icon: 'database' },
               ].map((feature, i) => (
                 <Card key={i} className="h-full text-center" padding="lg" hover>
@@ -267,18 +267,18 @@ export default function MarketingApp() {
         <section id="informes" className="py-20 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <Badge variant="success" className="mb-4 inline-flex" dot>Módulo: Informes</Badge>
+              <Badge variant="success" className="mb-4 inline-flex" dot>MÃ³dulo: Informes</Badge>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
                 Informes al <span className="text-blue-600">Instante</span> con IA
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Pregúntele al chatbot qué necesita saber (gastos, saldos, mora, ocupación) y obtenga la respuesta en segundos.
+                PregÃºntele al chatbot quÃ© necesita saber (gastos, saldos, mora, ocupaciÃ³n) y obtenga la respuesta en segundos.
               </p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { title: 'Chat con Datos', desc: 'Consulta en lenguaje natural: "¿Cuánto debemos en servicios?"', icon: 'bot' },
-                { title: 'Exportación', desc: 'Descarga reportes en Excel/PDF con un clic.', icon: 'file-text' },
+                { title: 'Chat con Datos', desc: 'Consulta en lenguaje natural: "Â¿CuÃ¡nto debemos en servicios?"', icon: 'bot' },
+                { title: 'ExportaciÃ³n', desc: 'Descarga reportes en Excel/PDF con un clic.', icon: 'file-text' },
                 { title: 'Dashboards', desc: 'Visualiza KPIs en tiempo real: mora, ingresos, gastos.', icon: 'dashboard' },
               ].map((feature, i) => (
                 <Card key={i} className="h-full text-center" padding="lg" hover>
@@ -308,7 +308,7 @@ export default function MarketingApp() {
               </p>
             </div>
 
-            <div className="flex justify-center gap-3 mb-10" role="radiogroup" aria-label="Periodo de facturación">
+            <div className="flex justify-center gap-3 mb-10" role="radiogroup" aria-label="Periodo de facturaciÃ³n">
               <Button
                 variant={period === 'monthly' ? 'primary' : 'outline'}
                 onClick={() => setPeriod('monthly')}
@@ -333,7 +333,7 @@ export default function MarketingApp() {
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-8 max-w-3xl mx-auto">
-              Todos los planes incluyen prueba gratuita de 14 días (sin tarjeta de crédito).
+              Todos los planes incluyen prueba gratuita de 14 dÃ­as (sin tarjeta de crÃ©dito).
               Cancela cuando quieras. Soporte incluido.
             </p>
           </div>
@@ -342,7 +342,7 @@ export default function MarketingApp() {
 
       <footer className="border-t border-gray-200 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-          © PAIC — Plataforma de Administración Inteligente de Copropiedades
+          Â© PAIC â€” Plataforma de AdministraciÃ³n Inteligente de Copropiedades
         </div>
       </footer>
     </div>
@@ -353,7 +353,7 @@ function PlanCard({ plan, period, onClick }: { plan: typeof PLANS[0]; period: 'm
   const price = period === 'annual' ? plan.annualPrice : plan.monthlyPrice;
   const link = period === 'annual' ? plan.annualLink : plan.monthlyLink;
   const equivalent = period === 'annual' && plan.annualPrice
-    ? `Equivale a ${formatCOP(Math.round(plan.annualPrice / 12))}/mes — Ahorras 15%`
+    ? `Equivale a ${formatCOP(Math.round(plan.annualPrice / 12))}/mes â€” Ahorras 15%`
     : null;
 
   return (
@@ -363,23 +363,23 @@ function PlanCard({ plan, period, onClick }: { plan: typeof PLANS[0]; period: 'm
     >
       {plan.popular && (
         <div className="flex justify-center mb-2">
-          <Badge variant="warning" size="sm">Más popular</Badge>
+          <Badge variant="warning" size="sm">MÃ¡s popular</Badge>
         </div>
       )}
       <h3 className="text-xl font-bold text-blue-900 mb-1">{plan.name}</h3>
       <p className="text-sm text-gray-500 mb-4">{getPlanCapacityText(plan)}</p>
       <div className="mb-4">
         <div className="text-3xl font-extrabold text-gray-900">
-          {price ? formatCOP(price) : 'Cotización'}
-          <span className="text-base font-normal text-gray-500"> / {period === 'annual' ? 'año' : 'mes'}</span>
+          {price ? formatCOP(price) : 'CotizaciÃ³n'}
+          <span className="text-base font-normal text-gray-500"> / {period === 'annual' ? 'aÃ±o' : 'mes'}</span>
         </div>
         {equivalent && <p className="text-xs text-green-700 font-medium mt-1">{equivalent}</p>}
       </div>
       <ul className="space-y-2 mb-6 flex-1" role="list">
         {[
           'Cobro inteligente a deudores',
-          'Informes al instante vía IA',
-          'Gestión de vencimientos',
+          'Informes al instante vÃ­a IA',
+          'GestiÃ³n de vencimientos',
           'Soporte por chat y email',
         ].slice(0, plan.name === 'Edificio' ? 4 : 5).map((feature, i) => (
           <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
@@ -407,10 +407,10 @@ function PlanCardCorporate({ period, onClick }: { period: 'monthly' | 'annual'; 
       <h3 className="text-xl font-bold text-blue-900 mb-1">{plan.name}</h3>
       <p className="text-sm text-gray-500 mb-4">{getPlanCapacityText(plan)}</p>
       <div className="mb-4">
-        <div className="text-2xl font-bold text-gray-900">Cotización a la medida</div>
+        <div className="text-2xl font-bold text-gray-900">CotizaciÃ³n a la medida</div>
       </div>
       <ul className="space-y-2 mb-6 flex-1" role="list">
-        {['Todo lo del Plan Megaproyecto', 'Infraestructura dedicada', 'SLA garantizado', 'Soporte 24/7', 'Capacitación presencial']
+        {['Todo lo del Plan Megaproyecto', 'Infraestructura dedicada', 'SLA garantizado', 'Soporte 24/7', 'CapacitaciÃ³n presencial']
           .map((feature, i) => (
             <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
               <Icon name="checkSquare" className="w-4 h-4 text-green-600 flex-shrink-0" />
@@ -428,3 +428,4 @@ function PlanCardCorporate({ period, onClick }: { period: 'monthly' | 'annual'; 
     </Card>
   );
 }
+
