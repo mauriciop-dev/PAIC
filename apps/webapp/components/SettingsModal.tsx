@@ -554,8 +554,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                      );
                  })}
              </nav>
-            </div>
-        
+        </div>
+
+        {/* Modal: Editar Punto de Acceso */}
         {editingAccessPoint && (
           <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4" onClick={() => setEditingAccessPoint(null)}>
             <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
@@ -565,7 +566,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Icon name="x" className="w-5 h-5" />
                 </button>
               </div>
-
+              {accessPointError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {accessPointError}
+                </div>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Nombre del Punto de Acceso</label>
@@ -574,15 +579,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={editAccessPointName}
                     onChange={e => setEditAccessPointName(e.target.value)}
                     className="w-full p-2 border rounded-md text-sm"
+                    placeholder="Ej: Portería Principal"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Correo de Acceso (Usuario técnico)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Correo de Acceso (usuario técnico de portería)</label>
                   <input
                     type="email"
                     value={editAccessPointEmail}
                     onChange={e => setEditAccessPointEmail(e.target.value)}
                     className="w-full p-2 border rounded-md text-sm font-mono"
+                    placeholder="porteria@paic.app"
                   />
                 </div>
                 <div>
@@ -592,10 +599,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={editAccessPointPassword}
                     onChange={e => setEditAccessPointPassword(e.target.value)}
                     className="w-full p-2 border rounded-md text-sm font-mono"
+                    placeholder="Contraseña de acceso"
                   />
+                  <p className="text-xs text-gray-400 mt-1">Esta contraseña se usa solo la primera vez o si cambia el dispositivo.</p>
                 </div>
               </div>
-
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
