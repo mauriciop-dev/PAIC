@@ -573,10 +573,17 @@ export const apiService = {
       const { data } = await supabase.from('access_points').select('*').eq('conjunto_id', conjuntoId);
       return data ? fromSupabase(data) : [];
   },
-  async addAccessPoint(conjuntoId: string, name: string): Promise<void> {
-    const { error } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
+  async addAccessPoint(conjuntoId: string, name: string, email?: string, password?: string): Promise<void> {
+    const { error } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name, email, password });
     if (error) {
       console.error('Error adding access point:', error);
+      throw error;
+    }
+  },
+  async updateAccessPoint(conjuntoId: string, id: number, name: string, email?: string, password?: string): Promise<void> {
+    const { error } = await supabase.from('access_points').update({ name, email, password }).eq('conjunto_id', conjuntoId).eq('id', id);
+    if (error) {
+      console.error('Error updating access point:', error);
       throw error;
     }
   },

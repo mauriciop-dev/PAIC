@@ -33,12 +33,25 @@ export interface PlatformUser {
   phoneNumber?: string;
   role: UserRole | string;
   password?: string;
+  pin?: string;
+  accessPointId?: number;
   conjuntoId: string;
 }
 
 export interface AccessPoint {
   id: number;
   name: string;
+  email?: string;
+  password?: string;
+  usuarioId?: string;
+}
+
+export interface ActiveShift {
+  guardName: string;
+  isEmergency: boolean;
+  noveltyNote?: string;
+  startedAt: string;
+  accessPointId?: number;
 }
 
 export interface Message {
@@ -85,6 +98,8 @@ export interface InternalStaff {
   position: string;
   email: string;
   phone: string;
+  pin?: string;
+  hashed_pin?: string;
 }
 
 export interface Reservation {

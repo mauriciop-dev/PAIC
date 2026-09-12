@@ -43,6 +43,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // States for different tabs
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
   const [newAccessPointName, setNewAccessPointName] = useState('');
+  const [newAccessPointEmail, setNewAccessPointEmail] = useState('');
+  const [newAccessPointPassword, setNewAccessPointPassword] = useState('');
+  const [showPasswordsMap, setShowPasswordsMap] = useState<Record<number, boolean>>({});
 
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
@@ -125,7 +128,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // --- Access Points Logic ---
-  const handleAddAccessPoint = async () => { if (newAccessPointName.trim() && userProfile.conjuntoId) { await apiService.addAccessPoint(userProfile.conjuntoId, newAccessPointName.trim()); setNewAccessPointName(''); fetchDataForTab('Puntos de Acceso'); }};
+  const handleAddAccessPoint = async () => {
+    if (newAccessPointName.trim() && userProfile.conjuntoId) {
+      const cleanName = newAccessPointName.trim();
+      const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.');
+      const email = newAccessPointEmail.trim() || `porteria.${slug}@paic.app`;
+      const password = newAccessPointPassword.trim() || `Porteria${Math.floor(1000 + Math.random() * 9000)}!`;
+      await apiService.addAccessPoint(userProfile.conjuntoId, cleanName, email, password);
+      setNewAccessPointName('');
+      setNewAccessPointEmail('');
+      setNewAccessPointPassword('');
+      fetchDataForTab('Puntos de Acceso');
+    }
+  };
   const handleDeleteAccessPoint = async (id: number) => { if(userProfile.conjuntoId) { await apiService.deleteAccessPoint(userProfile.conjuntoId, id); fetchDataForTab('Puntos de Acceso'); }};
 
   // --- Common Areas Logic ---
@@ -237,19 +252,72 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
   );
 
+  const toggleShowPassword = (id: number) => {
+    setShowPasswordsMap(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const renderAccessPointsTab = () => (
-    <div>
-      <div className="flex items-center gap-2 mb-4">
-        <input type="text" value={newAccessPointName} onChange={(e) => setNewAccessPointName(e.target.value)} placeholder="Nombre del punto de acceso" className="flex-1 p-2 border rounded-md"/>
-        <button onClick={handleAddAccessPoint} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">Agregar</button>
-      </div>
-      <div className="space-y-2 max-h-80 overflow-y-auto">
-        {accessPoints.map(point => (
-          <div key={point.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-            <span className="text-gray-800">{point.name}</span>
-            <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="text-red-500 hover:text-red-700 text-sm">Eliminar</button>
+    <div className="space-y-4">
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Agregar Nuevo Punto de Acceso</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del Punto de Acceso</label>
+            <input type="text" value={newAccessPointName} onChange={(e) => setNewAccessPointName(e.target.value)} placeholder="Ej: Portería Principal" className="w-full p-2 border rounded-md text-sm"/>
           </div>
-        ))}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Correo de Acceso (Opcional)</label>
+            <input type="email" value={newAccessPointEmail} onChange={(e) => setNewAccessPointEmail(e.target.value)} placeholder="Auto-generado si se deja vacío" className="w-full p-2 border rounded-md text-sm"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña (Opcional)</label>
+            <input type="password" value={newAccessPointPassword} onChange={(e) => setNewAccessPointPassword(e.target.value)} placeholder="Auto-generada si se deja vacía" className="w-full p-2 border rounded-md text-sm"/>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleAddAccessPoint} disabled={!newAccessPointName.trim()} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 text-sm disabled:opacity-50">
+            Agregar Punto de Acceso
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto max-h-80 border rounded-lg">
+        <table className="w-full text-sm text-left text-gray-600">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+            <tr>
+              <th className="px-4 py-3">Nombre del Punto de Acceso</th>
+              <th className="px-4 py-3">Correo</th>
+              <th className="px-4 py-3">Contraseña</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accessPoints.map(point => (
+              <tr key={point.id} className="bg-white border-b hover:bg-gray-50">
+                <td className="px-4 py-3 font-semibold text-gray-800">{point.name}</td>
+                <td className="px-4 py-3 text-gray-600 font-mono text-xs">{point.email || `porteria.${point.name.toLowerCase().replace(/\s+/g, '.')}@paic.app`}</td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  <div className="flex items-center gap-2">
+                    <span>{showPasswordsMap[point.id] ? (point.password || 'Porteria2026!') : '••••••••'}</span>
+                    <button type="button" onClick={() => toggleShowPassword(point.id)} className="text-gray-400 hover:text-gray-600">
+                      <Icon name={showPasswordsMap[point.id] ? 'eye-off' : 'eye'} className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="text-red-500 hover:text-red-700 font-medium text-xs">
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {accessPoints.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-6 text-gray-500">No hay puntos de acceso registrados.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -271,8 +339,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex justify-end mb-4"><button onClick={() => handleUserModalOpen(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1"><Icon name="user-plus" className="w-4 h-4"/>Agregar Usuario</button></div>
         <div className="overflow-x-auto max-h-96">
             <table className="w-full text-sm text-left text-gray-500">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0"><tr><th className="px-6 py-3">Nombre</th><th className="px-6 py-3">Correo</th><th className="px-6 py-3">Rol</th><th className="px-6 py-3 text-right">Acciones</th></tr></thead>
-                <tbody>{platformUsers.map(user => (<tr key={user.id} className="bg-white border-b hover:bg-gray-50"><td className="px-6 py-4">{user.name}</td><td className="px-6 py-4">{user.email}</td><td className="px-6 py-4">{user.role}</td><td className="px-6 py-4 text-right space-x-2"><button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button><button onClick={() => setConfirmAction({ title: 'Eliminar Usuario', message: '¿Seguro que quieres eliminar este usuario?', onConfirm: () => handleDeleteUser(user.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button></td></tr>))}</tbody>
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3">Nombre</th>
+                    <th className="px-6 py-3">Correo</th>
+                    <th className="px-6 py-3">Rol</th>
+                    <th className="px-6 py-3">PIN</th>
+                    <th className="px-6 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {platformUsers.map(user => (
+                    <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
+                      <td className="px-6 py-4 font-semibold text-gray-800">{user.name}</td>
+                      <td className="px-6 py-4">{user.email}</td>
+                      <td className="px-6 py-4">{user.role}</td>
+                      <td className="px-6 py-4 font-mono">{user.pin ? user.pin : '••••'}</td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                        <button onClick={() => setConfirmAction({ title: 'Eliminar Usuario', message: '¿Seguro que quieres eliminar este usuario?', onConfirm: () => handleDeleteUser(user.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {platformUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-gray-500">No hay usuarios registrados.</td>
+                    </tr>
+                  )}
+                </tbody>
             </table>
         </div>
       </div>

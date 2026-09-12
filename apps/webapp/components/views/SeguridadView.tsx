@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { apiService } from "../../services/apiService";
-import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint, InternalStaff } from "../../types";
+import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint, InternalStaff, ActiveShift } from "../../types";
 import { Icon } from "@paic/ui";
 import PinVerificationModal from "../../components/PinVerificationModal";
+import ShiftModal from "../../components/ShiftModal";
 
 type SeguridadTab = "Visitantes" | "Paquetes";
 
@@ -42,10 +43,38 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
   const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [activeShift, setActiveShift] = useState<ActiveShift | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     type: "authorize_visitor" | "register_package" | "register_entry" | "register_exit" | "mark_delivered";
     data: any;
   } | null>(null);
+
+  // Load active shift from localStorage
+  useEffect(() => {
+    if (userProfile.conjuntoId) {
+      const savedShift = localStorage.getItem(`paic_active_shift_${userProfile.conjuntoId}`);
+      if (savedShift) {
+        try {
+          setActiveShift(JSON.parse(savedShift));
+        } catch (e) {
+          console.error("Failed to parse saved shift:", e);
+        }
+      }
+    }
+  }, [userProfile.conjuntoId]);
+
+  const handleStartShift = (shift: ActiveShift) => {
+    setActiveShift(shift);
+    if (userProfile.conjuntoId) {
+      localStorage.setItem(`paic_active_shift_${userProfile.conjuntoId}`, JSON.stringify(shift));
+    }
+    setActionFeedback({
+      type: "success",
+      text: ` Turno iniciado exitosamente para ${shift.guardName}.`,
+    });
+    setTimeout(() => setActionFeedback(null), 4000);
+  };
 
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
@@ -532,6 +561,47 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
 
   return (
     <div>
+      {/* Shift Control Header Card */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeShift ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+            <Icon name="shield" className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-800 text-sm">Control Operativo de Portería</h3>
+            {activeShift ? (
+              <p className="text-xs text-green-700 font-semibold flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Turno Activo: <span className="font-bold">{activeShift.guardName}</span> (Iniciado {activeShift.startedAt})
+                {activeShift.isEmergency && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] rounded-full">Novedad</span>}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-0.5">Sin turno activo en este punto de acceso.</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          {activeShift ? (
+            <button
+              onClick={() => setIsShiftModalOpen(true)}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Icon name="user-check" className="w-4 h-4 text-gray-600" />
+              Cambiar / Cerrar Turno
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsShiftModalOpen(true)}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <Icon name="log-in" className="w-4 h-4" />
+              Inicia Turno
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="mb-4 border-b border-gray-200">
         <nav className="-mb-px flex justify-between items-center" aria-label="Tabs">
           <div className="flex space-x-6">
@@ -573,6 +643,14 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
           </div>
         </div>
       )}
+
+      <ShiftModal
+        isOpen={isShiftModalOpen}
+        onClose={() => setIsShiftModalOpen(false)}
+        onStartShift={handleStartShift}
+        conjuntoId={userProfile.conjuntoId || ""}
+        accessPointName={accessPoints.find(ap => ap.id === selectedAccessPointId)?.name || "Portería Principal"}
+      />
 
       <PinVerificationModal
         isOpen={pinModalOpen}
