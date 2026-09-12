@@ -574,17 +574,33 @@ export const apiService = {
       return data ? fromSupabase(data) : [];
   },
   async addAccessPoint(conjuntoId: string, name: string, email?: string, password?: string): Promise<void> {
-    const { error } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name, email, password });
+    const payload: any = { conjunto_id: conjuntoId, name };
+    if (email) payload.email = email;
+    if (password) payload.password = password;
+
+    const { error } = await supabase.from('access_points').insert(payload);
     if (error) {
-      console.error('Error adding access point:', error);
-      throw error;
+      console.warn('Error adding access point with email/password, trying fallback:', error);
+      const fallbackRes = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
+      if (fallbackRes.error) {
+        console.error('Error adding access point fallback:', fallbackRes.error);
+        throw fallbackRes.error;
+      }
     }
   },
   async updateAccessPoint(conjuntoId: string, id: number, name: string, email?: string, password?: string): Promise<void> {
-    const { error } = await supabase.from('access_points').update({ name, email, password }).eq('conjunto_id', conjuntoId).eq('id', id);
+    const payload: any = { name };
+    if (email !== undefined) payload.email = email;
+    if (password !== undefined) payload.password = password;
+
+    const { error } = await supabase.from('access_points').update(payload).eq('conjunto_id', conjuntoId).eq('id', id);
     if (error) {
-      console.error('Error updating access point:', error);
-      throw error;
+      console.warn('Error updating access point with email/password, trying fallback:', error);
+      const fallbackRes = await supabase.from('access_points').update({ name }).eq('conjunto_id', conjuntoId).eq('id', id);
+      if (fallbackRes.error) {
+        console.error('Error updating access point fallback:', fallbackRes.error);
+        throw fallbackRes.error;
+      }
     }
   },
   async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {

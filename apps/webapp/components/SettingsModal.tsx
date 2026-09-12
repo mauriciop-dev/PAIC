@@ -47,6 +47,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newAccessPointPassword, setNewAccessPointPassword] = useState('');
   const [showPasswordsMap, setShowPasswordsMap] = useState<Record<number, boolean>>({});
 
+  const [editingAccessPoint, setEditingAccessPoint] = useState<AccessPoint | null>(null);
+  const [editAccessPointName, setEditAccessPointName] = useState('');
+  const [editAccessPointEmail, setEditAccessPointEmail] = useState('');
+  const [editAccessPointPassword, setEditAccessPointPassword] = useState('');
+  const [accessPointError, setAccessPointError] = useState<string | null>(null);
+  const [accessPointSuccess, setAccessPointSuccess] = useState<string | null>(null);
+
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
 
@@ -129,7 +136,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // --- Access Points Logic ---
   const handleAddAccessPoint = async () => {
-    if (newAccessPointName.trim() && userProfile.conjuntoId) {
+    if (!newAccessPointName.trim() || !userProfile.conjuntoId) return;
+    setAccessPointError(null);
+    setAccessPointSuccess(null);
+    try {
       const cleanName = newAccessPointName.trim();
       const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.');
       const email = newAccessPointEmail.trim() || `porteria.${slug}@paic.app`;
@@ -138,9 +148,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setNewAccessPointName('');
       setNewAccessPointEmail('');
       setNewAccessPointPassword('');
-      fetchDataForTab('Puntos de Acceso');
+      setAccessPointSuccess(`Punto de acceso "${cleanName}" agregado exitosamente.`);
+      setTimeout(() => setAccessPointSuccess(null), 3000);
+      await fetchDataForTab('Puntos de Acceso');
+    } catch (err: any) {
+      console.error("Error adding access point:", err);
+      setAccessPointError(err.message || "Error al agregar el punto de acceso.");
     }
   };
+
+  const handleOpenEditAccessPoint = (ap: AccessPoint) => {
+    setEditingAccessPoint(ap);
+    setEditAccessPointName(ap.name);
+    setEditAccessPointEmail(ap.email || `porteria.${ap.name.toLowerCase().replace(/\s+/g, '.')}@paic.app`);
+    setEditAccessPointPassword(ap.password || 'Porteria2026!');
+    setAccessPointError(null);
+  };
+
+  const handleSaveEditAccessPoint = async () => {
+    if (!editingAccessPoint || !userProfile.conjuntoId) return;
+    setAccessPointError(null);
+    try {
+      await apiService.updateAccessPoint(
+        userProfile.conjuntoId,
+        editingAccessPoint.id,
+        editAccessPointName.trim(),
+        editAccessPointEmail.trim(),
+        editAccessPointPassword.trim()
+      );
+      setEditingAccessPoint(null);
+      setAccessPointSuccess(`Punto de acceso "${editAccessPointName}" actualizado.`);
+      setTimeout(() => setAccessPointSuccess(null), 3000);
+      await fetchDataForTab('Puntos de Acceso');
+    } catch (err: any) {
+      console.error("Error updating access point:", err);
+      setAccessPointError(err.message || "Error al actualizar el punto de acceso.");
+    }
+  };
+
   const handleDeleteAccessPoint = async (id: number) => { if(userProfile.conjuntoId) { await apiService.deleteAccessPoint(userProfile.conjuntoId, id); fetchDataForTab('Puntos de Acceso'); }};
 
   // --- Common Areas Logic ---
@@ -258,6 +303,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const renderAccessPointsTab = () => (
     <div className="space-y-4">
+      {accessPointSuccess && (
+        <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center gap-2">
+          <Icon name="check" className="w-4 h-4" />
+          <span>{accessPointSuccess}</span>
+        </div>
+      )}
+      {accessPointError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
+          <Icon name="alert-triangle" className="w-4 h-4" />
+          <span>{accessPointError}</span>
+        </div>
+      )}
+
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Agregar Nuevo Punto de Acceso</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -304,8 +362,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="text-red-500 hover:text-red-700 font-medium text-xs">
+                <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                  <button onClick={() => handleOpenEditAccessPoint(point)} className="font-medium text-blue-600 hover:underline text-xs mr-2">
+                    Editar
+                  </button>
+                  <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="font-medium text-red-500 hover:underline text-xs">
                     Eliminar
                   </button>
                 </td>
@@ -489,7 +550,68 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
              </nav>
             </div>
         
-        {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} error={modalError} />}
+        {editingAccessPoint && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4" onClick={() => setEditingAccessPoint(null)}>
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Editar Punto de Acceso</h3>
+                <button onClick={() => setEditingAccessPoint(null)} className="text-gray-400 hover:text-gray-600">
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nombre del Punto de Acceso</label>
+                  <input
+                    type="text"
+                    value={editAccessPointName}
+                    onChange={e => setEditAccessPointName(e.target.value)}
+                    className="w-full p-2 border rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Correo de Acceso (Usuario técnico)</label>
+                  <input
+                    type="email"
+                    value={editAccessPointEmail}
+                    onChange={e => setEditAccessPointEmail(e.target.value)}
+                    className="w-full p-2 border rounded-md text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Contraseña de Acceso</label>
+                  <input
+                    type="text"
+                    value={editAccessPointPassword}
+                    onChange={e => setEditAccessPointPassword(e.target.value)}
+                    className="w-full p-2 border rounded-md text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingAccessPoint(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditAccessPoint}
+                  disabled={!editAccessPointName.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} accessPoints={accessPoints} error={modalError} />}
         {isRoleModalOpen && editingUserPermissions && <RoleModal isOpen={isRoleModalOpen} onClose={() => {setIsRoleModalOpen(false); setEditingUserPermissions(null);}} onSave={handleSaveRole} userToEdit={editingUserPermissions} allRoles={roles} error={modalError} />}
         <ConfirmModal
           isOpen={confirmAction !== null}
