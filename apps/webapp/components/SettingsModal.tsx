@@ -83,8 +83,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 setCommonAreas(await apiService.fetchCommonAreas(userProfile.conjuntoId));
                 break;
             case 'Usuarios':
-                setPlatformUsers(await apiService.fetchUsers(userProfile.conjuntoId));
-                setRoles(await apiService.fetchRoles(userProfile.conjuntoId));
+                const [uList, uRoles, uPoints] = await Promise.all([
+                    apiService.fetchUsers(userProfile.conjuntoId),
+                    apiService.fetchRoles(userProfile.conjuntoId),
+                    apiService.fetchAccessPoints(userProfile.conjuntoId)
+                ]);
+                setPlatformUsers(uList);
+                setRoles(uRoles);
+                setAccessPoints(uPoints);
                 break;
             case 'Permisos de Usuario':
                  const [users, userRoles] = await Promise.all([

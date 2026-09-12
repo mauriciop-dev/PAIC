@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { PlatformUser, UserRole, UserRoleDefinition, AccessPoint } from "../types";
 import { Icon } from "./ui/Icon";
 
@@ -7,8 +7,8 @@ interface UserModalProps {
   onClose: () => void;
   onSave: (user: PlatformUser) => void;
   userToEdit: PlatformUser | null;
-  availableRoles: UserRoleDefinition[];
-  accessPoints: AccessPoint[]; // New prop for access point selector
+  availableRoles?: UserRoleDefinition[];
+  accessPoints?: AccessPoint[];
   error?: string | null;
 }
 
@@ -17,8 +17,8 @@ const UserModal: React.FC<UserModalProps> = ({
   onClose,
   onSave,
   userToEdit,
-  availableRoles,
-  accessPoints,
+  availableRoles = [],
+  accessPoints = [],
   error,
 }) => {
   const [formData, setFormData] = useState<Partial<PlatformUser>>({
@@ -42,7 +42,7 @@ const UserModal: React.FC<UserModalProps> = ({
         phoneNumber: userToEdit.phoneNumber || "",
         role: userToEdit.role,
         accessPointId: userToEdit.accessPointId, // Load existing access point linkage
-        pin: "", // Never load existing PIN for security
+        pin: userToEdit.pin || "", // Operational PIN if set
         password: "", // Password field is for changing, not displaying
       });
     } else {
@@ -85,7 +85,7 @@ const UserModal: React.FC<UserModalProps> = ({
   };
 
   // Filter out custom roles that are just for permissions to not clutter the dropdown
-  const predefinedRoles = availableRoles.filter((r) => !r.name.startsWith("Personalizado para"));
+  const predefinedRoles = (availableRoles || []).filter((r) => r && r.name && !r.name.startsWith("Personalizado para"));
 
   const allRoleOptions = [
     { name: "Guard" },
@@ -194,9 +194,9 @@ const UserModal: React.FC<UserModalProps> = ({
                   required
                 >
                   <option value="">Seleccionar punto de acceso...</option>
-                  {accessPoints.map((ap) => (
+                  {(accessPoints || []).map((ap) => (
                     <option key={ap.id} value={ap.id}>
-                      {ap.name} {ap.usuario_id ? `(Usuario técnico: ${ap.usuario_id})` : ""}
+                      {ap.name} {ap.usuarioId ? `(Usuario técnico: ${ap.usuarioId})` : ""}
                     </option>
                   ))}
                 </select>
