@@ -37,13 +37,36 @@ export const apiService = {
     }
   },
   async authenticateUser(email: string, password: string): Promise<T.PlatformUser | null> {
-    const { data, error } = await supabase.rpc('authenticate_platform_user', { _email: email, _password: password });
-    if (error) {
-        console.error('Authentication error:', error);
-        throw new Error('Error de autenticación.');
+    // Primero intentar con el RPC (que puede usar pgcrypto)
+    try {
+      const { data, error } = await supabase.rpc('authenticate_platform_user', { _email: email, _password: password });
+      if (!error && data) {
+        return fromSupabase(data) as T.PlatformUser;
+      }
+      if (!error && data === null) {
+        // RPC respondió pero no encontró usuario - credenciales incorrectas
+        return null;
+      }
+      // Si hay error en el RPC, intentar fallback directo
+      console.warn('RPC authenticate_platform_user falló, intentando fallback directo:', error?.message);
+    } catch (rpcErr) {
+      console.warn('RPC no disponible, usando fallback directo:', rpcErr);
     }
-    if (!data) return null;
-    return fromSupabase(data) as T.PlatformUser;
+
+    // Fallback: consulta directa a la tabla users (contraseña en texto plano)
+    const { data: directData, error: directError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('password', password)
+      .maybeSingle();
+
+    if (directError) {
+      console.error('Error en fallback de autenticación:', directError);
+      throw new Error('Error de autenticación.');
+    }
+    if (!directData) return null;
+    return fromSupabase(directData) as T.PlatformUser;
   },
 
   // --- Conjunto Management ---
@@ -574,21 +597,41 @@ export const apiService = {
       return data ? fromSupabase(data) : [];
   },
   async addAccessPoint(conjuntoId: string, name: string, email?: string, password?: string): Promise<void> {
-    const payload: any = { conjunto_id: conjuntoId, name };
-    if (email) payload.email = email;
-    if (password) payload.password = password;
+    const cleanName = name.trim();
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.');
+    const finalEmail = email?.trim() || `porteria.${slug}@paic.app`;
+    const finalPassword = password?.trim() || `Porteria${Math.floor(1000 + Math.random() * 9000)}!`;
 
-    const { error } = await supabase.from('access_points').insert(payload);
-    if (error) {
-      console.warn('Error adding access point with email/password, trying fallback:', error);
-      const fallbackRes = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name });
-      if (fallbackRes.error) {
-        console.error('Error adding access point fallback:', fallbackRes.error);
-        throw fallbackRes.error;
-      }
+    const payload: any = { conjunto_id: conjuntoId, name: cleanName, email: finalEmail, password: finalPassword };
+
+    const { error: apError } = await supabase.from('access_points').insert(payload);
+    if (apError) {
+      // Si falla con email/password, intentar solo con nombre
+      console.warn('Error adding AP with email/password, trying name only:', apError.message);
+      const { error: fallbackError } = await supabase.from('access_points').insert({ conjunto_id: conjuntoId, name: cleanName });
+      if (fallbackError) throw fallbackError;
+    }
+
+    // Crear también el usuario Guard correspondiente en tabla users para que pueda hacer login
+    const guardUser = {
+      conjunto_id: conjuntoId,
+      name: `Portería ${cleanName}`,
+      email: finalEmail,
+      password: finalPassword,
+      role: 'Guard',
+      phone_number: '',
+    };
+    const { error: userError } = await supabase.from('users').insert(guardUser);
+    if (userError) {
+      // Si ya existe el email, no es un error crítico
+      console.warn('No se pudo crear usuario Guard para el punto de acceso (puede que ya exista):', userError.message);
     }
   },
   async updateAccessPoint(conjuntoId: string, id: number, name: string, email?: string, password?: string): Promise<void> {
+    // Obtener el email actual del AP antes de actualizar (para sincronizar tabla users)
+    const { data: currentAP } = await supabase.from('access_points').select('email').eq('id', id).maybeSingle();
+    const currentEmail = currentAP?.email;
+
     const payload: any = { name };
     if (email !== undefined) payload.email = email;
     if (password !== undefined) payload.password = password;
@@ -602,7 +645,24 @@ export const apiService = {
         throw fallbackRes.error;
       }
     }
+
+    // Sincronizar tabla users: actualizar el usuario Guard correspondiente
+    const lookupEmail = currentEmail || email;
+    if (lookupEmail) {
+      const updateUserPayload: any = { name: `Portería ${name}` };
+      if (email) updateUserPayload.email = email;
+      if (password) updateUserPayload.password = password;
+      const { error: userSyncError } = await supabase
+        .from('users')
+        .update(updateUserPayload)
+        .eq('conjunto_id', conjuntoId)
+        .eq('email', lookupEmail);
+      if (userSyncError) {
+        console.warn('No se pudo sincronizar usuario en tabla users:', userSyncError.message);
+      }
+    }
   },
+
   async deleteAccessPoint(conjuntoId: string, id: number): Promise<void> {
     const { error } = await supabase.from('access_points').delete().eq('conjunto_id', conjuntoId).eq('id', id);
     if (error) {
