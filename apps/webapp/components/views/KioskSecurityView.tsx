@@ -76,24 +76,46 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
     if (!stationSession) return;
     setIsLoadingData(true);
     try {
-      const [visitors, packages, resList] = await Promise.all([
-        apiService.fetchVisitorLogs(stationSession.conjunto_id),
-        apiService.fetchPackageLogs(stationSession.conjunto_id),
-        apiService.fetchResidents(stationSession.conjunto_id),
-      ]);
-      setVisitorLogs(visitors.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id - a.id));
+      // 1. Intentar cargar datos consolidados mediante RPC de portería
+      let visitors: VisitorLog[] = [];
+      let packages: PackageLog[] = [];
+      let resList: Resident[] = [];
+
+      try {
+        const guardData = await apiService.fetchGuardData(stationSession.conjunto_id);
+        visitors = guardData.visitorLogs || [];
+        packages = guardData.packageLogs || [];
+        resList = guardData.residents || [];
+      } catch (e) {
+        console.warn("RPC fetchGuardData fallback:", e);
+      }
+
+      // 2. Fallback a consultas directas si alguna lista vino vacía
+      if (visitors.length === 0 && packages.length === 0 && resList.length === 0) {
+        const [v, p, r] = await Promise.all([
+          apiService.fetchVisitorLogs(stationSession.conjunto_id).catch(() => []),
+          apiService.fetchPackageLogs(stationSession.conjunto_id).catch(() => []),
+          apiService.fetchResidents(stationSession.conjunto_id).catch(() => []),
+        ]);
+        visitors = v;
+        packages = p;
+        resList = r;
+      }
+
+      setVisitorLogs(visitors.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.id || 0) - (a.id || 0)));
       setPackageLogs(packages);
       setResidents(resList);
+
       if (resList.length > 0) {
-        if (!visitorApartment) setVisitorApartment(resList[0].apartment);
-        if (!pkgApartment) setPkgApartment(resList[0].apartment);
+        setVisitorApartment((prev) => prev || resList[0].apartment);
+        setPkgApartment((prev) => prev || resList[0].apartment);
       }
     } catch (err) {
       console.error("Error loading kiosk operational data:", err);
     } finally {
       setIsLoadingData(false);
     }
-  }, [stationSession, visitorApartment, pkgApartment]);
+  }, [stationSession]);
 
   useEffect(() => {
     if (activeShift && stationSession) {
@@ -157,19 +179,27 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
   // --- Operational Handlers (NO PIN REQUIRED IN ACTIVE SHIFT) ---
   const handleAuthorizeVisitor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stationSession || !visitorName || !visitorApartment) return;
+    if (!stationSession || !visitorName.trim() || !visitorApartment.trim()) return;
     setIsSubmittingVisitor(true);
     try {
-      await apiService.addVisitorLog(stationSession.conjunto_id, {
+      const payload = {
         visitorName: visitorName.trim(),
-        apartment: visitorApartment,
+        apartment: visitorApartment.trim(),
         date: visitorDate,
-        status: "Autorizado",
-      });
+        status: "Autorizado" as const,
+      };
+
+      try {
+        await apiService.guardAddVisitorLog(stationSession.conjunto_id, payload);
+      } catch (rpcErr) {
+        console.warn("Fallback to standard addVisitorLog:", rpcErr);
+        await apiService.addVisitorLog(stationSession.conjunto_id, payload);
+      }
+
       setVisitorName("");
       setVisitorFeedback("✅ Visitante registrado y autorizado en bitácora.");
       setTimeout(() => setVisitorFeedback(null), 3000);
-      fetchOperationalData();
+      await fetchOperationalData();
     } catch (err: any) {
       setNotification({ type: "error", text: err.message || "Error al autorizar visitante." });
     } finally {
@@ -181,10 +211,15 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
     if (!stationSession) return;
     const now = formatTime(new Date());
     try {
-      await apiService.updateVisitorLog(stationSession.conjunto_id, logId, {
-        status: "Ingresó",
-        entryTime: now,
-      });
+      try {
+        await apiService.guardUpdateVisitorLog(logId, { status: "Ingresó", entryTime: now });
+      } catch (rpcErr) {
+        console.warn("Fallback to standard updateVisitorLog:", rpcErr);
+        await apiService.updateVisitorLog(stationSession.conjunto_id, logId, {
+          status: "Ingresó",
+          entryTime: now,
+        });
+      }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Ingresó", entryTime: now } : log))
       );
@@ -197,10 +232,15 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
     if (!stationSession) return;
     const now = formatTime(new Date());
     try {
-      await apiService.updateVisitorLog(stationSession.conjunto_id, logId, {
-        status: "Salió",
-        exitTime: now,
-      });
+      try {
+        await apiService.guardUpdateVisitorLog(logId, { status: "Salió", exitTime: now });
+      } catch (rpcErr) {
+        console.warn("Fallback to standard updateVisitorLog:", rpcErr);
+        await apiService.updateVisitorLog(stationSession.conjunto_id, logId, {
+          status: "Salió",
+          exitTime: now,
+        });
+      }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Salió", exitTime: now } : log))
       );
@@ -211,19 +251,27 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
 
   const handleRegisterPackage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stationSession || !pkgApartment || !pkgCourier) return;
+    if (!stationSession || !pkgApartment.trim() || !pkgCourier.trim()) return;
     setIsSubmittingPackage(true);
     try {
-      await apiService.addPackageLog(stationSession.conjunto_id, {
-        apartment: pkgApartment,
+      const payload = {
+        apartment: pkgApartment.trim(),
         courier: pkgCourier.trim(),
         trackingNumber: pkgTracking.trim() || undefined,
-      });
+      };
+
+      try {
+        await apiService.guardAddPackageLog(stationSession.conjunto_id, payload);
+      } catch (rpcErr) {
+        console.warn("Fallback to standard addPackageLog:", rpcErr);
+        await apiService.addPackageLog(stationSession.conjunto_id, payload);
+      }
+
       setPkgCourier("");
       setPkgTracking("");
       setPackageFeedback("✅ Paquete recibido y registrado en bitácora.");
       setTimeout(() => setPackageFeedback(null), 3000);
-      fetchOperationalData();
+      await fetchOperationalData();
     } catch (err: any) {
       setNotification({ type: "error", text: err.message || "Error al registrar paquete." });
     } finally {
@@ -234,7 +282,12 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
   const handleMarkDelivered = async (packageId: number) => {
     if (!stationSession) return;
     try {
-      await apiService.updatePackageLogStatus(stationSession.conjunto_id, packageId, "Entregado");
+      try {
+        await apiService.guardUpdatePackageLogStatus(packageId, "Entregado");
+      } catch (rpcErr) {
+        console.warn("Fallback to standard updatePackageLogStatus:", rpcErr);
+        await apiService.updatePackageLogStatus(stationSession.conjunto_id, packageId, "Entregado");
+      }
       setPackageLogs((prev) =>
         prev.map((p) => (p.id === packageId ? { ...p, status: "Entregado" } : p))
       );
@@ -457,17 +510,30 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
                           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                             Apartamento de Destino
                           </label>
-                          <select
-                            value={visitorApartment}
-                            onChange={(e) => setVisitorApartment(e.target.value)}
-                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            {residents.map((r) => (
-                              <option key={r.apartment} value={r.apartment}>
-                                Apto {r.apartment} - {r.name}
-                              </option>
-                            ))}
-                          </select>
+                          {residents.length > 0 ? (
+                            <select
+                              value={visitorApartment}
+                              onChange={(e) => setVisitorApartment(e.target.value)}
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                              required
+                            >
+                              <option value="">Seleccionar apartamento...</option>
+                              {residents.map((r) => (
+                                <option key={r.apartment} value={r.apartment}>
+                                  Apto {r.apartment} - {r.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={visitorApartment}
+                              onChange={(e) => setVisitorApartment(e.target.value)}
+                              placeholder="Ej. 101, Torre 1 - 202"
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                              required
+                            />
+                          )}
                         </div>
 
                         <div>
@@ -518,17 +584,30 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
                           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                             Apartamento
                           </label>
-                          <select
-                            value={pkgApartment}
-                            onChange={(e) => setPkgApartment(e.target.value)}
-                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            {residents.map((r) => (
-                              <option key={r.apartment} value={r.apartment}>
-                                Apto {r.apartment} - {r.name}
-                              </option>
-                            ))}
-                          </select>
+                          {residents.length > 0 ? (
+                            <select
+                              value={pkgApartment}
+                              onChange={(e) => setPkgApartment(e.target.value)}
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                              required
+                            >
+                              <option value="">Seleccionar apartamento...</option>
+                              {residents.map((r) => (
+                                <option key={r.apartment} value={r.apartment}>
+                                  Apto {r.apartment} - {r.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={pkgApartment}
+                              onChange={(e) => setPkgApartment(e.target.value)}
+                              placeholder="Ej. 101, Torre 1 - 202"
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                              required
+                            />
+                          )}
                         </div>
 
                         <div>

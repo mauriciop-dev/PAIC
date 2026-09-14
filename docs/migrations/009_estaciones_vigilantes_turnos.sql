@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- 1. Tabla: estaciones (Puntos de Acceso Físicos)
 CREATE TABLE IF NOT EXISTS public.estaciones (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conjunto_id UUID NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
     codigo_estacion TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     nombre TEXT NOT NULL,
@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_estaciones_codigo ON public.estaciones(codigo_est
 -- 2. Tabla: vigilantes (Personal de Seguridad)
 CREATE TABLE IF NOT EXISTS public.vigilantes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conjunto_id UUID NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
     cedula TEXT NOT NULL,
     nombre_completo TEXT NOT NULL,
     pin_hash TEXT NOT NULL, -- PIN de 6 dígitos encubierto con pgcrypto crypt()
@@ -248,7 +248,7 @@ $$;
 
 -- 4. Auditoría de Turnos para Administradores
 CREATE OR REPLACE FUNCTION public.obtener_auditoria_turnos(
-    p_conjunto_id UUID,
+    p_conjunto_id TEXT,
     p_limit INT DEFAULT 50,
     p_offset INT DEFAULT 0
 )
@@ -289,7 +289,7 @@ $$;
 
 -- 5. Helper para crear/actualizar vigilante con PIN hasheado
 CREATE OR REPLACE FUNCTION public.guardar_vigilante(
-    p_conjunto_id UUID,
+    p_conjunto_id TEXT,
     p_cedula TEXT,
     p_nombre_completo TEXT,
     p_pin TEXT,
@@ -337,7 +337,7 @@ $$;
 
 -- 6. Helper para crear/actualizar estación con contraseña hasheada
 CREATE OR REPLACE FUNCTION public.guardar_estacion(
-    p_conjunto_id UUID,
+    p_conjunto_id TEXT,
     p_codigo_estacion TEXT,
     p_nombre TEXT,
     p_password TEXT,
@@ -382,3 +382,17 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'id', v_id);
 END;
 $$;
+
+-- ==============================================================================
+-- Grants de Acceso a Roles de Supabase
+-- ==============================================================================
+GRANT ALL ON TABLE public.estaciones TO authenticated, anon, service_role;
+GRANT ALL ON TABLE public.vigilantes TO authenticated, anon, service_role;
+GRANT ALL ON TABLE public.turnos_vigilancia TO authenticated, anon, service_role;
+
+GRANT EXECUTE ON FUNCTION public.autenticar_estacion(TEXT, TEXT) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.iniciar_turno_vigilante(UUID, TEXT, TEXT, BOOLEAN, TEXT, TEXT) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.cerrar_turno_vigilante(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.obtener_auditoria_turnos(TEXT, INT, INT) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.guardar_vigilante(TEXT, TEXT, TEXT, TEXT, UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.guardar_estacion(TEXT, TEXT, TEXT, TEXT, UUID) TO authenticated, anon, service_role;
