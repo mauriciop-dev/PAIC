@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -10,6 +9,7 @@ import InitialSetupModal from './components/InitialSetupModal';
 import SettingsModal from './components/SettingsModal';
 import LoginView from './components/views/LoginView';
 import SuperAdminDashboard from './components/views/SuperAdminDashboard';
+import KioskSecurityView from './components/views/KioskSecurityView';
 import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog, PlatformUser } from './types';
 import { Icon, ToastProvider, useToast } from '@paic/ui';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
@@ -32,7 +32,7 @@ interface LoginError {
   type: 'sync' | 'config';
 }
 
-export type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Gestionar Áreas' | 'Suscripción' | 'Usuarios' | 'Permisos de Usuario';
+export type SettingsTab = 'Perfil' | 'Conjunto' | 'Puntos de Acceso' | 'Personal de Seguridad' | 'Gestionar Áreas' | 'Suscripción' | 'Usuarios' | 'Permisos de Usuario';
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Dashboard);
@@ -41,15 +41,29 @@ const AppContent: React.FC = () => {
   const [isInitialSetupModalOpen, setIsInitialSetupModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAccessPointModalOpen, setIsAccessPointModalOpen] = useState(false);
-  
-  const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined means "not yet determined"
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [conjuntoInfo, setConjuntoInfo] = useState<ConjuntoInfo | null>(null);
   const [selectedAccessPointId, setSelectedAccessPointId] = useState<number | null>(null);
+  const [isKioskMode, setIsKioskMode] = useState<boolean>(() => {
+    return window.location.pathname.includes('/seguridad/kiosco') || 
+           new URLSearchParams(window.location.search).get('view') === 'kiosco';
+  });
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [loginError, setLoginError] = useState<LoginError | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsKioskMode(
+        window.location.pathname.includes('/seguridad/kiosco') ||
+        new URLSearchParams(window.location.search).get('view') === 'kiosco'
+      );
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (notification) {
@@ -57,6 +71,7 @@ const AppContent: React.FC = () => {
       setNotification(null);
     }
   }, [notification, addToast]);
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [activeDetailedTour, setActiveDetailedTour] = useState<number | null>(null);
@@ -91,7 +106,7 @@ const AppContent: React.FC = () => {
     }
   }, [activeTab, userProfile]);
 
-  // Effect to catch specific configuration errors from the URL on load
+  // Catch specific configuration errors from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const errorDescription = params.get('error_description');
@@ -100,7 +115,7 @@ const AppContent: React.FC = () => {
       analytics.trackError('config_error', 'Database error saving new user');
       setLoginError({
         title: "Error de Configuración del Servidor",
-        message: "No se pudo crear el perfil de usuario. Esto suele ocurrir si una cuenta fue eliminada y se intenta registrar de nuevo. Por favor, contacta a soporte técnico e informa del error 'DB_SAVE_USER_CONFLICT' para reactivar tu cuenta.",
+        message: "No se pudo crear el perfil de usuario. Por favor contacta a soporte técnico.",
         type: 'config',
       });
       setIsLoadingSession(false);
@@ -108,23 +123,18 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
-  // Effect #1: Runs ONCE on mount. Gets the initial session via getSession()
-  // and sets up the auth listener for subsequent changes.
+  // Initial session recovery
   useEffect(() => {
-    // Do not run if a config error was already detected from the URL
     const params = new URLSearchParams(window.location.hash.slice(1));
     if (params.get('error_description')) {
         setIsLoadingSession(false);
         return;
     }
 
-    // getSession() explicitly recovers the session from storage or URL hash,
-    // handling the OAuth redirect callback properly.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    // Listen for future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
     });
@@ -134,15 +144,10 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  // Effect #2: Runs whenever the `session` state changes. It is responsible for
-  // fetching all user-dependent application data. This separation of concerns is key.
+  // Fetch profile when session changes
   useEffect(() => {
-    // If session is `undefined`, it means the listener hasn't fired yet. We wait.
-    if (session === undefined) {
-        return;
-    }
+    if (session === undefined) return;
 
-    // If session is `null`, the user is logged out. Clear all data and finish loading.
     if (session === null) {
         setUserProfile(null);
         setConjuntoInfo(null);
@@ -150,18 +155,15 @@ const AppContent: React.FC = () => {
         return;
     }
 
-    // A session exists. Fetch the corresponding application profile and data.
     let cancelled = false;
 
     const fetchProfileData = async () => {
         try {
             let profile = null;
-            // Retry loop to handle DB replication lag after sign-up.
             for (let i = 0; i < 5; i++) {
                 if (cancelled) return;
                 profile = await apiService.fetchUserProfile(session.user.id);
                 if (profile) break;
-                console.warn(`Profile not found, retrying... Attempt ${i + 1}`);
                 await new Promise(res => setTimeout(res, 2000));
             }
 
@@ -191,7 +193,6 @@ const AppContent: React.FC = () => {
                         setIsInitialSetupModalOpen(true);
                     }
 
-                    // Auto-abrir modal de suscripción si el trial expiró
                     const isTrialExpired = profile.role === UserRole.Trial 
                       && profile.trialExpiresAt 
                       && new Date(profile.trialExpiresAt).getTime() < Date.now();
@@ -204,10 +205,9 @@ const AppContent: React.FC = () => {
                 }
             } else {
                 analytics.trackError('sync_error', 'Profile not found after retries');
-                console.error("User is logged in but profile data is missing after retries.");
                 setLoginError({
                     title: "Error de Sincronización",
-                    message: "No pudimos encontrar tu perfil. Esto puede ser un problema de sincronización. Por favor, refresca la página. Si el problema persiste, contacta a soporte.",
+                    message: "No pudimos encontrar tu perfil. Por favor refresca la página.",
                     type: 'sync',
                 });
                 setUserProfile(null);
@@ -215,10 +215,9 @@ const AppContent: React.FC = () => {
             }
         } catch (error) {
             analytics.trackError('fetch_error', 'Error fetching profile data');
-            console.error("Error fetching profile data:", error);
             setLoginError({
                 title: "Error de Datos",
-                message: "Ocurrió un error al cargar la información de tu cuenta. Por favor, intenta de nuevo.",
+                message: "Ocurrió un error al cargar tu cuenta.",
                 type: 'sync',
             });
         } finally {
@@ -235,7 +234,7 @@ const AppContent: React.FC = () => {
     };
   }, [session]);
   
-  // Effect to handle post-payment redirection
+  // Post-payment redirection
   useEffect(() => {
     const handlePaymentReturn = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -291,6 +290,7 @@ const AppContent: React.FC = () => {
     }
   }, [userProfile, conjuntoInfo]);
 
+  // Package realtime notifications
   useEffect(() => {
       if (userProfile && (userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber) && userProfile.conjuntoId) {
           const channel = supabase
@@ -350,20 +350,15 @@ const AppContent: React.FC = () => {
     if (!userProfile) return;
     
     try {
-        // 1. Create conjunto info using the new, explicit 'add' function.
         await apiService.addConjuntoInfo(info);
-        
-        // 2. Update the user's profile with the new conjuntoId
         const updatedProfile: UserProfile = { ...userProfile, conjuntoId: info.id, fullName: info.adminName };
         await apiService.updateUserProfile(updatedProfile);
 
-        // 3. Update local state
         setUserProfile(updatedProfile);
         setConjuntoInfo(info);
         setIsInitialSetupModalOpen(false);
     } catch (error) {
         console.error("Error saving initial setup:", error);
-        // Re-throw the error so the modal component can catch it and display a message.
         throw error;
     }
   };
@@ -383,7 +378,6 @@ const AppContent: React.FC = () => {
       if (userRoleDef) {
           permissions = userRoleDef.permissions;
       } else {
-          // Handle predefined static roles
           if (platformUser.role === 'Guard') {
               permissions = [Tab.Seguridad];
           } else if (platformUser.role === 'Contador') {
@@ -420,7 +414,7 @@ const AppContent: React.FC = () => {
         </div>
       );
   }
-  
+
   if (loginError) {
       return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -445,13 +439,39 @@ const AppContent: React.FC = () => {
       );
   }
 
+  // Kiosk mode view for security stations
+  if (isKioskMode) {
+    return (
+      <KioskSecurityView
+        onStationDisconnect={() => {
+          setIsKioskMode(false);
+          window.history.pushState({}, '', '/?tab=porteria');
+        }}
+      />
+    );
+  }
+
+  // Superadmin view
   if (userProfile && userProfile.role === UserRole.Admin) {
       const superAdminProfile: SuperAdminProfile = { name: userProfile.fullName, email: userProfile.email, role: UserRole.Admin };
       return <SuperAdminDashboard profile={superAdminProfile} onLogout={handleLogout} />;
   }
 
+  // Login view
   if (!userProfile) {
-    return <LoginView onInternalAuthSuccess={handleInternalAuthSuccess} />;
+    return (
+      <LoginView
+        onInternalAuthSuccess={handleInternalAuthSuccess}
+        onStationAuthSuccess={() => {
+          setIsKioskMode(true);
+          window.history.pushState({}, '', '/seguridad/kiosco');
+        }}
+        onNavigateToKiosk={() => {
+          setIsKioskMode(true);
+          window.history.pushState({}, '', '/seguridad/kiosco');
+        }}
+      />
+    );
   }
   
   const conjuntoName = conjuntoInfo?.name || "Conjunto Residencial";
@@ -460,152 +480,150 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      
       <div className="flex min-h-screen font-sans text-gray-800 bg-gray-50 overflow-x-hidden">
+        {isConjuntoAdmin && (
+            <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
+        )}
         
-      {isConjuntoAdmin && (
-          <Chatbot isOpen={isChatbotOpen} setIsOpen={setIsChatbotOpen} userProfile={userProfile} conjuntoInfo={conjuntoInfo} />
-      )}
-      
-      {isConjuntoAdmin && (
-        <DraggableChatButton 
-          isChatbotOpen={isChatbotOpen} 
-          onClick={() => setIsChatbotOpen(true)} 
-        />
-      )}
-
-      <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
-        <Header 
-            onHelpClick={() => setIsHelpModalOpen(true)} 
-            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
-            onOpenOnboarding={handleOpenOnboarding}
-            showAnimatedButton={showAnimatedButton}
-            userProfile={userProfile}
-            conjuntoInfo={conjuntoInfo} 
-            onLogout={handleLogout} 
-            onSettingsClick={handleSettingsClick} 
-            activeTabName={activeTab}
-        />
-        {!needsAdminSetup && (
-          <NavBar 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            userProfile={userProfile} 
-            onSettingsClick={handleSettingsClick}
+        {isConjuntoAdmin && (
+          <DraggableChatButton 
+            isChatbotOpen={isChatbotOpen} 
+            onClick={() => setIsChatbotOpen(true)} 
           />
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
-          <div className="max-w-screen-2xl mx-auto w-full">
-            {needsAdminSetup ? (
-               <div className="text-center p-10 text-gray-600 bg-white rounded-xl shadow-sm border border-gray-200">
-                  <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
-                  <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
-                  <p className="mt-2">
-                      Bienvenido a PAIC. Por favor, completa la información de tu conjunto en el diálogo que ha aparecido.
-                  </p>
-              </div>
-            ) : (
-              <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
-            )}
-          </div>
-        </div>
-      </main>
 
-      {!needsAdminSetup && isConjuntoAdmin && (
-        <BottomNav
-          activeTab={activeTab}
-          onTabSelect={setActiveTab}
-          isConjuntoAdmin={isConjuntoAdmin}
-          onSettingsClick={handleSettingsClick}
-          onHelpClick={() => setIsHelpModalOpen(true)}
-          onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
-        />
-      )}
-      {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboardingModal(true); }} />}
-      
-      {isInitialSetupModalOpen && (
-        <InitialSetupModal 
-            onClose={() => setIsInitialSetupModalOpen(false)} 
-            onSaveSetup={handleSaveSetup} 
-            userProfile={userProfile}
-        />
-      )}
-      
-      {isSettingsModalOpen && isConjuntoAdmin && conjuntoInfo && (
-          <SettingsModal 
-            isOpen={isSettingsModalOpen} 
-            onClose={() => setIsSettingsModalOpen(false)} 
-            userProfile={userProfile} 
-            conjuntoInfo={conjuntoInfo} 
-            initialTab={initialSettingsTab}
-            setConjuntoInfo={setConjuntoInfo}
-            setUserProfile={setUserProfile}
+        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
+          <Header 
+              onHelpClick={() => setIsHelpModalOpen(true)} 
+              onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
+              onOpenOnboarding={handleOpenOnboarding}
+              showAnimatedButton={showAnimatedButton}
+              userProfile={userProfile}
+              conjuntoInfo={conjuntoInfo} 
+              onLogout={handleLogout} 
+              onSettingsClick={handleSettingsClick} 
+              activeTabName={activeTab}
           />
-      )}
-      
-       {isAccessPointModalOpen && userProfile.conjuntoId && (
-        <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
-      )}
-      
-      <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} userProfile={userProfile} />
-
-      <OnboardingModal
-        isOpen={showOnboardingModal}
-        onClose={() => setShowOnboardingModal(false)}
-        onSelectOption={handleSelectOption}
-        options={[
-          { id: 1, label: 'Tour guiado', description: 'Recorrido general por toda la plataforma', icon: 'play', completed: false, glowing: false },
-          ...onboardingProgress.getAll().map(p => ({
-            id: p.id,
-            label: [
-              'Configuraciones Iniciales', 'Base de Datos', 'Áreas Comunes', 'Comunicaciones',
-              'Archivos', 'Finanzas', 'Seguridad', 'Vencimientos', 'Tareas'
-            ][p.id - 2],
-            description: [
-              'Configura tu copropiedad y crea usuarios',
-              'Crea un nuevo residente o copropietario',
-              'Realiza tu primera reserva de área común',
-              'Envía tu primer comunicado a residentes',
-              'Sube tu primer archivo al repositorio',
-              'Agrega un ingreso a la contabilidad',
-              'Registra un visitante y un paquete',
-              'Agrega un vencimiento importante',
-              'Crea una tarea y recibe alertas'
-            ][p.id - 2],
-            icon: 'check',
-            completed: p.completed,
-            glowing: !p.completed && onboardingProgress.getNextPending() === p.id,
-          }))
-        ]}
-      />
-
-      <DetailedOnboarding
-        optionId={activeDetailedTour}
-        onComplete={handleDetailedTourComplete}
-        onClose={handleDetailedTourClose}
-        userProfile={userProfile}
-      />
-
-      {welcomePlanName && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setWelcomePlanName(null)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center" onClick={e => e.stopPropagation()}>
-            <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
-              <Icon name="check" className="w-8 h-8 text-green-600" />
+          {!needsAdminSetup && (
+            <NavBar 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              userProfile={userProfile} 
+              onSettingsClick={handleSettingsClick}
+            />
+          )}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
+            <div className="max-w-screen-2xl mx-auto w-full">
+              {needsAdminSetup ? (
+                 <div className="text-center p-10 text-gray-600 bg-white rounded-xl shadow-sm border border-gray-200">
+                    <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
+                    <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
+                    <p className="mt-2">
+                        Bienvenido a PAIC. Por favor, completa la información de tu conjunto en el diálogo que ha aparecido.
+                    </p>
+                </div>
+              ) : (
+                <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
+              )}
             </div>
-            <h2 className="mt-4 text-2xl font-bold text-gray-800">¡Bienvenido al Plan {welcomePlanName}!</h2>
-            <p className="mt-3 text-gray-600">
-              Tu pago fue aprobado y tu suscripción ya está activa. Ahora tienes acceso completo a todos los módulos de PAIC para tu copropiedad.
-            </p>
-            <button
-              onClick={() => setWelcomePlanName(null)}
-              className="mt-6 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
-            >
-              ¡Empezar a usar PAIC!
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+        </main>
+
+        {!needsAdminSetup && isConjuntoAdmin && (
+          <BottomNav
+            activeTab={activeTab}
+            onTabSelect={setActiveTab}
+            isConjuntoAdmin={isConjuntoAdmin}
+            onSettingsClick={handleSettingsClick}
+            onHelpClick={() => setIsHelpModalOpen(true)}
+            onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
+          />
+        )}
+        {isHelpModalOpen && <HelpModal onClose={() => setIsHelpModalOpen(false)} onStartTour={() => { analytics.trackOnboarding('started'); setIsHelpModalOpen(false); setShowOnboardingModal(true); }} />}
+        
+        {isInitialSetupModalOpen && (
+          <InitialSetupModal 
+              onClose={() => setIsInitialSetupModalOpen(false)} 
+              onSaveSetup={handleSaveSetup} 
+              userProfile={userProfile}
+          />
+        )}
+        
+        {isSettingsModalOpen && isConjuntoAdmin && conjuntoInfo && (
+            <SettingsModal 
+              isOpen={isSettingsModalOpen} 
+              onClose={() => setIsSettingsModalOpen(false)} 
+              userProfile={userProfile} 
+              conjuntoInfo={conjuntoInfo} 
+              initialTab={initialSettingsTab}
+              setConjuntoInfo={setConjuntoInfo}
+              setUserProfile={setUserProfile}
+            />
+        )}
+        
+         {isAccessPointModalOpen && userProfile.conjuntoId && (
+          <AccessPointSelectionModal isOpen={isAccessPointModalOpen} onClose={() => setIsAccessPointModalOpen(false)} conjuntoId={userProfile.conjuntoId} onSelect={setSelectedAccessPointId} />
+        )}
+        
+        <OnboardingGuide isOpen={showOnboarding} onClose={handleOnboardingComplete} userProfile={userProfile} />
+
+        <OnboardingModal
+          isOpen={showOnboardingModal}
+          onClose={() => setShowOnboardingModal(false)}
+          onSelectOption={handleSelectOption}
+          options={[
+            { id: 1, label: 'Tour guiado', description: 'Recorrido general por toda la plataforma', icon: 'play', completed: false, glowing: false },
+            ...onboardingProgress.getAll().map(p => ({
+              id: p.id,
+              label: [
+                'Configuraciones Iniciales', 'Base de Datos', 'Áreas Comunes', 'Comunicaciones',
+                'Archivos', 'Finanzas', 'Seguridad', 'Vencimientos', 'Tareas'
+              ][p.id - 2],
+              description: [
+                'Configura tu copropiedad y crea usuarios',
+                'Crea un nuevo residente o copropietario',
+                'Realiza tu primera reserva de área común',
+                'Envía tu primer comunicado a residentes',
+                'Sube tu primer archivo al repositorio',
+                'Agrega un ingreso a la contabilidad',
+                'Registra un visitante y un paquete',
+                'Agrega un vencimiento importante',
+                'Crea una tarea y recibe alertas'
+              ][p.id - 2],
+              icon: 'check',
+              completed: p.completed,
+              glowing: !p.completed && onboardingProgress.getNextPending() === p.id,
+            }))
+          ]}
+        />
+
+        <DetailedOnboarding
+          optionId={activeDetailedTour}
+          onComplete={handleDetailedTourComplete}
+          onClose={handleDetailedTourClose}
+          userProfile={userProfile}
+        />
+
+        {welcomePlanName && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setWelcomePlanName(null)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center" onClick={e => e.stopPropagation()}>
+              <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+                <Icon name="check" className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="mt-4 text-2xl font-bold text-gray-800">¡Bienvenido al Plan {welcomePlanName}!</h2>
+              <p className="mt-3 text-gray-600">
+                Tu pago fue aprobado y tu suscripción ya está activa. Ahora tienes acceso completo a todos los módulos de PAIC para tu copropiedad.
+              </p>
+              <button
+                onClick={() => setWelcomePlanName(null)}
+                className="mt-6 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
+              >
+                ¡Empezar a usar PAIC!
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 };
@@ -617,4 +635,3 @@ const App: React.FC = () => (
 );
 
 export default App;
-

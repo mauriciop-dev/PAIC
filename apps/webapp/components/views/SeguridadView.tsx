@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { apiService } from "../../services/apiService";
-import { VisitorLog, PackageLog, Resident, UserProfile, AccessPoint, InternalStaff, ActiveShift } from "../../types";
+import {
+  VisitorLog,
+  PackageLog,
+  Resident,
+  UserProfile,
+  TurnoAuditoriaItem,
+  Estacion,
+} from "../../types";
 import { Icon } from "@paic/ui";
-import PinVerificationModal from "../../components/PinVerificationModal";
-import ShiftModal from "../../components/ShiftModal";
 
-type SeguridadTab = "Visitantes" | "Paquetes";
+type SeguridadTab = "Visitantes" | "Paquetes" | "Auditoría de Turnos";
 
 interface SeguridadViewProps {
   userProfile: UserProfile;
@@ -18,12 +23,29 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}`;
 };
 
-const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAccessPointId }) => {
+const formatDateTime = (dateStr?: string | null): string => {
+  if (!dateStr) return "En curso";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleString("es-CO", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
+const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
   const [activeTab, setActiveTab] = useState<SeguridadTab>("Visitantes");
   const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
   const [packageLogs, setPackageLogs] = useState<PackageLog[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
-  const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
+  const [estaciones, setEstaciones] = useState<Estacion[]>([]);
+  const [turnosAuditoria, setTurnosAuditoria] = useState<TurnoAuditoriaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingLogId, setUpdatingLogId] = useState<number | null>(null);
@@ -42,54 +64,23 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
 
   const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [pinModalOpen, setPinModalOpen] = useState(false);
-  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
-  const [activeShift, setActiveShift] = useState<ActiveShift | null>(null);
-  const [pendingAction, setPendingAction] = useState<{
-    type: "authorize_visitor" | "register_package" | "register_entry" | "register_exit" | "mark_delivered";
-    data: any;
-  } | null>(null);
-
-  // Load active shift from localStorage
-  useEffect(() => {
-    if (userProfile.conjuntoId) {
-      const savedShift = localStorage.getItem(`paic_active_shift_${userProfile.conjuntoId}`);
-      if (savedShift) {
-        try {
-          setActiveShift(JSON.parse(savedShift));
-        } catch (e) {
-          console.error("Failed to parse saved shift:", e);
-        }
-      }
-    }
-  }, [userProfile.conjuntoId]);
-
-  const handleStartShift = (shift: ActiveShift) => {
-    setActiveShift(shift);
-    if (userProfile.conjuntoId) {
-      localStorage.setItem(`paic_active_shift_${userProfile.conjuntoId}`, JSON.stringify(shift));
-    }
-    setActionFeedback({
-      type: "success",
-      text: ` Turno iniciado exitosamente para ${shift.guardName}.`,
-    });
-    setTimeout(() => setActionFeedback(null), 4000);
-  };
-
   const fetchData = async () => {
     if (!userProfile.conjuntoId) return;
     setIsLoading(true);
     try {
-      const [visitors, packages, res, points] = await Promise.all([
+      const [visitors, packages, res, ests, audit] = await Promise.all([
         apiService.fetchVisitorLogs(userProfile.conjuntoId),
         apiService.fetchPackageLogs(userProfile.conjuntoId),
         apiService.fetchResidents(userProfile.conjuntoId),
-        apiService.fetchAccessPoints(userProfile.conjuntoId),
+        apiService.fetchEstaciones(userProfile.conjuntoId),
+        apiService.fetchTurnosAuditoria(userProfile.conjuntoId),
       ]);
       setVisitorLogs(visitors.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id - a.id));
       setPackageLogs(packages);
       setResidents(res);
-      setAccessPoints(points);
+      setEstaciones(ests);
+      setTurnosAuditoria(audit);
+
       if (res.length > 0) {
         if (!pkgApartment) setPkgApartment(res[0].apartment);
         if (!visitorApartment) setVisitorApartment(res[0].apartment);
@@ -128,142 +119,109 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
     }
   };
 
-  const openPinModal = (
-    type: "authorize_visitor" | "register_package" | "register_entry" | "register_exit" | "mark_delivered",
-    data: any
-  ) => {
-    setPendingAction({ type, data });
-    setPinModalOpen(true);
-  };
-
-  const closePinModal = () => {
-    setPinModalOpen(false);
-    setPendingAction(null);
-  };
-
-  const handlePinVerified = async (staff: InternalStaff) => {
-    if (!pendingAction || !userProfile.conjuntoId) return;
-
-    const { type, data } = pendingAction;
-    setActionFeedback(null);
-
-    try {
-      switch (type) {
-        case "authorize_visitor": {
-          await apiService.addVisitorLog(userProfile.conjuntoId, {
-            visitorName: data.visitorName,
-            apartment: data.visitorApartment,
-            date: data.visitorDate,
-            status: "Autorizado",
-          });
-          setVisitorName("");
-          setVisitorFeedback("✅ Visitante autorizado exitosamente!");
-          setTimeout(() => setVisitorFeedback(null), 3000);
-          break;
-        }
-        case "register_package": {
-          await apiService.addPackageLog(userProfile.conjuntoId, {
-            apartment: data.pkgApartment,
-            courier: data.pkgCourier,
-            trackingNumber: data.pkgTracking || undefined,
-          });
-          setPkgCourier("");
-          setPkgTracking("");
-          setPackageFeedback("✅ Paquete registrado exitosamente!");
-          setTimeout(() => setPackageFeedback(null), 3000);
-          break;
-        }
-        case "register_entry": {
-          const now = formatTime(new Date());
-          await apiService.updateVisitorLog(userProfile.conjuntoId, data.logId, {
-            status: "Ingresó",
-            entryTime: now,
-          });
-          setVisitorLogs((prev) =>
-            prev.map((log) =>
-              log.id === data.logId ? { ...log, status: "Ingresó", entryTime: now } : log
-            )
-          );
-          break;
-        }
-        case "register_exit": {
-          const now = formatTime(new Date());
-          await apiService.updateVisitorLog(userProfile.conjuntoId, data.logId, {
-            status: "Salió",
-            exitTime: now,
-          });
-          setVisitorLogs((prev) =>
-            prev.map((log) =>
-              log.id === data.logId ? { ...log, status: "Salió", exitTime: now } : log
-            )
-          );
-          break;
-        }
-        case "mark_delivered": {
-          await apiService.updatePackageLogStatus(userProfile.conjuntoId, data.packageId, "Entregado");
-          break;
-        }
-      }
-
-      // Log to operational audit
-      await logOperationalAction(type, data, staff);
-    } catch (error) {
-      console.error(`Error executing ${type}:`, error);
-      setActionFeedback({ type: "error", text: `Error: ${error instanceof Error ? error.message : "Error desconocido"}` });
-      setTimeout(() => setActionFeedback(null), 5000);
-    } finally {
-      closePinModal();
-      if (type === "authorize_visitor" || type === "register_package" || type === "mark_delivered") {
-        fetchData();
-      }
-    }
-  };
-
-  const logOperationalAction = async (
-    type: string,
-    data: any,
-    staff: InternalStaff
-  ) => {
-    if (!userProfile.conjuntoId || !selectedAccessPointId) return;
-
-    try {
-      const actionMap: Record<string, string> = {
-        authorize_visitor: "autorizar_visitante",
-        register_package: "registrar_paquete",
-        register_entry: "registrar_ingreso",
-        register_exit: "registrar_salida",
-        mark_delivered: "marcar_entregado",
-      };
-
-      await apiService.addVisitorLog(userProfile.conjuntoId, {
-        visitorName: `AUDIT: ${actionMap[type] || type}`,
-        apartment: "SISTEMA",
-        date: new Date().toISOString().split("T")[0],
-        status: "Autorizado", // audit log
-      });
-    } catch (err) {
-      console.warn("Failed to log operational action:", err);
-    }
-  };
-
-  const handleAuthorizeVisitor = (e: React.FormEvent) => {
+  const handleAuthorizeVisitor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!visitorName || !visitorApartment || !userProfile.conjuntoId) return;
-    openPinModal("authorize_visitor", { visitorName, visitorApartment, visitorDate });
+    setIsSubmittingVisitor(true);
+    try {
+      await apiService.addVisitorLog(userProfile.conjuntoId, {
+        visitorName,
+        apartment: visitorApartment,
+        date: visitorDate,
+        status: "Autorizado",
+      });
+      setVisitorName("");
+      setVisitorFeedback("✅ Visitante autorizado exitosamente.");
+      setTimeout(() => setVisitorFeedback(null), 3000);
+      fetchData();
+    } catch (err: any) {
+      setActionFeedback({ type: "error", text: err.message || "Error al registrar visitante." });
+    } finally {
+      setIsSubmittingVisitor(false);
+    }
   };
 
-  const handleRegisterPackage = (e: React.FormEvent) => {
+  const handleRegisterPackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pkgApartment || !pkgCourier || !userProfile.conjuntoId) return;
-    openPinModal("register_package", { pkgApartment, pkgCourier, pkgTracking });
+    setIsSubmittingPackage(true);
+    try {
+      await apiService.addPackageLog(userProfile.conjuntoId, {
+        apartment: pkgApartment,
+        courier: pkgCourier,
+        trackingNumber: pkgTracking || undefined,
+      });
+      setPkgCourier("");
+      setPkgTracking("");
+      setPackageFeedback("✅ Paquete registrado exitosamente.");
+      setTimeout(() => setPackageFeedback(null), 3000);
+      fetchData();
+    } catch (err: any) {
+      setActionFeedback({ type: "error", text: err.message || "Error al registrar paquete." });
+    } finally {
+      setIsSubmittingPackage(false);
+    }
+  };
+
+  const handleRegisterEntry = async (logId: number) => {
+    if (!userProfile.conjuntoId) return;
+    setUpdatingLogId(logId);
+    const now = formatTime(new Date());
+    try {
+      await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+        status: "Ingresó",
+        entryTime: now,
+      });
+      setVisitorLogs((prev) =>
+        prev.map((log) => (log.id === logId ? { ...log, status: "Ingresó", entryTime: now } : log))
+      );
+    } catch (err: any) {
+      setActionFeedback({ type: "error", text: err.message || "Error al registrar ingreso." });
+    } finally {
+      setUpdatingLogId(null);
+    }
+  };
+
+  const handleRegisterExit = async (logId: number) => {
+    if (!userProfile.conjuntoId) return;
+    setUpdatingLogId(logId);
+    const now = formatTime(new Date());
+    try {
+      await apiService.updateVisitorLog(userProfile.conjuntoId, logId, {
+        status: "Salió",
+        exitTime: now,
+      });
+      setVisitorLogs((prev) =>
+        prev.map((log) => (log.id === logId ? { ...log, status: "Salió", exitTime: now } : log))
+      );
+    } catch (err: any) {
+      setActionFeedback({ type: "error", text: err.message || "Error al registrar salida." });
+    } finally {
+      setUpdatingLogId(null);
+    }
+  };
+
+  const handleMarkDelivered = async (packageId: number) => {
+    if (!userProfile.conjuntoId) return;
+    try {
+      await apiService.updatePackageLogStatus(userProfile.conjuntoId, packageId, "Entregado");
+      setPackageLogs((prev) =>
+        prev.map((p) => (p.id === packageId ? { ...p, status: "Entregado" } : p))
+      );
+    } catch (err: any) {
+      setActionFeedback({ type: "error", text: err.message || "Error al entregar paquete." });
+    }
   };
 
   const renderVisitorForm = () => (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold text-gray-700 mb-4">Autorizar Ingreso de Visitante</h3>
+    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Icon name="user" className="w-4 h-4 text-blue-600" />
+        <span>Autorizar Ingreso de Visitante</span>
+      </h3>
       <form onSubmit={handleAuthorizeVisitor} className="space-y-4">
         <div>
-          <label htmlFor="visitorName" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="visitorName" className="block text-xs font-semibold text-gray-700 mb-1">
             Nombre del Visitante
           </label>
           <input
@@ -271,19 +229,19 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
             id="visitorName"
             value={visitorName}
             onChange={(e) => setVisitorName(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             required
           />
         </div>
         <div>
-          <label htmlFor="apartmentVisitor" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="apartmentVisitor" className="block text-xs font-semibold text-gray-700 mb-1">
             Apartamento
           </label>
           <select
             id="apartmentVisitor"
             value={visitorApartment}
             onChange={(e) => setVisitorApartment(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           >
             {residents.map((r) => (
               <option key={r.apartment} value={r.apartment}>
@@ -293,7 +251,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
           </select>
         </div>
         <div>
-          <label htmlFor="visitDate" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="visitDate" className="block text-xs font-semibold text-gray-700 mb-1">
             Fecha de Visita
           </label>
           <input
@@ -301,35 +259,38 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
             id="visitDate"
             value={visitorDate}
             onChange={(e) => setVisitorDate(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             required
           />
         </div>
         <button
           type="submit"
           disabled={isSubmittingVisitor}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md shadow-blue-500/20 disabled:bg-blue-300 transition-all"
         >
           {isSubmittingVisitor ? "Autorizando..." : "Autorizar Ingreso"}
         </button>
-        {visitorFeedback && <p className="text-sm text-green-600 text-center">{visitorFeedback}</p>}
+        {visitorFeedback && <p className="text-xs text-green-600 font-semibold text-center mt-2">{visitorFeedback}</p>}
       </form>
     </div>
   );
 
   const renderPackageForm = () => (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold text-gray-700 mb-4">Registrar Paquete</h3>
+    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Icon name="package" className="w-4 h-4 text-blue-600" />
+        <span>Registrar Paquete / Correspondencia</span>
+      </h3>
       <form onSubmit={handleRegisterPackage} className="space-y-4">
         <div>
-          <label htmlFor="apartmentPackage" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="apartmentPackage" className="block text-xs font-semibold text-gray-700 mb-1">
             Apartamento
           </label>
           <select
             id="apartmentPackage"
             value={pkgApartment}
             onChange={(e) => setPkgApartment(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md bg-white"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           >
             {residents.map((r) => (
               <option key={r.apartment} value={r.apartment}>
@@ -339,7 +300,7 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
           </select>
         </div>
         <div>
-          <label htmlFor="courier" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="courier" className="block text-xs font-semibold text-gray-700 mb-1">
             Empresa de Transporte
           </label>
           <input
@@ -347,13 +308,13 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
             id="courier"
             value={pkgCourier}
             onChange={(e) => setPkgCourier(e.target.value)}
-            placeholder="Ej: Servientrega"
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+            placeholder="Ej: Servientrega, Envia"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             required
           />
         </div>
         <div>
-          <label htmlFor="trackingNumber" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="trackingNumber" className="block text-xs font-semibold text-gray-700 mb-1">
             Número de Guía (Opcional)
           </label>
           <input
@@ -361,124 +322,81 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
             id="trackingNumber"
             value={pkgTracking}
             onChange={(e) => setPkgTracking(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+            className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
         <button
           type="submit"
           disabled={isSubmittingPackage}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md shadow-blue-500/20 disabled:bg-blue-300 transition-all"
         >
           {isSubmittingPackage ? "Registrando..." : "Registrar Recepción"}
         </button>
-        {packageFeedback && <p className="text-sm text-green-600 text-center">{packageFeedback}</p>}
+        {packageFeedback && <p className="text-xs text-green-600 font-semibold text-center mt-2">{packageFeedback}</p>}
       </form>
     </div>
   );
 
   const renderVisitorsTable = () => (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="md:hidden space-y-3 p-4">
-        {visitorLogs.map((log) => (
-          <div key={log.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <p className="font-semibold text-gray-900 text-sm truncate">{log.visitorName}</p>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${getStatusChipStyle(log.status)}`}>
-                {log.status}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mb-3">Apto {log.apartment} � {log.date}</p>
-            <div className="flex items-center gap-4 text-xs text-gray-600 mb-3">
-              <span className="flex items-center gap-1">
-                <Icon name="log-in" className="w-3.5 h-3.5 text-gray-400" />
-                {log.entryTime || "N/A"}
-              </span>
-              <span className="flex items-center gap-1">
-                <Icon name="log-in" className="w-3.5 h-3.5 text-gray-400 rotate-180" />
-                {log.exitTime || "N/A"}
-              </span>
-            </div>
-            {log.status === "Autorizado" && (
-              <button
-                onClick={() => openPinModal("register_entry", { logId: log.id })}
-                disabled={updatingLogId === log.id}
-                className="w-full text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-wait"
-              >
-                {updatingLogId === log.id ? "Registrando..." : "Registrar Ingreso"}
-              </button>
-            )}
-            {log.status === "Ingresó" && (
-              <button
-                onClick={() => openPinModal("register_exit", { logId: log.id })}
-                disabled={updatingLogId === log.id}
-                className="w-full text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-wait"
-              >
-                {updatingLogId === log.id ? "Registrando..." : "Registrar Salida"}
-              </button>
-            )}
-            {log.status === "Salió" && (
-              <p className="text-center text-xs text-gray-500 font-medium py-2">Visita Completada</p>
-            )}
-          </div>
-        ))}
-        {visitorLogs.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <Icon name="user" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm">No hay visitas registradas</p>
-          </div>
-        )}
-      </div>
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm text-left text-gray-500">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left text-gray-600">
+          <thead className="text-[11px] text-gray-700 uppercase bg-gray-50 font-bold border-b border-gray-200">
             <tr>
-              <th scope="col" className="px-6 py-3">Fecha</th>
-              <th scope="col" className="px-6 py-3">Visitante</th>
-              <th scope="col" className="px-6 py-3">Apartamento</th>
-              <th scope="col" className="px-6 py-3">Estado</th>
-              <th scope="col" className="px-6 py-3">Hora Ingreso</th>
-              <th scope="col" className="px-6 py-3">Hora Salida</th>
-              <th scope="col" className="px-6 py-3 text-center">Acciones</th>
+              <th className="px-4 py-3">Fecha</th>
+              <th className="px-4 py-3">Visitante</th>
+              <th className="px-4 py-3">Apartamento</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Hora Ingreso</th>
+              <th className="px-4 py-3">Hora Salida</th>
+              <th className="px-4 py-3 text-center">Acciones</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {visitorLogs.map((log) => (
-              <tr key={log.id} className="bg-white border-b hover:bg-gray-50">
-                <td className="px-6 py-4">{log.date}</td>
-                <td className="px-6 py-4 font-medium text-gray-900">{log.visitorName}</td>
-                <td className="px-6 py-4">{log.apartment}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusChipStyle(log.status)}`}>
+              <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 whitespace-nowrap text-gray-500">{log.date}</td>
+                <td className="px-4 py-3 font-semibold text-gray-900">{log.visitorName}</td>
+                <td className="px-4 py-3 font-medium">Apto {log.apartment}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full ${getStatusChipStyle(log.status)}`}>
                     {log.status}
                   </span>
                 </td>
-                <td className="px-6 py-4">{log.entryTime || "N/A"}</td>
-                <td className="px-6 py-4">{log.exitTime || "N/A"}</td>
-                <td className="px-6 py-4 text-center">
+                <td className="px-4 py-3">{log.entryTime || "—"}</td>
+                <td className="px-4 py-3">{log.exitTime || "—"}</td>
+                <td className="px-4 py-3 text-center">
                   {log.status === "Autorizado" && (
                     <button
-                      onClick={() => openPinModal("register_entry", { logId: log.id })}
+                      onClick={() => handleRegisterEntry(log.id)}
                       disabled={updatingLogId === log.id}
-                      className="font-medium text-blue-600 hover:underline text-xs disabled:text-gray-400 disabled:cursor-wait"
+                      className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                     >
-                      {updatingLogId === log.id ? "Registrando..." : "Registrar Ingreso"}
+                      Ingreso
                     </button>
                   )}
                   {log.status === "Ingresó" && (
                     <button
-                      onClick={() => openPinModal("register_exit", { logId: log.id })}
+                      onClick={() => handleRegisterExit(log.id)}
                       disabled={updatingLogId === log.id}
-                      className="font-medium text-green-600 hover:underline text-xs disabled:text-gray-400 disabled:cursor-wait"
+                      className="px-2.5 py-1 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
                     >
-                      {updatingLogId === log.id ? "Registrando..." : "Registrar Salida"}
+                      Salida
                     </button>
                   )}
                   {log.status === "Salió" && (
-                    <span className="text-gray-500 text-xs font-medium">Visita Completada</span>
+                    <span className="text-[11px] text-gray-400 font-medium">Completado</span>
                   )}
                 </td>
               </tr>
             ))}
+            {visitorLogs.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center py-10 text-gray-400">
+                  No hay visitas registradas
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -486,73 +404,145 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
   );
 
   const renderPackagesTable = () => (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="md:hidden space-y-3 p-4">
-        {packageLogs.map((log) => (
-          <div key={log.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <p className="font-semibold text-gray-900 text-sm truncate">Apto {log.apartment}</p>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 ${getStatusChipStyle(log.status)}`}>
-                {log.status}
-              </span>
-            </div>
-            <p className="text-sm text-gray-700 mb-1">{log.courier}</p>
-            <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-              <span className="flex items-center gap-1">
-                <Icon name="clock" className="w-3.5 h-3.5 text-gray-400" />
-                {new Date(log.receivedDate).toLocaleString("es-CO")}
-              </span>
-              {log.trackingNumber && <span className="truncate">Guía: {log.trackingNumber}</span>}
-            </div>
-            <button
-              onClick={() => openPinModal("mark_delivered", { packageId: log.id })}
-              disabled={log.status === "Entregado"}
-              className="w-full text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg py-2 px-3 transition-colors disabled:text-gray-400 disabled:bg-gray-50 disabled:cursor-not-allowed"
-            >
-              {log.status === "Entregado" ? "Entregado" : "Marcar Entregado"}
-            </button>
-          </div>
-        ))}
-        {packageLogs.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <Icon name="package" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm">No hay paquetes registrados</p>
-          </div>
-        )}
-      </div>
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm text-left text-gray-500">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left text-gray-600">
+          <thead className="text-[11px] text-gray-700 uppercase bg-gray-50 font-bold border-b border-gray-200">
             <tr>
-              <th scope="col" className="px-6 py-3">Fecha Recepción</th>
-              <th scope="col" className="px-6 py-3">Apartamento</th>
-              <th scope="col" className="px-6 py-3">Transportadora</th>
-              <th scope="col" className="px-6 py-3">Estado</th>
-              <th scope="col" className="px-6 py-3 text-right">Acciones</th>
+              <th className="px-4 py-3">Fecha Recepción</th>
+              <th className="px-4 py-3">Apartamento</th>
+              <th className="px-4 py-3">Empresa</th>
+              <th className="px-4 py-3">Guía</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3 text-center">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            {packageLogs.map((log) => (
-              <tr key={log.id} className="bg-white border-b hover:bg-gray-50">
-                <td className="px-6 py-4">{new Date(log.receivedDate).toLocaleString("es-CO")}</td>
-                <td className="px-6 py-4 font-medium text-gray-900">{log.apartment}</td>
-                <td className="px-6 py-4">{log.courier}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusChipStyle(log.status)}`}>
-                    {log.status}
+          <tbody className="divide-y divide-gray-100">
+            {packageLogs.map((pkg) => (
+              <tr key={pkg.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 whitespace-nowrap text-gray-500">{pkg.receivedDate}</td>
+                <td className="px-4 py-3 font-semibold text-gray-900">Apto {pkg.apartment}</td>
+                <td className="px-4 py-3 font-medium">{pkg.courier}</td>
+                <td className="px-4 py-3 font-mono text-gray-500">{pkg.trackingNumber || "—"}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full ${getStatusChipStyle(pkg.status)}`}>
+                    {pkg.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  <button
-                    onClick={() => openPinModal("mark_delivered", { packageId: log.id })}
-                    disabled={log.status === "Entregado"}
-                    className="font-medium text-green-600 hover:underline text-xs disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
-                  >
-                    Marcar Entregado
-                  </button>
+                <td className="px-4 py-3 text-center">
+                  {pkg.status === "En recepción" ? (
+                    <button
+                      onClick={() => handleMarkDelivered(pkg.id)}
+                      className="px-2.5 py-1 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                    >
+                      Marcar Entregado
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-gray-400 font-medium">Entregado</span>
+                  )}
                 </td>
               </tr>
             ))}
+            {packageLogs.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-center py-10 text-gray-400">
+                  No hay paquetes registrados
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderAuditoriaTab = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">Bitácora Legal de Turnos de Vigilancia</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Registro histórico inmutable de aperturas, cierres y novedades de servicio por estación.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+        >
+          <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          Actualizar Bitácora
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left text-gray-600">
+          <thead className="text-[11px] text-gray-700 uppercase bg-gray-50 font-bold border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-3">Estación</th>
+              <th className="px-4 py-3">Vigilante en Turno</th>
+              <th className="px-4 py-3">Cédula</th>
+              <th className="px-4 py-3">Tipo de Turno</th>
+              <th className="px-4 py-3">Inicio de Turno</th>
+              <th className="px-4 py-3">Cierre de Turno</th>
+              <th className="px-4 py-3 text-center">Estado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {turnosAuditoria.map((turno) => (
+              <tr key={turno.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3">
+                  <span className="font-bold text-gray-900 block">{turno.estacion_nombre}</span>
+                  <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                    {turno.codigo_estacion}
+                  </span>
+                </td>
+                <td className="px-4 py-3 font-semibold text-gray-800">
+                  {turno.vigilante_nombre}
+                  {turno.motivo_reemplazo && (
+                    <span className="block text-[10px] font-normal text-amber-700 mt-0.5 italic">
+                      Motivo: {turno.motivo_reemplazo}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 font-mono text-gray-700">{turno.vigilante_cedula}</td>
+                <td className="px-4 py-3">
+                  {turno.es_emergencia ? (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">
+                      Reemplazo / Emergencia
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">
+                      Ordinario
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-700 font-medium">
+                  {formatDateTime(turno.fecha_inicio)}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-700 font-medium">
+                  {formatDateTime(turno.fecha_fin)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {turno.estado === "ACTIVO" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-green-100 text-green-800 font-bold text-[10px] rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse"></span>
+                      ACTIVO
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 bg-gray-100 text-gray-600 font-semibold text-[10px] rounded-full">
+                      FINALIZADO
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {turnosAuditoria.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center py-12 text-gray-400">
+                  No hay registros de turnos de vigilancia en la bitácora histórica.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -560,79 +550,78 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
   );
 
   return (
-    <div>
-      {/* Shift Control Header Card */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-wrap justify-between items-center gap-4">
+    <div className="space-y-6">
+      {/* Top Banner with Kiosk Access Link */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-5 rounded-2xl shadow-lg flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeShift ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-            <Icon name="shield" className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white">
+            <Icon name="shield" className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 text-sm">Control Operativo de Portería</h3>
-            {activeShift ? (
-              <p className="text-xs text-green-700 font-semibold flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                Turno Activo: <span className="font-bold">{activeShift.guardName}</span> (Iniciado {activeShift.startedAt})
-                {activeShift.isEmergency && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] rounded-full">Novedad</span>}
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500 mt-0.5">Sin turno activo en este punto de acceso.</p>
-            )}
+            <h2 className="text-lg font-bold">Módulo de Seguridad y Vigilancia</h2>
+            <p className="text-xs text-blue-100 mt-0.5">
+              Supervisión administrativa de puntos de acceso, bitácoras de visitantes y auditoría de turnos.
+            </p>
           </div>
         </div>
 
-        <div>
-          {activeShift ? (
-            <button
-              onClick={() => setIsShiftModalOpen(true)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <Icon name="user-check" className="w-4 h-4 text-gray-600" />
-              Cambiar / Cerrar Turno
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsShiftModalOpen(true)}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-            >
-              <Icon name="log-in" className="w-4 h-4" />
-              Inicia Turno
-            </button>
-          )}
-        </div>
+        <a
+          href="/seguridad/kiosco"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2.5 bg-white text-blue-800 hover:bg-blue-50 font-bold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+        >
+          <Icon name="external-link" className="w-4 h-4" />
+          <span>Abrir Kiosco de Portería</span>
+        </a>
       </div>
 
-      <div className="mb-4 border-b border-gray-200">
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
         <nav className="-mb-px flex justify-between items-center" aria-label="Tabs">
           <div className="flex space-x-6">
-            {(["Visitantes", "Paquetes"] as SeguridadTab[]).map((tab) => {
-              const subtabId = "subtab-seguridad-" + tab.toLowerCase().replace(/[óíáéú]/g, (c) => ({ ó: "o", í: "i", á: "a", é: "e", ú: "u" })[c] || c);
-              return (
-                <button
-                  key={tab}
-                  id={subtabId}
-                  onClick={() => setActiveTab(tab)}
-                  className={`${activeTab === tab ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"} whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
-                >
-                  {tab}
-                </button>
-              );
-            })}
+            {(["Visitantes", "Paquetes", "Auditoría de Turnos"] as SeguridadTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`${
+                  activeTab === tab
+                    ? "border-blue-600 text-blue-600 font-bold"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium"
+                } whitespace-nowrap py-3 px-1 border-b-2 text-sm transition-all`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+          <button
+            onClick={handleRefresh}
+            className="p-2 text-gray-500 hover:text-gray-800 rounded-xl hover:bg-gray-100 transition-colors"
+            title="Refrescar datos"
+          >
             <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
         </nav>
       </div>
 
       {actionFeedback && (
-        <div className={`p-3 mb-4 rounded-md text-sm ${actionFeedback.type === "error" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>
-          {actionFeedback.text}
+        <div
+          className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+            actionFeedback.type === "error" ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-700 border border-green-200"
+          }`}
+        >
+          <Icon name={actionFeedback.type === "error" ? "alert-triangle" : "check"} className="w-4 h-4 flex-shrink-0" />
+          <span>{actionFeedback.text}</span>
         </div>
       )}
 
       {isLoading ? (
-        <div className="text-center p-10">Cargando datos...</div>
+        <div className="text-center py-16 text-gray-400">
+          <Icon name="refresh-cw" className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-600" />
+          <p className="text-xs font-medium">Cargando módulo de seguridad...</p>
+        </div>
+      ) : activeTab === "Auditoría de Turnos" ? (
+        renderAuditoriaTab()
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
@@ -643,36 +632,6 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile, selectedAcce
           </div>
         </div>
       )}
-
-      <ShiftModal
-        isOpen={isShiftModalOpen}
-        onClose={() => setIsShiftModalOpen(false)}
-        onStartShift={handleStartShift}
-        conjuntoId={userProfile.conjuntoId || ""}
-        accessPointName={accessPoints.find(ap => ap.id === selectedAccessPointId)?.name || "Portería Principal"}
-      />
-
-      <PinVerificationModal
-        isOpen={pinModalOpen}
-        onClose={() => {
-          setPinModalOpen(false);
-          setPendingAction(null);
-        }}
-        onVerify={handlePinVerified}
-        conjuntoId={userProfile.conjuntoId || ""}
-        title="Verificar Identidad"
-        actionDescription={
-          pendingAction
-            ? {
-                authorize_visitor: `Autorizar visitante: ${pendingAction.data.visitorName}`,
-                register_package: `Registrar paquete para Apto ${pendingAction.data.pkgApartment}`,
-                register_entry: "Registrar ingreso de visitante",
-                register_exit: "Registrar salida de visitante",
-                mark_delivered: "Marcar paquete como entregado",
-              }[pendingAction.type]
-            : "Confirme su identidad para continuar"
-        }
-      />
     </div>
   );
 };

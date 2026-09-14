@@ -46,12 +46,80 @@ export interface AccessPoint {
   usuarioId?: string;
 }
 
+export interface Estacion {
+  id: string;
+  conjunto_id: string;
+  codigo_estacion: string;
+  nombre: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface EstacionSession {
+  id: string;
+  conjunto_id: string;
+  conjunto_nombre: string;
+  codigo_estacion: string;
+  nombre: string;
+}
+
+export interface Vigilante {
+  id: string;
+  conjunto_id: string;
+  cedula: string;
+  nombre_completo: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface TurnoVigilancia {
+  id: string;
+  estacion_id: string;
+  vigilante_id?: string | null;
+  vigilante_nombre_reemplazo?: string | null;
+  motivo_reemplazo?: string | null;
+  es_emergencia: boolean;
+  fecha_inicio: string;
+  fecha_fin?: string | null;
+  estado: 'ACTIVO' | 'FINALIZADO';
+  total_novedades?: number;
+}
+
+export interface VigilanteSession {
+  turno_id: string;
+  estacion_id: string;
+  vigilante_id?: string | null;
+  vigilante_nombre: string;
+  es_emergencia: boolean;
+  fecha_inicio: string;
+  estado: 'ACTIVO' | 'FINALIZADO';
+}
+
+export interface TurnoAuditoriaItem {
+  id: string;
+  estacion_id: string;
+  estacion_nombre: string;
+  codigo_estacion: string;
+  vigilante_id?: string | null;
+  vigilante_nombre: string;
+  vigilante_cedula: string;
+  es_emergencia: boolean;
+  motivo_reemplazo?: string | null;
+  fecha_inicio: string;
+  fecha_fin?: string | null;
+  estado: 'ACTIVO' | 'FINALIZADO';
+  total_novedades: number;
+}
+
 export interface ActiveShift {
   guardName: string;
   isEmergency: boolean;
   noveltyNote?: string;
   startedAt: string;
   accessPointId?: number;
+  turnoId?: string;
+  estacionId?: string;
+  vigilanteId?: string;
 }
 
 export interface Message {

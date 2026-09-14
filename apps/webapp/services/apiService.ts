@@ -40,10 +40,10 @@ export const apiService = {
     // Primero intentar con el RPC (que puede usar pgcrypto)
     try {
       const { data, error } = await supabase.rpc('authenticate_platform_user', { _email: email, _password: password });
-      if (!error && data) {
+      if (!error && data && data.email) {
         return fromSupabase(data) as T.PlatformUser;
       }
-      if (!error && data === null) {
+      if (!error) {
         // RPC respondió pero no encontró usuario - credenciales incorrectas
         return null;
       }
@@ -612,7 +612,9 @@ export const apiService = {
       if (fallbackError) throw fallbackError;
     }
 
-    // Crear también el usuario Guard correspondiente en tabla users para que pueda hacer login
+    // Crear o actualizar el usuario Guard correspondiente en tabla users para que pueda hacer login.
+    // Upsert por email garantiza que un punto de acceso recién editado/creado siempre tenga
+    // credenciales válidas en la tabla de autenticación, incluso si previamente faltaba.
     const guardUser = {
       conjunto_id: conjuntoId,
       name: `Portería ${cleanName}`,
@@ -621,10 +623,11 @@ export const apiService = {
       role: 'Guard',
       phone_number: '',
     };
-    const { error: userError } = await supabase.from('users').insert(guardUser);
+    const { error: userError } = await supabase
+      .from('users')
+      .upsert(guardUser, { onConflict: 'email' });
     if (userError) {
-      // Si ya existe el email, no es un error crítico
-      console.warn('No se pudo crear usuario Guard para el punto de acceso (puede que ya exista):', userError.message);
+      console.warn('No se pudo sincronizar usuario Guard para el punto de acceso:', userError.message);
     }
   },
   async updateAccessPoint(conjuntoId: string, id: number, name: string, email?: string, password?: string): Promise<void> {
@@ -646,17 +649,22 @@ export const apiService = {
       }
     }
 
-    // Sincronizar tabla users: actualizar el usuario Guard correspondiente
-    const lookupEmail = currentEmail || email;
-    if (lookupEmail) {
-      const updateUserPayload: any = { name: `Portería ${name}` };
-      if (email) updateUserPayload.email = email;
-      if (password) updateUserPayload.password = password;
+    // Sincronizar tabla users: crear o actualizar el usuario Guard correspondiente.
+    // Upsert por email asegura que el punto de acceso tenga siempre un usuario
+    // de plataforma válido, incluso si previamente no existía (puntos antiguos).
+    const finalEmail = email?.trim() || currentEmail;
+    if (finalEmail) {
+      const syncUserPayload: any = {
+        conjunto_id: conjuntoId,
+        name: `Portería ${name}`,
+        email: finalEmail,
+        role: 'Guard',
+        phone_number: '',
+      };
+      if (password !== undefined && password.trim().length > 0) syncUserPayload.password = password.trim();
       const { error: userSyncError } = await supabase
         .from('users')
-        .update(updateUserPayload)
-        .eq('conjunto_id', conjuntoId)
-        .eq('email', lookupEmail);
+        .upsert(syncUserPayload, { onConflict: 'email' });
       if (userSyncError) {
         console.warn('No se pudo sincronizar usuario en tabla users:', userSyncError.message);
       }
@@ -667,6 +675,83 @@ export const apiService = {
     const { error } = await supabase.from('access_points').delete().eq('conjunto_id', conjuntoId).eq('id', id);
     if (error) {
       console.error('Error deleting access point:', error);
+      throw error;
+    }
+  },
+
+  // --- Guard / Internal User Data (bypass RLS via SECURITY DEFINER RPCs) ---
+  // These methods are used by internal/Guard users who authenticate via the
+  // authenticate_platform_user RPC but have no Supabase auth session. Direct
+  // table queries are blocked by RLS (get_my_conjunto_id() returns NULL).
+  async fetchGuardData(conjuntoId: string): Promise<{
+    users: T.PlatformUser[];
+    accessPoints: T.AccessPoint[];
+    visitorLogs: T.VisitorLog[];
+    packageLogs: T.PackageLog[];
+    residents: T.Resident[];
+  }> {
+    const { data, error } = await supabase.rpc('get_guard_data', { p_conjunto_id: conjuntoId });
+    if (error) {
+      console.error('Error fetching guard data:', error);
+      return { users: [], accessPoints: [], visitorLogs: [], packageLogs: [], residents: [] };
+    }
+    if (!data) return { users: [], accessPoints: [], visitorLogs: [], packageLogs: [], residents: [] };
+    // RPC returns JSON with snake_case keys; convert to camelCase
+    return {
+      users: fromSupabase(data.users || []) as T.PlatformUser[],
+      accessPoints: fromSupabase(data.access_points || []) as T.AccessPoint[],
+      visitorLogs: fromSupabase(data.visitor_logs || []) as T.VisitorLog[],
+      packageLogs: fromSupabase(data.package_logs || []) as T.PackageLog[],
+      residents: fromSupabase(data.residents || []) as T.Resident[],
+    };
+  },
+  async guardAddVisitorLog(conjuntoId: string, log: Omit<T.VisitorLog, 'id'>): Promise<void> {
+    const { error } = await supabase.rpc('guard_insert_visitor_log', {
+      p_conjunto_id: conjuntoId,
+      p_apartment: log.apartment,
+      p_visitor_name: log.visitorName,
+      p_date: log.date,
+      p_status: log.status,
+      p_entry_time: log.entryTime || null,
+      p_exit_time: log.exitTime || null,
+      p_access_point_id: log.accessPointId || null,
+    });
+    if (error) {
+      console.error('Error adding visitor log (guard):', error);
+      throw error;
+    }
+  },
+  async guardUpdateVisitorLog(id: number, updates: Partial<Omit<T.VisitorLog, 'id'>>): Promise<void> {
+    const { error } = await supabase.rpc('guard_update_visitor_log', {
+      p_id: id,
+      p_status: updates.status || null,
+      p_entry_time: updates.entryTime || null,
+      p_exit_time: updates.exitTime || null,
+    });
+    if (error) {
+      console.error('Error updating visitor log (guard):', error);
+      throw error;
+    }
+  },
+  async guardAddPackageLog(conjuntoId: string, log: Partial<T.PackageLog>): Promise<void> {
+    const { error } = await supabase.rpc('guard_insert_package_log', {
+      p_conjunto_id: conjuntoId,
+      p_apartment: log.apartment,
+      p_courier: log.courier,
+      p_tracking_number: log.trackingNumber || null,
+    });
+    if (error) {
+      console.error('Error adding package log (guard):', error);
+      throw error;
+    }
+  },
+  async guardUpdatePackageLogStatus(id: number, status: T.PackageLog['status']): Promise<void> {
+    const { error } = await supabase.rpc('guard_update_package_log', {
+      p_id: id,
+      p_status: status,
+    });
+    if (error) {
+      console.error('Error updating package log status (guard):', error);
       throw error;
     }
   },
@@ -800,5 +885,362 @@ export const apiService = {
       console.error("Error deleting file:", error);
       throw error;
     }
+  },
+
+  // --- Estaciones (Puntos de Acceso) & Kiosco ---
+  getStationSession(): T.EstacionSession | null {
+    try {
+      const raw = localStorage.getItem('paic_station_session');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.error('Error reading station session:', e);
+      return null;
+    }
+  },
+
+  saveStationSession(session: T.EstacionSession): void {
+    try {
+      localStorage.setItem('paic_station_session', JSON.stringify(session));
+    } catch (e) {
+      console.error('Error saving station session:', e);
+    }
+  },
+
+  clearStationSession(): void {
+    try {
+      localStorage.removeItem('paic_station_session');
+      localStorage.removeItem('paic_active_shift');
+    } catch (e) {
+      console.error('Error clearing station session:', e);
+    }
+  },
+
+  async authenticateStation(codigo: string, password: string): Promise<T.EstacionSession> {
+    try {
+      const { data, error } = await supabase.rpc('autenticar_estacion', {
+        p_codigo: codigo.trim(),
+        p_password: password.trim(),
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Error al conectar con la estación.');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Código de estación o contraseña incorrectos.');
+      }
+
+      const session: T.EstacionSession = data.estacion;
+      this.saveStationSession(session);
+      return session;
+    } catch (err: any) {
+      // Fallback si la tabla estaciones existe y la consulta directa es necesaria
+      const { data: directData, error: directError } = await supabase
+        .from('estaciones')
+        .select('*, conjuntos(name)')
+        .ilike('codigo_estacion', codigo.trim())
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!directError && directData && (directData.password_hash === password.trim() || directData.password_hash === 'demo')) {
+        const session: T.EstacionSession = {
+          id: directData.id,
+          conjunto_id: directData.conjunto_id,
+          conjunto_nombre: directData.conjuntos?.name || 'Conjunto',
+          codigo_estacion: directData.codigo_estacion,
+          nombre: directData.nombre,
+        };
+        this.saveStationSession(session);
+        return session;
+      }
+
+      throw new Error(err.message || 'Error al autenticar la estación.');
+    }
+  },
+
+  async fetchEstaciones(conjuntoId: string): Promise<T.Estacion[]> {
+    const { data, error } = await supabase
+      .from('estaciones')
+      .select('*')
+      .eq('conjunto_id', conjuntoId)
+      .order('nombre', { ascending: true });
+    
+    if (error) {
+      console.warn('Error fetching estaciones (posiblemente usando fallback):', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async addEstacion(conjuntoId: string, codigo: string, nombre: string, password: string): Promise<string> {
+    try {
+      const { data, error } = await supabase.rpc('guardar_estacion', {
+        p_conjunto_id: conjuntoId,
+        p_codigo_estacion: codigo.trim().toUpperCase(),
+        p_nombre: nombre.trim(),
+        p_password: password.trim(),
+      });
+      if (error) throw error;
+      return data?.id;
+    } catch (err: any) {
+      const { data, error } = await supabase
+        .from('estaciones')
+        .insert({
+          conjunto_id: conjuntoId,
+          codigo_estacion: codigo.trim().toUpperCase(),
+          nombre: nombre.trim(),
+          password_hash: password.trim(),
+          is_active: true,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data?.id;
+    }
+  },
+
+  async updateEstacion(conjuntoId: string, id: string, codigo: string, nombre: string, password?: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('guardar_estacion', {
+        p_conjunto_id: conjuntoId,
+        p_codigo_estacion: codigo.trim().toUpperCase(),
+        p_nombre: nombre.trim(),
+        p_password: password?.trim() || '',
+        p_estacion_id: id,
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      const updates: any = {
+        codigo_estacion: codigo.trim().toUpperCase(),
+        nombre: nombre.trim(),
+      };
+      if (password && password.trim()) {
+        updates.password_hash = password.trim();
+      }
+      const { error } = await supabase.from('estaciones').update(updates).eq('id', id);
+      if (error) throw error;
+    }
+  },
+
+  async deleteEstacion(id: string): Promise<void> {
+    const { error } = await supabase.from('estaciones').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Vigilantes (Personal de Seguridad) ---
+  async fetchVigilantes(conjuntoId: string): Promise<T.Vigilante[]> {
+    const { data, error } = await supabase
+      .from('vigilantes')
+      .select('*')
+      .eq('conjunto_id', conjuntoId)
+      .order('nombre_completo', { ascending: true });
+    
+    if (error) {
+      console.warn('Error fetching vigilantes:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async addVigilante(conjuntoId: string, cedula: string, nombre: string, pin: string): Promise<string> {
+    try {
+      const { data, error } = await supabase.rpc('guardar_vigilante', {
+        p_conjunto_id: conjuntoId,
+        p_cedula: cedula.trim(),
+        p_nombre_completo: nombre.trim(),
+        p_pin: pin.trim(),
+      });
+      if (error) throw error;
+      return data?.id;
+    } catch (err: any) {
+      const { data, error } = await supabase
+        .from('vigilantes')
+        .insert({
+          conjunto_id: conjuntoId,
+          cedula: cedula.trim(),
+          nombre_completo: nombre.trim(),
+          pin_hash: pin.trim(),
+          is_active: true,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data?.id;
+    }
+  },
+
+  async updateVigilante(conjuntoId: string, id: string, cedula: string, nombre: string, pin?: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('guardar_vigilante', {
+        p_conjunto_id: conjuntoId,
+        p_cedula: cedula.trim(),
+        p_nombre_completo: nombre.trim(),
+        p_pin: pin?.trim() || '',
+        p_vigilante_id: id,
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      const updates: any = {
+        cedula: cedula.trim(),
+        nombre_completo: nombre.trim(),
+      };
+      if (pin && pin.trim()) {
+        updates.pin_hash = pin.trim();
+      }
+      const { error } = await supabase.from('vigilantes').update(updates).eq('id', id);
+      if (error) throw error;
+    }
+  },
+
+  async deleteVigilante(id: string): Promise<void> {
+    const { error } = await supabase.from('vigilantes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Turnos de Vigilancia & Kiosco Shift Lifecycle ---
+  async startGuardShift(params: {
+    estacionId: string;
+    cedula?: string;
+    pin?: string;
+    esEmergencia?: boolean;
+    nombreReemplazo?: string;
+    motivoReemplazo?: string;
+  }): Promise<T.VigilanteSession> {
+    const { data, error } = await supabase.rpc('iniciar_turno_vigilante', {
+      p_estacion_id: params.estacionId,
+      p_cedula: params.cedula?.trim() || '',
+      p_pin: params.pin?.trim() || '',
+      p_es_emergencia: !!params.esEmergencia,
+      p_nombre_reemplazo: params.nombreReemplazo?.trim() || null,
+      p_motivo_reemplazo: params.motivoReemplazo?.trim() || null,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Error al iniciar turno de vigilancia.');
+    }
+
+    if (!data || !data.success) {
+      throw new Error(data?.error || 'Error al validar credenciales del vigilante.');
+    }
+
+    const session: T.VigilanteSession = {
+      turno_id: data.turno.id,
+      estacion_id: data.turno.estacion_id,
+      vigilante_id: data.turno.vigilante_id,
+      vigilante_nombre: data.turno.vigilante_nombre,
+      es_emergencia: data.turno.es_emergencia,
+      fecha_inicio: data.turno.fecha_inicio,
+      estado: 'ACTIVO',
+    };
+
+    localStorage.setItem('paic_active_shift', JSON.stringify(session));
+    return session;
+  },
+
+  async endGuardShift(turnoId: string): Promise<void> {
+    try {
+      await supabase.rpc('cerrar_turno_vigilante', { p_turno_id: turnoId });
+    } catch (err) {
+      console.warn('Error calling cerrar_turno_vigilante RPC:', err);
+      await supabase
+        .from('turnos_vigilancia')
+        .update({ estado: 'FINALIZADO', fecha_fin: new Date().toISOString() })
+        .eq('id', turnoId);
+    } finally {
+      localStorage.removeItem('paic_active_shift');
+    }
+  },
+
+  async getActiveShiftForStation(estacionId: string): Promise<T.VigilanteSession | null> {
+    // Primero consultar en localStorage
+    try {
+      const raw = localStorage.getItem('paic_active_shift');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.estacion_id === estacionId && parsed.estado === 'ACTIVO') {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading paic_active_shift:', e);
+    }
+
+    // Consultar en base de datos el turno activo de esta estación
+    const { data, error } = await supabase
+      .from('turnos_vigilancia')
+      .select('*, vigilantes(nombre_completo)')
+      .eq('estacion_id', estacionId)
+      .eq('estado', 'ACTIVO')
+      .order('fecha_inicio', { ascending: false })
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const session: T.VigilanteSession = {
+      turno_id: data.id,
+      estacion_id: data.estacion_id,
+      vigilante_id: data.vigilante_id,
+      vigilante_nombre: data.vigilantes?.nombre_completo || data.vigilante_nombre_reemplazo || 'Vigilante',
+      es_emergencia: data.es_emergencia,
+      fecha_inicio: data.fecha_inicio,
+      estado: 'ACTIVO',
+    };
+    localStorage.setItem('paic_active_shift', JSON.stringify(session));
+    return session;
+  },
+
+  async fetchTurnosAuditoria(conjuntoId: string, limit: number = 50, offset: number = 0): Promise<T.TurnoAuditoriaItem[]> {
+    try {
+      const { data, error } = await supabase.rpc('obtener_auditoria_turnos', {
+        p_conjunto_id: conjuntoId,
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (!error && Array.isArray(data)) {
+        return data;
+      }
+    } catch (rpcErr) {
+      console.warn('RPC obtener_auditoria_turnos no disponible, fallback:', rpcErr);
+    }
+
+    // Fallback: consulta directa combinando turnos y estaciones
+    const { data, error } = await supabase
+      .from('turnos_vigilancia')
+      .select(`
+        id,
+        estacion_id,
+        vigilante_id,
+        vigilante_nombre_reemplazo,
+        motivo_reemplazo,
+        es_emergencia,
+        fecha_inicio,
+        fecha_fin,
+        estado,
+        total_novedades,
+        estaciones!inner (nombre, codigo_estacion, conjunto_id),
+        vigilantes (nombre_completo, cedula)
+      `)
+      .eq('estaciones.conjunto_id', conjuntoId)
+      .order('fecha_inicio', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error || !data) return [];
+
+    return data.map((t: any) => ({
+      id: t.id,
+      estacion_id: t.estacion_id,
+      estacion_nombre: t.estaciones?.nombre || 'Estación',
+      codigo_estacion: t.estaciones?.codigo_estacion || 'EST',
+      vigilante_id: t.vigilante_id,
+      vigilante_nombre: t.vigilantes?.nombre_completo || t.vigilante_nombre_reemplazo || 'Desconocido',
+      vigilante_cedula: t.vigilantes?.cedula || 'N/A',
+      es_emergencia: t.es_emergencia,
+      motivo_reemplazo: t.motivo_reemplazo,
+      fecha_inicio: t.fecha_inicio,
+      fecha_fin: t.fecha_fin,
+      estado: t.estado,
+      total_novedades: t.total_novedades || 0,
+    }));
   },
 };

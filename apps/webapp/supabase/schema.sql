@@ -461,3 +461,51 @@ CREATE POLICY "Users own their chat messages"
     ON public.chat_messages
     FOR ALL
     USING (auth.uid() = user_id);
+
+-- ============================================
+-- Internal/Platform User Authentication
+-- ============================================
+-- SECURITY DEFINER RPC used by LoginForm to authenticate internal platform
+-- users (portería, contador, etc.) stored in public.users. Bypasses RLS
+-- intentionally, because unauthenticated callers cannot read the users table.
+CREATE OR REPLACE FUNCTION public.authenticate_platform_user(
+  _email text,
+  _password text
+)
+RETURNS public.users
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  user_record public.users%rowtype;
+BEGIN
+  SELECT *
+  INTO user_record
+  FROM public.users
+  WHERE email = _email
+    AND password = _password;
+
+  RETURN user_record;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.authenticate_platform_user(text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.authenticate_platform_user(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.authenticate_platform_user(text, text) TO authenticated;
+
+-- Backfill existing access_points into public.users so porterías created before
+-- this fix can still log in.
+INSERT INTO public.users (conjunto_id, name, email, password, role, phone_number)
+SELECT ap.conjunto_id,
+       'Portería ' || ap.name,
+       ap.email,
+       ap.password,
+       'Guard',
+       ''
+FROM public.access_points ap
+WHERE ap.email IS NOT NULL
+  AND ap.password IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.users u WHERE u.email = ap.email
+  );

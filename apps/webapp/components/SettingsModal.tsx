@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserProfile, ConjuntoInfo, AccessPoint, UserRole, CommonArea, PlatformUser, UserRoleDefinition, Tab } from '../types';
+import { UserProfile, ConjuntoInfo, CommonArea, PlatformUser, UserRoleDefinition, Tab, Estacion, Vigilante, AccessPoint } from '../types';
 import { Icon } from './ui/Icon';
 import { apiService } from '../services/apiService';
 import { SettingsTab } from '../App';
@@ -35,24 +34,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
 
   // Detectar si el trial expiró
-  const isTrialExpired = userProfile.role === UserRole.Trial 
+  const isTrialExpired = userProfile.role === 'trial' 
     && userProfile.trialExpiresAt 
     && new Date(userProfile.trialExpiresAt).getTime() < Date.now()
     && conjuntoInfo.subscriptionPlan === 'Free';
   
-  // States for different tabs
-  const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
-  const [newAccessPointName, setNewAccessPointName] = useState('');
-  const [newAccessPointEmail, setNewAccessPointEmail] = useState('');
-  const [newAccessPointPassword, setNewAccessPointPassword] = useState('');
-  const [showPasswordsMap, setShowPasswordsMap] = useState<Record<number, boolean>>({});
+  // --- Estaciones (Puntos de Acceso Físicos) ---
+  const [estaciones, setEstaciones] = useState<Estacion[]>([]);
+  const [newEstacionCodigo, setNewEstacionCodigo] = useState('');
+  const [newEstacionNombre, setNewEstacionNombre] = useState('');
+  const [newEstacionPassword, setNewEstacionPassword] = useState('');
+  const [editingEstacion, setEditingEstacion] = useState<Estacion | null>(null);
+  const [editEstacionCodigo, setEditEstacionCodigo] = useState('');
+  const [editEstacionNombre, setEditEstacionNombre] = useState('');
+  const [editEstacionPassword, setEditEstacionPassword] = useState('');
+  const [estacionError, setEstacionError] = useState<string | null>(null);
+  const [estacionSuccess, setEstacionSuccess] = useState<string | null>(null);
 
-  const [editingAccessPoint, setEditingAccessPoint] = useState<AccessPoint | null>(null);
-  const [editAccessPointName, setEditAccessPointName] = useState('');
-  const [editAccessPointEmail, setEditAccessPointEmail] = useState('');
-  const [editAccessPointPassword, setEditAccessPointPassword] = useState('');
-  const [accessPointError, setAccessPointError] = useState<string | null>(null);
-  const [accessPointSuccess, setAccessPointSuccess] = useState<string | null>(null);
+  // --- Personal de Seguridad (Vigilantes) ---
+  const [vigilantes, setVigilantes] = useState<Vigilante[]>([]);
+  const [newVigilanteCedula, setNewVigilanteCedula] = useState('');
+  const [newVigilanteNombre, setNewVigilanteNombre] = useState('');
+  const [newVigilantePin, setNewVigilantePin] = useState('');
+  const [editingVigilante, setEditingVigilante] = useState<Vigilante | null>(null);
+  const [editVigilanteCedula, setEditVigilanteCedula] = useState('');
+  const [editVigilanteNombre, setEditVigilanteNombre] = useState('');
+  const [editVigilantePin, setEditVigilantePin] = useState('');
+  const [vigilanteError, setVigilanteError] = useState<string | null>(null);
+  const [vigilanteSuccess, setVigilanteSuccess] = useState<string | null>(null);
 
   const [commonAreas, setCommonAreas] = useState<CommonArea[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
@@ -77,20 +86,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
         switch(tab) {
             case 'Puntos de Acceso':
-                setAccessPoints(await apiService.fetchAccessPoints(userProfile.conjuntoId));
+                setEstaciones(await apiService.fetchEstaciones(userProfile.conjuntoId));
+                break;
+            case 'Personal de Seguridad':
+                setVigilantes(await apiService.fetchVigilantes(userProfile.conjuntoId));
                 break;
             case 'Gestionar Áreas':
                 setCommonAreas(await apiService.fetchCommonAreas(userProfile.conjuntoId));
                 break;
             case 'Usuarios':
-                const [uList, uRoles, uPoints] = await Promise.all([
+                const [uList, uRoles] = await Promise.all([
                     apiService.fetchUsers(userProfile.conjuntoId),
-                    apiService.fetchRoles(userProfile.conjuntoId),
-                    apiService.fetchAccessPoints(userProfile.conjuntoId)
+                    apiService.fetchRoles(userProfile.conjuntoId)
                 ]);
                 setPlatformUsers(uList);
                 setRoles(uRoles);
-                setAccessPoints(uPoints);
                 break;
             case 'Permisos de Usuario':
                  const [users, userRoles] = await Promise.all([
@@ -119,12 +129,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
       setConjuntoData(conjuntoInfo);
       setProfileData(userProfile);
-  }, [conjuntoInfo, userProfile, isOpen])
+  }, [conjuntoInfo, userProfile, isOpen]);
 
   const handleTabClick = (tab: SettingsTab) => {
     setActiveTab(tab);
     fetchDataForTab(tab);
-  }
+  };
 
   // --- Save general settings ---
   const handleSaveChanges = async () => {
@@ -134,73 +144,176 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setUserProfile(profileData);
         setConjuntoInfo(conjuntoData);
         setHasChanges(false);
-        onClose(); // Close modal on success
+        onClose();
     } catch (error) {
         console.error("Error saving settings:", error);
     }
   };
 
-  // --- Access Points Logic ---
-  const handleAddAccessPoint = async () => {
-    if (!newAccessPointName.trim() || !userProfile.conjuntoId) return;
-    setAccessPointError(null);
-    setAccessPointSuccess(null);
-    try {
-      const cleanName = newAccessPointName.trim();
-      const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.');
-      const email = newAccessPointEmail.trim() || `porteria.${slug}@paic.app`;
-      const password = newAccessPointPassword.trim() || `Porteria${Math.floor(1000 + Math.random() * 9000)}!`;
-      await apiService.addAccessPoint(userProfile.conjuntoId, cleanName, email, password);
-      setNewAccessPointName('');
-      setNewAccessPointEmail('');
-      setNewAccessPointPassword('');
-      setAccessPointSuccess(`Punto de acceso "${cleanName}" agregado exitosamente.`);
-      setTimeout(() => setAccessPointSuccess(null), 3000);
-      await fetchDataForTab('Puntos de Acceso');
-    } catch (err: any) {
-      console.error("Error adding access point:", err);
-      setAccessPointError(err.message || "Error al agregar el punto de acceso.");
+  // --- Estaciones Handlers ---
+  const handleAddEstacion = async () => {
+    if (!newEstacionNombre.trim() || !newEstacionCodigo.trim() || !newEstacionPassword.trim() || !userProfile.conjuntoId) {
+      setEstacionError('Complete todos los campos de la estación.');
+      return;
     }
-  };
-
-  const handleOpenEditAccessPoint = (ap: AccessPoint) => {
-    setEditingAccessPoint(ap);
-    setEditAccessPointName(ap.name);
-    setEditAccessPointEmail(ap.email || `porteria.${ap.name.toLowerCase().replace(/\s+/g, '.')}@paic.app`);
-    setEditAccessPointPassword(ap.password || 'Porteria2026!');
-    setAccessPointError(null);
-  };
-
-  const handleSaveEditAccessPoint = async () => {
-    if (!editingAccessPoint || !userProfile.conjuntoId) return;
-    setAccessPointError(null);
+    setEstacionError(null);
+    setEstacionSuccess(null);
     try {
-      await apiService.updateAccessPoint(
+      await apiService.addEstacion(
         userProfile.conjuntoId,
-        editingAccessPoint.id,
-        editAccessPointName.trim(),
-        editAccessPointEmail.trim(),
-        editAccessPointPassword.trim()
+        newEstacionCodigo.trim(),
+        newEstacionNombre.trim(),
+        newEstacionPassword.trim()
       );
-      setEditingAccessPoint(null);
-      setAccessPointSuccess(`Punto de acceso "${editAccessPointName}" actualizado.`);
-      setTimeout(() => setAccessPointSuccess(null), 3000);
+      setNewEstacionCodigo('');
+      setNewEstacionNombre('');
+      setNewEstacionPassword('');
+      setEstacionSuccess(`Estación agregada exitosamente.`);
+      setTimeout(() => setEstacionSuccess(null), 3000);
       await fetchDataForTab('Puntos de Acceso');
     } catch (err: any) {
-      console.error("Error updating access point:", err);
-      setAccessPointError(err.message || "Error al actualizar el punto de acceso.");
+      console.error("Error adding estacion:", err);
+      setEstacionError(err.message || "Error al agregar la estación.");
     }
   };
 
-  const handleDeleteAccessPoint = async (id: number) => { if(userProfile.conjuntoId) { await apiService.deleteAccessPoint(userProfile.conjuntoId, id); fetchDataForTab('Puntos de Acceso'); }};
+  const handleOpenEditEstacion = (est: Estacion) => {
+    setEditingEstacion(est);
+    setEditEstacionCodigo(est.codigo_estacion);
+    setEditEstacionNombre(est.nombre);
+    setEditEstacionPassword('');
+    setEstacionError(null);
+  };
+
+  const handleSaveEditEstacion = async () => {
+    if (!editingEstacion || !userProfile.conjuntoId) return;
+    setEstacionError(null);
+    try {
+      await apiService.updateEstacion(
+        userProfile.conjuntoId,
+        editingEstacion.id,
+        editEstacionCodigo.trim(),
+        editEstacionNombre.trim(),
+        editEstacionPassword.trim() || undefined
+      );
+      setEditingEstacion(null);
+      setEstacionSuccess(`Estación "${editEstacionNombre}" actualizada.`);
+      setTimeout(() => setEstacionSuccess(null), 3000);
+      await fetchDataForTab('Puntos de Acceso');
+    } catch (err: any) {
+      console.error("Error updating estacion:", err);
+      setEstacionError(err.message || "Error al actualizar la estación.");
+    }
+  };
+
+  const handleDeleteEstacion = async (id: string) => {
+    try {
+      await apiService.deleteEstacion(id);
+      fetchDataForTab('Puntos de Acceso');
+    } catch (err: any) {
+      setEstacionError(err.message || "Error al eliminar la estación.");
+    }
+  };
+
+  // --- Vigilantes Handlers ---
+  const handleAddVigilante = async () => {
+    if (!newVigilanteCedula.trim() || !newVigilanteNombre.trim() || !newVigilantePin.trim() || !userProfile.conjuntoId) {
+      setVigilanteError('Complete todos los campos del vigilante.');
+      return;
+    }
+    if (newVigilantePin.trim().length !== 6) {
+      setVigilanteError('El PIN de seguridad debe ser de exactamente 6 dígitos.');
+      return;
+    }
+    setVigilanteError(null);
+    setVigilanteSuccess(null);
+    try {
+      await apiService.addVigilante(
+        userProfile.conjuntoId,
+        newVigilanteCedula.trim(),
+        newVigilanteNombre.trim(),
+        newVigilantePin.trim()
+      );
+      setNewVigilanteCedula('');
+      setNewVigilanteNombre('');
+      setNewVigilantePin('');
+      setVigilanteSuccess(`Vigilante registrado exitosamente con PIN de 6 dígitos.`);
+      setTimeout(() => setVigilanteSuccess(null), 3000);
+      await fetchDataForTab('Personal de Seguridad');
+    } catch (err: any) {
+      console.error("Error adding vigilante:", err);
+      setVigilanteError(err.message || "Error al agregar vigilante.");
+    }
+  };
+
+  const handleOpenEditVigilante = (vig: Vigilante) => {
+    setEditingVigilante(vig);
+    setEditVigilanteCedula(vig.cedula);
+    setEditVigilanteNombre(vig.nombre_completo);
+    setEditVigilantePin('');
+    setVigilanteError(null);
+  };
+
+  const handleSaveEditVigilante = async () => {
+    if (!editingVigilante || !userProfile.conjuntoId) return;
+    if (editVigilantePin.trim() && editVigilantePin.trim().length !== 6) {
+      setVigilanteError('Si modifica el PIN, debe contener exactamente 6 dígitos.');
+      return;
+    }
+    setVigilanteError(null);
+    try {
+      await apiService.updateVigilante(
+        userProfile.conjuntoId,
+        editingVigilante.id,
+        editVigilanteCedula.trim(),
+        editVigilanteNombre.trim(),
+        editVigilantePin.trim() || undefined
+      );
+      setEditingVigilante(null);
+      setVigilanteSuccess(`Vigilante "${editVigilanteNombre}" actualizado.`);
+      setTimeout(() => setVigilanteSuccess(null), 3000);
+      await fetchDataForTab('Personal de Seguridad');
+    } catch (err: any) {
+      console.error("Error updating vigilante:", err);
+      setVigilanteError(err.message || "Error al actualizar vigilante.");
+    }
+  };
+
+  const handleDeleteVigilante = async (id: string) => {
+    try {
+      await apiService.deleteVigilante(id);
+      fetchDataForTab('Personal de Seguridad');
+    } catch (err: any) {
+      setVigilanteError(err.message || "Error al eliminar vigilante.");
+    }
+  };
 
   // --- Common Areas Logic ---
-  const handleAddArea = async () => { if (newAreaName.trim() && userProfile.conjuntoId) { await apiService.addCommonArea(userProfile.conjuntoId, newAreaName.trim()); setNewAreaName(''); fetchDataForTab('Gestionar Áreas'); }};
-  const handleRemoveArea = async (id: string) => { if (userProfile.conjuntoId) { await apiService.removeCommonArea(userProfile.conjuntoId, id); fetchDataForTab('Gestionar Áreas'); }};
+  const handleAddArea = async () => {
+    if (newAreaName.trim() && userProfile.conjuntoId) {
+      await apiService.addCommonArea(userProfile.conjuntoId, newAreaName.trim());
+      setNewAreaName('');
+      fetchDataForTab('Gestionar Áreas');
+    }
+  };
+  const handleRemoveArea = async (id: string) => {
+    if (userProfile.conjuntoId) {
+      await apiService.removeCommonArea(userProfile.conjuntoId, id);
+      fetchDataForTab('Gestionar Áreas');
+    }
+  };
   
   // --- Users & Roles Logic ---
-  const handleUserModalOpen = (user: PlatformUser | null) => { setModalError(null); setSelectedUser(user); setIsUserModalOpen(true); };
-  const handleOpenPermissionEditor = (user: PlatformUser) => { setModalError(null); setEditingUserPermissions(user); setIsRoleModalOpen(true);};
+  const handleUserModalOpen = (user: PlatformUser | null) => {
+    setModalError(null);
+    setSelectedUser(user);
+    setIsUserModalOpen(true);
+  };
+  const handleOpenPermissionEditor = (user: PlatformUser) => {
+    setModalError(null);
+    setEditingUserPermissions(user);
+    setIsRoleModalOpen(true);
+  };
   const handleSaveUser = async (user: PlatformUser) => {
       if (!userProfile.conjuntoId) return;
       setModalError(null);
@@ -211,7 +324,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setIsUserModalOpen(false);
       } catch (error: any) { setModalError(error.message); }
   };
-  const handleDeleteUser = async (userId: number) => { if(userProfile.conjuntoId) { await apiService.deleteUser(userProfile.conjuntoId, userId); fetchDataForTab('Usuarios'); }};
+  const handleDeleteUser = async (userId: number) => {
+    if(userProfile.conjuntoId) {
+      await apiService.deleteUser(userProfile.conjuntoId, userId);
+      fetchDataForTab('Usuarios');
+    }
+  };
   const handleSaveRole = async (role: UserRoleDefinition, userIdToAssign?: number) => {
     if (!userProfile.conjuntoId) return;
     setModalError(null);
@@ -239,30 +357,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const getPermissionsForRole = (roleName: string, allCustomRoles: UserRoleDefinition[]): string[] => {
     switch (roleName) {
-        case UserRole.Admin: case UserRole.Subscriber: case UserRole.Trial: return ['Todos'];
+        case 'admin': case 'subscriber': case 'trial': return ['Todos'];
         case 'Guard': return [Tab.Seguridad];
         case 'Contador': return [Tab.Finanzas];
         default: const customRole = allCustomRoles.find(r => r.name === roleName); return customRole ? customRole.permissions : [];
     }
   };
 
-  // --- Subscription Logic ---
   const handleUpgradeClick = () => {
-    setPaymentError(null);
     setIsPlansModalOpen(true);
   };
 
-
-  // --- Render Functions for each Tab ---
-
   const renderContent = () => {
-      if (isLoadingTabData) {
-          return <div className="text-center p-10 text-gray-500">Cargando...</div>;
-      }
       switch(activeTab) {
         case 'Perfil': return renderProfileTab();
         case 'Conjunto': return renderConjuntoTab();
-        case 'Puntos de Acceso': return renderAccessPointsTab();
+        case 'Puntos de Acceso': return renderEstacionesTab();
+        case 'Personal de Seguridad': return renderVigilantesTab();
         case 'Gestionar Áreas': return renderManageAreasTab();
         case 'Usuarios': return renderUsersTab();
         case 'Permisos de Usuario': return renderRolesTab();
@@ -303,84 +414,199 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
   );
 
-  const toggleShowPassword = (id: number) => {
-    setShowPasswordsMap(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const renderAccessPointsTab = () => (
+  const renderEstacionesTab = () => (
     <div className="space-y-4">
-      {accessPointSuccess && (
+      {estacionSuccess && (
         <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center gap-2">
           <Icon name="check" className="w-4 h-4" />
-          <span>{accessPointSuccess}</span>
+          <span>{estacionSuccess}</span>
         </div>
       )}
-      {accessPointError && (
+      {estacionError && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
           <Icon name="alert-triangle" className="w-4 h-4" />
-          <span>{accessPointError}</span>
+          <span>{estacionError}</span>
         </div>
       )}
 
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Agregar Nuevo Punto de Acceso</h4>
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Icon name="shield" className="w-4 h-4 text-blue-600" />
+          <span>Configurar Nueva Estación / Portería</span>
+        </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del Punto de Acceso</label>
-            <input type="text" value={newAccessPointName} onChange={(e) => setNewAccessPointName(e.target.value)} placeholder="Ej: Portería Principal" className="w-full p-2 border rounded-md text-sm"/>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">ID / Código de Estación *</label>
+            <input
+              type="text"
+              value={newEstacionCodigo}
+              onChange={(e) => setNewEstacionCodigo(e.target.value.toUpperCase())}
+              placeholder="Ej: EST-TORRE1"
+              className="w-full p-2.5 border rounded-lg text-sm uppercase font-mono"
+            />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Correo de Acceso (Opcional)</label>
-            <input type="email" value={newAccessPointEmail} onChange={(e) => setNewAccessPointEmail(e.target.value)} placeholder="Auto-generado si se deja vacío" className="w-full p-2 border rounded-md text-sm"/>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre Descriptivo *</label>
+            <input
+              type="text"
+              value={newEstacionNombre}
+              onChange={(e) => setNewEstacionNombre(e.target.value)}
+              placeholder="Ej: Portería Principal Calle 100"
+              className="w-full p-2.5 border rounded-lg text-sm"
+            />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña (Opcional)</label>
-            <input type="password" value={newAccessPointPassword} onChange={(e) => setNewAccessPointPassword(e.target.value)} placeholder="Auto-generada si se deja vacía" className="w-full p-2 border rounded-md text-sm"/>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Contraseña de Estación *</label>
+            <input
+              type="password"
+              value={newEstacionPassword}
+              onChange={(e) => setNewEstacionPassword(e.target.value)}
+              placeholder="Contraseña del puesto"
+              className="w-full p-2.5 border rounded-lg text-sm"
+            />
           </div>
         </div>
         <div className="flex justify-end">
-          <button onClick={handleAddAccessPoint} disabled={!newAccessPointName.trim()} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 text-sm disabled:opacity-50">
-            Agregar Punto de Acceso
+          <button
+            onClick={handleAddEstacion}
+            disabled={!newEstacionNombre.trim() || !newEstacionCodigo.trim() || !newEstacionPassword.trim()}
+            className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Icon name="plus" className="w-4 h-4" />
+            Guardar Estación
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto max-h-80 border rounded-lg">
+      <div className="overflow-x-auto max-h-80 border rounded-xl">
         <table className="w-full text-sm text-left text-gray-600">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 font-bold">
             <tr>
-              <th className="px-4 py-3">Nombre del Punto de Acceso</th>
-              <th className="px-4 py-3">Correo</th>
-              <th className="px-4 py-3">Contraseña</th>
+              <th className="px-4 py-3">Código</th>
+              <th className="px-4 py-3">Nombre de la Estación</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            {accessPoints.map(point => (
-              <tr key={point.id} className="bg-white border-b hover:bg-gray-50">
-                <td className="px-4 py-3 font-semibold text-gray-800">{point.name}</td>
-                <td className="px-4 py-3 text-gray-600 font-mono text-xs">{point.email || `porteria.${point.name.toLowerCase().replace(/\s+/g, '.')}@paic.app`}</td>
-                <td className="px-4 py-3 font-mono text-xs">
-                  <div className="flex items-center gap-2">
-                    <span>{showPasswordsMap[point.id] ? (point.password || 'Porteria2026!') : '••••••••'}</span>
-                    <button type="button" onClick={() => toggleShowPassword(point.id)} className="text-gray-400 hover:text-gray-600">
-                      <Icon name={showPasswordsMap[point.id] ? 'eye-off' : 'eye'} className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
+          <tbody className="divide-y divide-gray-100">
+            {estaciones.map(est => (
+              <tr key={est.id} className="bg-white hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono font-bold text-blue-700">{est.codigo_estacion}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{est.nombre}</td>
                 <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                  <button onClick={() => handleOpenEditAccessPoint(point)} className="font-medium text-blue-600 hover:underline text-xs mr-2">
+                  <button onClick={() => handleOpenEditEstacion(est)} className="font-medium text-blue-600 hover:underline text-xs mr-2">
                     Editar
                   </button>
-                  <button onClick={() => setConfirmAction({ title: 'Eliminar Punto de Acceso', message: '¿Seguro que quieres eliminar este punto de acceso?', onConfirm: () => handleDeleteAccessPoint(point.id) })} className="font-medium text-red-500 hover:underline text-xs">
+                  <button onClick={() => setConfirmAction({ title: 'Eliminar Estación', message: `¿Seguro que quieres eliminar la estación ${est.nombre}?`, onConfirm: () => handleDeleteEstacion(est.id) })} className="font-medium text-red-500 hover:underline text-xs">
                     Eliminar
                   </button>
                 </td>
               </tr>
             ))}
-            {accessPoints.length === 0 && (
+            {estaciones.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-gray-500">No hay puntos de acceso registrados.</td>
+                <td colSpan={3} className="text-center py-6 text-gray-500">No hay estaciones configuradas.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderVigilantesTab = () => (
+    <div className="space-y-4">
+      {vigilanteSuccess && (
+        <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center gap-2">
+          <Icon name="check" className="w-4 h-4" />
+          <span>{vigilanteSuccess}</span>
+        </div>
+      )}
+      {vigilanteError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
+          <Icon name="alert-triangle" className="w-4 h-4" />
+          <span>{vigilanteError}</span>
+        </div>
+      )}
+
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Icon name="user-check" className="w-4 h-4 text-blue-600" />
+          <span>Registrar Personal de Seguridad (Vigilante)</span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Cédula de Ciudadanía *</label>
+            <input
+              type="text"
+              value={newVigilanteCedula}
+              onChange={(e) => setNewVigilanteCedula(e.target.value.replace(/\D/g, ''))}
+              placeholder="Ej: 1020304050"
+              className="w-full p-2.5 border rounded-lg text-sm font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre Completo *</label>
+            <input
+              type="text"
+              value={newVigilanteNombre}
+              onChange={(e) => setNewVigilanteNombre(e.target.value)}
+              placeholder="Ej: Carlos Andrés Pérez"
+              className="w-full p-2.5 border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">PIN de Seguridad (6 Dígitos) *</label>
+            <input
+              type="password"
+              maxLength={6}
+              value={newVigilantePin}
+              onChange={(e) => setNewVigilantePin(e.target.value.replace(/\D/g, ''))}
+              placeholder="••••••"
+              className="w-full p-2.5 border rounded-lg text-sm font-mono tracking-widest text-center"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={handleAddVigilante}
+            disabled={!newVigilanteCedula.trim() || !newVigilanteNombre.trim() || newVigilantePin.length !== 6}
+            className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Icon name="plus" className="w-4 h-4" />
+            Registrar Vigilante
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto max-h-80 border rounded-xl">
+        <table className="w-full text-sm text-left text-gray-600">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 font-bold">
+            <tr>
+              <th className="px-4 py-3">Cédula</th>
+              <th className="px-4 py-3">Nombre Completo</th>
+              <th className="px-4 py-3">PIN</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {vigilantes.map(vig => (
+              <tr key={vig.id} className="bg-white hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono font-bold text-gray-900">{vig.cedula}</td>
+                <td className="px-4 py-3 font-medium text-gray-800">{vig.nombre_completo}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">•••••• (Encriptado)</td>
+                <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                  <button onClick={() => handleOpenEditVigilante(vig)} className="font-medium text-blue-600 hover:underline text-xs mr-2">
+                    Editar / Resetear PIN
+                  </button>
+                  <button onClick={() => setConfirmAction({ title: 'Eliminar Vigilante', message: `¿Seguro que quieres eliminar a ${vig.nombre_completo}?`, onConfirm: () => handleDeleteVigilante(vig.id) })} className="font-medium text-red-500 hover:underline text-xs">
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {vigilantes.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-6 text-gray-500">No hay vigilantes registrados.</td>
               </tr>
             )}
           </tbody>
@@ -411,7 +637,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <th className="px-6 py-3">Nombre</th>
                     <th className="px-6 py-3">Correo</th>
                     <th className="px-6 py-3">Rol</th>
-                    <th className="px-6 py-3">PIN</th>
                     <th className="px-6 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -421,7 +646,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <td className="px-6 py-4 font-semibold text-gray-800">{user.name}</td>
                       <td className="px-6 py-4">{user.email}</td>
                       <td className="px-6 py-4">{user.role}</td>
-                      <td className="px-6 py-4 font-mono">{user.pin ? user.pin : '••••'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button onClick={() => handleUserModalOpen(user)} className="font-medium text-blue-600 hover:underline">Editar</button>
                         <button onClick={() => setConfirmAction({ title: 'Eliminar Usuario', message: '¿Seguro que quieres eliminar este usuario?', onConfirm: () => handleDeleteUser(user.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
@@ -430,7 +654,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   ))}
                   {platformUsers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-6 text-gray-500">No hay usuarios registrados.</td>
+                      <td colSpan={4} className="text-center py-6 text-gray-500">No hay usuarios registrados.</td>
                     </tr>
                   )}
                 </tbody>
@@ -516,107 +740,151 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
   
+  const allTabs: SettingsTab[] = [
+    'Perfil',
+    'Conjunto',
+    'Gestionar Áreas',
+    'Puntos de Acceso',
+    'Personal de Seguridad',
+    'Usuarios',
+    'Permisos de Usuario',
+    'Suscripción'
+  ];
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-end md:items-center" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl md:rounded-lg shadow-2xl w-full md:w-2/3 lg:w-[48rem] relative flex flex-col max-h-[95vh] md:max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <header className="p-4 md:p-6 border-b"><button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button><h2 className="text-xl md:text-2xl font-bold text-gray-800">Configuración</h2></header>
+      <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:w-3/4 lg:w-[52rem] relative flex flex-col max-h-[95vh] md:max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <header className="p-4 md:p-6 border-b flex justify-between items-center">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800">Configuración</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1 rounded-lg hover:bg-gray-100">
+            <Icon name="x" className="w-6 h-6"/>
+          </button>
+        </header>
 
         <div className="flex flex-1 overflow-hidden md:flex-row">
-                <nav className="hidden md:block w-48 border-r p-4">
-                    <ul className="space-y-1">
-                        {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
-                            const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
-                            return (
-                            <li key={tab}><button id={subtabId} onClick={() => handleTabClick(tab)} className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button></li>
-                            );
-                        })}
-                    </ul>
-                </nav>
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-4 md:p-6 overflow-y-auto">
-                    {renderContent()}
+          <nav className="hidden md:block w-56 border-r p-4 bg-gray-50/50">
+            <ul className="space-y-1">
+              {allTabs.map(tab => {
+                const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+                return (
+                  <li key={tab}>
+                    <button
+                      id={subtabId}
+                      onClick={() => handleTabClick(tab)}
+                      className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                        activeTab === tab ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <main className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-4 md:p-6 overflow-y-auto">
+              {isLoadingTabData ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Icon name="refresh-cw" className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
+                  <p className="text-xs">Cargando...</p>
                 </div>
-                {(activeTab === 'Perfil' || activeTab === 'Conjunto') && (
-                    <footer className="p-4 border-t bg-gray-50 mt-auto flex justify-end gap-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
-                        <button type="button" onClick={handleSaveChanges} disabled={!hasChanges} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300">Guardar Cambios</button>
-                    </footer>
-                )}
-            </main>
-        </div>
-        {/* Mobile: bottom scrollable tabs */}
-        <div className="md:hidden border-t border-gray-200 bg-white overflow-x-auto touch-pan-x pb-[env(safe-area-inset-bottom)]">
-             <nav className="flex space-x-2 px-4 py-2 w-max" aria-label="Tabs de configuración">
-                 {(['Perfil', 'Conjunto', 'Gestionar Áreas', 'Puntos de Acceso', 'Usuarios', 'Permisos de Usuario', 'Suscripción'] as SettingsTab[]).map(tab => {
-                     const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
-                     return (
-                     <button key={tab} id={subtabId} onClick={() => handleTabClick(tab)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>{tab}</button>
-                     );
-                 })}
-             </nav>
+              ) : (
+                renderContent()
+              )}
+            </div>
+            {(activeTab === 'Perfil' || activeTab === 'Conjunto') && (
+              <footer className="p-4 border-t bg-gray-50 mt-auto flex justify-end gap-3">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-semibold text-sm">
+                  Cancelar
+                </button>
+                <button type="button" onClick={handleSaveChanges} disabled={!hasChanges} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-bold text-sm">
+                  Guardar Cambios
+                </button>
+              </footer>
+            )}
+          </main>
         </div>
 
-        {/* Modal: Editar Punto de Acceso */}
-        {editingAccessPoint && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4" onClick={() => setEditingAccessPoint(null)}>
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
+        {/* Mobile bottom scrollable tabs */}
+        <div className="md:hidden border-t border-gray-200 bg-white overflow-x-auto touch-pan-x pb-[env(safe-area-inset-bottom)]">
+          <nav className="flex space-x-2 px-4 py-2 w-max" aria-label="Tabs de configuración">
+            {allTabs.map(tab => {
+              const subtabId = 'subtab-config-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
+              return (
+                <button
+                  key={tab}
+                  id={subtabId}
+                  onClick={() => handleTabClick(tab)}
+                  className={`whitespace-nowrap px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                    activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Modal: Editar Estación */}
+        {editingEstacion && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4" onClick={() => setEditingEstacion(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Editar Punto de Acceso</h3>
-                <button onClick={() => setEditingAccessPoint(null)} className="text-gray-400 hover:text-gray-600">
+                <h3 className="text-lg font-bold text-gray-800">Editar Estación / Portería</h3>
+                <button onClick={() => setEditingEstacion(null)} className="text-gray-400 hover:text-gray-600">
                   <Icon name="x" className="w-5 h-5" />
                 </button>
               </div>
-              {accessPointError && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-                  {accessPointError}
+              {estacionError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+                  {estacionError}
                 </div>
               )}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Nombre del Punto de Acceso</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Código de Estación *</label>
                   <input
                     type="text"
-                    value={editAccessPointName}
-                    onChange={e => setEditAccessPointName(e.target.value)}
-                    className="w-full p-2 border rounded-md text-sm"
-                    placeholder="Ej: Portería Principal"
+                    value={editEstacionCodigo}
+                    onChange={e => setEditEstacionCodigo(e.target.value.toUpperCase())}
+                    className="w-full p-2.5 border rounded-lg text-sm font-mono uppercase"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Correo de Acceso (usuario técnico de portería)</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre de la Estación *</label>
                   <input
-                    type="email"
-                    value={editAccessPointEmail}
-                    onChange={e => setEditAccessPointEmail(e.target.value)}
-                    className="w-full p-2 border rounded-md text-sm font-mono"
-                    placeholder="porteria@paic.app"
+                    type="text"
+                    value={editEstacionNombre}
+                    onChange={e => setEditEstacionNombre(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Contraseña de Acceso</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nueva Contraseña (Opcional)</label>
                   <input
-                    type="text"
-                    value={editAccessPointPassword}
-                    onChange={e => setEditAccessPointPassword(e.target.value)}
-                    className="w-full p-2 border rounded-md text-sm font-mono"
-                    placeholder="Contraseña de acceso"
+                    type="password"
+                    value={editEstacionPassword}
+                    onChange={e => setEditEstacionPassword(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg text-sm"
+                    placeholder="Dejar vacío para no cambiar"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Esta contraseña se usa solo la primera vez o si cambia el dispositivo.</p>
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setEditingAccessPoint(null)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200"
+                  onClick={() => setEditingEstacion(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveEditAccessPoint}
-                  disabled={!editAccessPointName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  onClick={handleSaveEditEstacion}
+                  disabled={!editEstacionCodigo.trim() || !editEstacionNombre.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   Guardar Cambios
                 </button>
@@ -625,7 +893,75 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         )}
 
-        {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} accessPoints={accessPoints} error={modalError} />}
+        {/* Modal: Editar / Resetear PIN Vigilante */}
+        {editingVigilante && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4" onClick={() => setEditingVigilante(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Editar Vigilante / Resetear PIN</h3>
+                <button onClick={() => setEditingVigilante(null)} className="text-gray-400 hover:text-gray-600">
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+              {vigilanteError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+                  {vigilanteError}
+                </div>
+              )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Cédula de Ciudadanía *</label>
+                  <input
+                    type="text"
+                    value={editVigilanteCedula}
+                    onChange={e => setEditVigilanteCedula(e.target.value.replace(/\D/g, ''))}
+                    className="w-full p-2.5 border rounded-lg text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    value={editVigilanteNombre}
+                    onChange={e => setEditVigilanteNombre(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Resetear PIN (6 Dígitos - Opcional)</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    value={editVigilantePin}
+                    onChange={e => setEditVigilantePin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full p-2.5 border rounded-lg text-sm font-mono text-center tracking-widest"
+                    placeholder="Nuevo PIN de 6 dígitos"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Deje vacío si no desea modificar el PIN actual.</p>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingVigilante(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditVigilante}
+                  disabled={!editVigilanteCedula.trim() || !editVigilanteNombre.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isUserModalOpen && <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} userToEdit={selectedUser} availableRoles={roles} accessPoints={estaciones as any} error={modalError} />}
         {isRoleModalOpen && editingUserPermissions && <RoleModal isOpen={isRoleModalOpen} onClose={() => {setIsRoleModalOpen(false); setEditingUserPermissions(null);}} onSave={handleSaveRole} userToEdit={editingUserPermissions} allRoles={roles} error={modalError} />}
         <ConfirmModal
           isOpen={confirmAction !== null}
