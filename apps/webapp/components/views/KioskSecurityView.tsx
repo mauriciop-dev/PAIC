@@ -22,6 +22,17 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}`;
 };
 
+const formatDate = (raw: string | null | undefined): string => {
+  if (!raw) return "—";
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return raw;
+  }
+};
+
 const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconnect }) => {
   const [stationSession, setStationSession] = useState<EstacionSession | null>(null);
   const [activeShift, setActiveShift] = useState<VigilanteSession | null>(null);
@@ -689,7 +700,7 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
                           <tbody className="divide-y divide-slate-100">
                             {visitorLogs.map((log) => (
                               <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{log.date}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{formatDate(log.date)}</td>
                                 <td className="px-4 py-3 font-semibold text-slate-900">{log.visitorName}</td>
                                 <td className="px-4 py-3 font-medium">Apto {log.apartment}</td>
                                 <td className="px-4 py-3">
@@ -759,7 +770,7 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
                           <tbody className="divide-y divide-slate-100">
                             {packageLogs.map((pkg) => (
                               <tr key={pkg.id} className="hover:bg-slate-50/80 transition-colors">
-                                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{pkg.receivedDate}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{formatDate(pkg.receivedDate)}</td>
                                 <td className="px-4 py-3 font-semibold text-slate-900">Apto {pkg.apartment}</td>
                                 <td className="px-4 py-3">{pkg.courier}</td>
                                 <td className="px-4 py-3 font-mono text-slate-500">{pkg.trackingNumber || "—"}</td>
