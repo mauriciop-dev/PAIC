@@ -13,6 +13,9 @@ export const ROLE_PERMISSIONS: Record<string, Tab[]> = {
     Tab.Archivos,
     Tab.Finanzas,
     Tab.Seguridad,
+    Tab.DueDates,
+    Tab.PendingTasks,
+    Tab.PWA,
   ],
   subscriber: [
     Tab.Dashboard,
@@ -22,6 +25,9 @@ export const ROLE_PERMISSIONS: Record<string, Tab[]> = {
     Tab.Archivos,
     Tab.Finanzas,
     Tab.Seguridad,
+    Tab.DueDates,
+    Tab.PendingTasks,
+    Tab.PWA,
   ],
   trial: [
     Tab.Dashboard,
@@ -31,6 +37,9 @@ export const ROLE_PERMISSIONS: Record<string, Tab[]> = {
     Tab.Archivos,
     Tab.Finanzas,
     Tab.Seguridad,
+    Tab.DueDates,
+    Tab.PendingTasks,
+    Tab.PWA,
   ],
   internal: [
     Tab.Dashboard,
