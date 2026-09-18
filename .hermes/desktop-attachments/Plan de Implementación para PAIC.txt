@@ -1,0 +1,1311 @@
+# Plan de Implementación para PAIC - Basado en Ajustes5.txt
+
+## Resumen Ejecutivo
+Este plan detalla la implementación de las cuatro mejoras especificadas en Ajustes5.txt en el orden de prioridad establecido:
+1. Sistema de Enlaces Externos a Google Drive
+2. Notificaciones Push Nativas del Sistema Operativo
+3. Sustitución de Correos Masivos (Resend) por Comunicados en PWA
+4. Arquitectura RAG sobre Documentación del Conjunto
+
+Cada sección incluye: análisis técnico, pasos de implementación, archivos modificados/creados, dependencias y consideraciones de testing.
+
+---
+
+## 1. Sistema de Enlaces Externos a Google Drive
+
+### Objetivo
+Reemplazar el almacenamiento local de archivos pesados por enlaces públicos de Google Drive en comunicados.
+
+### Análisis Técnico
+- **Tabla existente**: `pwa_communications` ya tiene campo `attachment_url` (text) y `attachment_type` (text)
+- **Cambios requeridos**: 
+  - Frontend: reemplazar input tipo file por input de texto con validación regex
+  - Backend: validar que las URLs sean enlaces públicos de Google Drive válidos
+  - PWA: mostrar botón de descarga/previsualización para enlaces de Drive
+
+### Pasos de Implementación
+
+#### 1.1 Modificaciones en el Frontend Admin
+**Archivo a crear/modificar**: `apps/webapp/components/CommunicationForm.tsx` (o similar)
+- Reemplazar `<input type="file" />` por `<input type="text" placeholder="Enlace de Google Drive" />`
+- Añadir validación regex en tiempo real:
+  ```javascript
+  const driveUrlPattern = /^(https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/)|(https:\/\/drive\.google\.com\/folders\/[a-zA-Z0-9_-]+)/;
+  ```
+- Mostrar mensaje de error si la URL no coincide con el patrón
+- Añadir banner informativo permanente:
+  > "Asegúrate de que este archivo o carpeta en Google Drive tenga los permisos configurados como 'Cualquier persona con el enlace puede ver' para evitar problemas de acceso con los residentes."
+
+#### 1.2 Modificaciones en el Componente PWA
+**Archivo a modificar**: `apps/webapp/components/CommunicationItem.tsx` (o similar)
+- Si `attachment_url` existe y es un enlace de Drive válido:
+  - Mostrar botón con icono de descarga que abra la URL en nueva pestaña (`target="_blank" rel="noopener noreferrer"`)
+  - Si es un archivo individual (contiene `/file/d/`), añadir opción de previsualización mediante iframe:
+    ```jsx
+    <iframe 
+      src={`https://drive.google.com/file/d/${fileId}/preview`}
+      width="100%" 
+      height="480" 
+      allow="autoplay"
+    ></iframe>
+    ```
+
+#### 1.3 Pruebas
+- **Testing.md** debe incluir casos para:
+  - URL de Drive válida (archivo y carpeta)
+  - URL de Drive inválida
+  - URL no de Drive (debería rechazar)
+  - Envío de comunicado con enlace de Drive
+  - Visualización en PWA de comunicado con enlace
+
+### Dependencias
+- Ninguna nueva dependencia requerida
+
+### Tiempo estimado: 2-3 días
+
+---
+
+## 2. Notificaciones Push Nativas del Sistema Operativo
+
+### Objetivo
+Reemplazar los avisos verdes/toasts temporales dentro de la app por notificaciones reales del sistema operativo (Android/iOS).
+
+### Análisis Técnico
+Se requieren:
+1. Nueva tabla `push_subscriptions` en Supabase
+2. Service worker para manejo de push
+3. Funcionalidad de registro de suscripciones en el cliente
+4. Envío de notificaciones desde el servidor
+5. Claves VAPID para autenticación
+
+### Pasos de Implementación
+
+#### 2.1 Extensión de la Base de Datos
+**Archivo a crear**: `apps/webapp/supabase/migrations/202609170001_create_push_subscriptions.sql`
+```sql
+-- Extensión para notificaciones push
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE public.push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    subscription_json JSONB NOT NULL,  -- Contiene endpoint, p256dh, auth
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, conjunto_id)
+);
+
+-- Habilitar RLS
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de acceso
+CREATE POLICY "Users can manage their own push subscriptions"
+ON public.push_subscriptions
+FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Índices para rendimiento
+CREATE INDEX idx_push_subscriptions_conjunto_id ON public.push_subscriptions(conjunto_id);
+CREATE INDEX idx_push_subscriptions_user_id ON public.push_subscriptions(user_id);
+```
+
+#### 2.2 Generación de Claves VAPID
+Para generar las claves VAPID (ejecutar una sola vez):
+```bash
+npm install -g web-push
+web-push generate-vapid-keys
+```
+Esto producirá:
+- **Clave pública**: Para almacenar en variables de entorno (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`)
+- **Clave privada**: Para almacenar de forma segura (NUNCA en repositorio)
+
+#### 2.3 Implementación del Cliente PWA
+**Archivos a crear/modificar**:
+- `apps/webapp/hooks/usePushNotifications.ts` - Hook personalizado
+- `apps/webapp/components/NotificationPermissionPrompt.tsx` - Componente para solicitar permisos
+- Modificar `apps/webapp/App.tsx` para inicializar el servicio
+
+**Lógica del hook**:
+```typescript
+const usePushNotifications = () => {
+  const [subscription, setSubscription] = useState<PushSubscription | null>(null);
+  
+  const requestPermission = async () => {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      return await registerServiceWorker();
+    }
+    return null;
+  };
+
+  const registerServiceWorker = async () => {
+    if (!('serviceWorker' in navigator)) return null;
+    
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/'
+    });
+    
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+    });
+    
+    // Guardar en base de datos
+    await saveSubscriptionToSupabase(subscription);
+    setSubscription(subscription);
+    return subscription;
+  };
+
+  return { requestPermission, subscription };
+};
+```
+
+#### 2.4 Service Worker
+**Archivo a crear**: `public/sw.js`
+```javascript
+const CACHE_NAME = 'paic-pwa-cache-v1';
+const VAPID_PUBLIC_KEY = 'TU_CLAVE_PUBLICA_VAPID_AQUI';
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() || {};
+  
+  const options = {
+    body: data.body || 'Notificación de PAIC',
+    icon: '/icon-192x192.png',
+    badge: '/badge-96x96.png',
+    data: {
+      url: data.url || '/'  // URL para abrir al hacer clic
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'PAIC', options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  const url = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((windowClients) => {
+      for (let client of windowClients) {
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});
+```
+
+#### 2.5 Implementación del Servidor
+**Archivo a crear**: `lib/push-notifications.ts`
+```typescript
+import webpush from 'web-push';
+import { supabase } from './supabaseClient';
+
+// Configurar VAPID (las claves privadas deben venir de variables de entorno)
+webpush.setVapidDetails(
+  'mailto:tu-email@dominio.com',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,  // Pública
+  process.env.VAPID_PRIVATE_KEY!              // Privada (SECRETO)
+);
+
+export const sendPushNotification = async (
+  conjuntoId: string,
+  payload: { title: string; body: string; url?: string }
+) => {
+  // Obtener todas las suscripciones activas del conjunto
+  const { data: subscriptions, error } = await supabase
+    .from('push_subscriptions')
+    .select('subscription_json')
+    .eq('conjunto_id', conjuntoId);
+
+  if (error) throw error;
+
+  // Envío paralelo de notificaciones
+  const promises = subscriptions.map((sub) => 
+    webpush.sendNotification(
+      sub.subscription_json,
+      JSON.stringify(payload)
+    ).catch(err => {
+      // Manejar suscripciones inválidas (HTTP 410/404)
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        // Eliminar suscripción inválida
+        return supabase
+          .from('push_subscriptions')
+          .delete()
+          .eq('subscription_json', sub.subscription_json);
+      }
+      throw err;
+    })
+  );
+
+  await Promise.all(promises);
+};
+```
+
+#### 2.6 Integración con Comunicados Existentes
+Modificar la lógica de creación de comunicados para disparar notificaciones push cuando se publique un comunicado.
+
+**Archivo a modificar**: `app/actions/comunicados.ts` (o similar)
+- Después de guardar el comunicado en Supabase, llamar a:
+  ```typescript
+  await sendPushNotification(
+    comunicado.conjunto_id,
+    {
+      title: comunicado.title,
+      body: comunicado.body,
+      url: `/comunicados/${comunicado.id}`
+    }
+  );
+  ```
+
+#### 2.7 Pruebas
+- **Testing.md** debe incluir casos para:
+  - Registro exitoso de service worker
+  - Solicitud y concesión de permisos de notificación
+  - Envío y recepción de notificación push
+  - Manejo de clics en notificaciones (abrir PWA en URL específica)
+  - Limpieza de suscripciones inválidas
+  - Funcionamiento en Android (Chrome) y simulacro para iOS (requiere pantalla de inicio)
+
+### Dependencias
+- `web-push` (npm install web-push)
+
+### Tiempo estimado: 4-5 días
+- Incluye manejo de particularidades de iOS (requisito de pantalla de inicio)
+
+---
+
+## 3. Sustitución de Correos Masivos (Resend) por Comunicados en PWA
+
+### Objetivo
+Eliminar el uso de Resend para avisos masivos rutinarios y mover toda la lógica de difusión al flujo nativo de la PWA (usando las notificaciones push recién implementadas).
+
+### Análisis Técnico
+Actualmente, PAIC usa Resend para enviar correos. Con las notificaciones push implementadas en el paso 2, podemos reemplazar esta funcionalidad.
+
+### Pasos de Implementación
+
+#### 3.1 Identificar Uso Actual de Resend
+Buscar en el código donde se llaman a las funciones de Resend:
+```bash
+grep -r "resend\|Resend" apps/
+```
+o buscar especificamente por:
+- `resend.sendEmail`
+- llamadas a API de Resend
+- funciones que envían emails masivos
+
+#### 3.2 Reemplazo Lógico
+Donde actualmente se hace:
+```typescript
+// ANTICO (usando Resend)
+await resend.sendEmail({
+  from: 'PAIC <notificaciones@paicai.com.co>',
+  to: [destinatarios],
+  subject: asunto,
+  html: contenido
+});
+```
+
+Se debe hacer:
+```typescript
+// NUEVO (usando notificaciones push y guardado en BD)
+await supabase.from('pwa_communications').insert({
+  conjunto_id: conjuntoId,
+  title: asunto,
+  body: contenido,
+  status: 'publicado',
+  published_at: new Date()
+});
+
+// Disparar notificaciones push a todos los miembros del conjunto
+await sendPushNotification(conjuntoId, {
+  title: asunto,
+  body: contenido.substring(0, 100) + '...', // Versión corta para push
+  url: `/comunicados/${nuevoComunicado.id}`
+});
+```
+
+#### 3.3 Eliminar Código de Resend
+- Remover importaciones de resend
+- Eliminar funciones auxiliares que solo enviaban emails
+- Mantener únicamente el registro en base de datos y el disparo de push notifications
+
+#### 3.4 Pruebas
+- **Testing.md** debe verificar que:
+  - No se realizan llamadas externas a Resend
+  - Los comunicados se guardan correctamente en base de datos
+  - Se disparan notificaciones push adecuadas
+  - Los usuarios reciben las notificaciones en sus dispositivos
+
+### Dependencias
+- Ninguna nueva dependencia (se elimina `resend`)
+
+### Tiempo estimado: 2-3 días
+- Dependiente de que las notificaciones push (paso 2) estén implementadas y funcionando
+
+---
+
+## 4. Arquitectura RAG sobre Documentación del Conjunto
+
+### Objetivo
+Permitir al Administrador interactuar con un asistente de IA capaz de responder preguntas precisas basándose en la documentación del conjunto almacenada en Google Drive.
+
+### Análisis Técnico
+Requiere:
+1. Extensión `pgvector` en Supabase
+2. Nueva tabla `documentos_embeddings`
+3. Servicio de extracción y chunking de documentos
+4. Servicio de generación de embeddings
+5. Funcionalidad de búsqueda por similitud coseno
+6. Integración con modelo LLM (Gemini o GPT-4o)
+7. Interfaz de consulta para administradores
+
+### Pasos de Implementación
+
+#### 4.1 Habilitación de pgvector en Supabase
+**Nota**: Esto requiere acceso de nivel superior en Supabase o soporte técnico
+```sql
+-- Ejecutar en SQL editor de Supabase
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+#### 4.2 Creación de Tabla para Embeddings
+**Archivo a crear**: `apps/webapp/supabase/migrations/202609170002_create_document_embeddings.sql`
+```sql
+-- Tabla para almacenar embeddings de documentos
+CREATE TABLE public.documentos_embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    contenido_chunk TEXT NOT NULL,
+    embedding VECTOR(1536) NOT NULL,  -- Para text-embedding-3-small (1536 dimensiones)
+    fuente_url TEXT NOT NULL,         -- Enlace de Google Drive
+    metadata JSONB,                   -- {nombre_archivo, pagina, tipo, etc.}
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Habilitar RLS
+ALTER TABLE public.documentos_embeddings ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de acceso (solo administradores pueden ver/gestionar embeddings)
+CREATE POLICY "Admins can manage documentos embeddings for their conjunto"
+ON public.documentos_embeddings
+FOR ALL
+USING (
+  (SELECT role FROM public.user_profiles WHERE id = auth.uid()) = 'admin'
+  AND conjunto_id = (SELECT conjunto_id FROM public.user_profiles WHERE id = auth.uid())
+)
+WITH CHECK (
+  (SELECT role FROM public.user_profiles WHERE id = auth.uid()) = 'admin'
+  AND conjunto_id = (SELECT conjunto_id FROM public.user_profiles WHERE id = auth.uid())
+);
+
+-- Índice para búsqueda por similitud coseno (IVFFlat para buen rendimiento)
+CREATE INDEX ON public.documentos_embeddings 
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- Índice adicional para filtrado por conjunto
+CREATE INDEX idx_documentos_embeddings_conjunto_id ON public.documentos_embeddings(conjunto_id);
+```
+
+#### 4.3 Servicios de Procesamiento de Documentos
+**Archivos a crear**:
+- `lib/drive-connector.ts` - Conecta con Google Drive API
+- `lib/document-processor.ts` - Extrae texto y hace chunking
+- `lib/embedding-service.ts` - Genera embeddings usando OpenAI o Google
+- `lib/rag-service.ts` - Orquesta la búsqueda RAG y generación de respuestas
+
+**4.3.1 Conector de Google Drive**
+```typescript
+import { google } from 'googleapis';
+
+export class DriveConnector {
+  private auth;
+  
+  constructor() {
+    this.auth = new google.auth.GoogleAuth({
+      keyFile: './credentials.json',  // O usar variables de entorno
+      scopes: ['https://www.googleapis.com/auth/drive.readonly']
+    });
+  }
+  
+  async listFiles(folderId: string) {
+    const drive = google.drive({ version: 'v3', auth: this.auth });
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and (mimeType contains 'text/' or mimeType = 'application/pdf' or mimeType contains 'officedocument')`,
+      fields: 'files(id, name, mimeType, modifiedTime, webViewLink)'
+    });
+    return res.data.files;
+  }
+  
+  async downloadFile(fileId: string): Promise<Buffer> {
+    const drive = google.drive({ version: 'v3', auth: this.auth });
+    const res = await drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'stream' }
+    );
+    // Convertir stream a buffer
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    });
+  }
+}
+```
+
+**4.3.2 Procesador de Documentos**
+```typescript
+import { PDFLoader } from 'langchain/document_loaders/fs/pdf';
+import { DocxLoader } from 'langchain/document_loaders/fs/docx';
+import { TextLoader } from 'langchain/document_loaders/fs/text';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+
+export class DocumentProcessor {
+  async extractText(file: Buffer, mimeType: string): Promise<string> {
+    switch (mimeType) {
+      case 'application/pdf':
+        const pdfLoader = new PDFLoader(file);
+        const docs = await pdfLoader.load();
+        return docs.map(doc => doc.pageContent).join('\n');
+        
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        const docxLoader = new DocxLoader(file);
+        const docs = await docxLoader.load();
+        return docs.map(doc => doc.pageContent).join('\n');
+        
+      case 'text/plain':
+        const textLoader = new TextLoader(file);
+        const docs = await textLoader.load();
+        return docs.map(doc => doc.pageContent).join('\n');
+        
+      default:
+        throw new Error(`Tipo de documento no soportado: ${mimeType}`);
+    }
+  }
+  
+  chunkText(text: string): string[] {
+    const splitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 1000,
+      chunkOverlap: 200,
+    });
+    return splitter.splitText(text);
+  }
+}
+```
+
+**4.3.3 Servicio de Embeddings**
+```typescript
+import { OpenAIEmbeddings } from '@langchain/openai';
+// O alternativamente: import { VertexAI } from '@google-cloud/vertexai';
+
+export class EmbeddingService {
+  private embeddingsModel;
+  
+  constructor() {
+    // Usar OpenAI por defecto (más económico para embeddings)
+    this.embeddingsModel = new OpenAIEmbeddings({
+      openAIApiKey: process.env.OPENAI_API_KEY,
+      modelName: 'text-embedding-3-small'  // 1536 dimensiones, buen equilibrio costo/calidad
+    });
+  }
+  
+  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+    const embeddings = await this.embeddingsModel.embedDocuments(texts);
+    return embeddings;
+  }
+}
+```
+
+**4.3.4 Servicio RAG Principal**
+```typescript
+import { supabase } from './supabaseClient';
+
+export class RAGService {
+  private driveConnector: DriveConnector;
+  private documentProcessor: DocumentProcessor;
+  private embeddingService: EmbeddingService;
+  
+  constructor() {
+    this.driveConnector = new DriveConnector();
+    this.documentProcessor = new DocumentProcessor();
+    this.embeddingService = new EmbeddingService();
+  }
+  
+  // 1. Sincronización periódica desde Drive
+  async syncDriveFolder(conjuntoId: string, driveFolderId: string) {
+    const files = await this.driveConnector.listFiles(driveFolderId);
+    
+    for (const file of files) {
+      try {
+        // Descargar archivo
+        const fileBuffer = await this.driveConnector.downloadFile(file.id);
+        
+        // Extraer texto
+        const textContent = await this.documentProcessor.extractText(
+          fileBuffer, 
+          file.mimeType
+        );
+        
+        // Chunking
+        const chunks = this.documentProcessor.chunkText(textContent);
+        
+        // Generar embeddings
+        const embeddings = await this.embeddingService.generateEmbeddings(chunks);
+        
+        // Almacenar en base de datos
+        const embeddingRecords = chunks.map((chunk, index) => ({
+          conjunto_id: conjuntoId,
+          contenido_chunk: chunk,
+          embedding: embeddings[index],
+          fuente_url: file.webViewLink,
+          metadata: JSON.stringify({
+            nombre_archivo: file.name,
+            tipo: file.mimeType,
+            ultima_modificacion: file.modifiedTime
+          })
+        }));
+        
+        await supabase
+          .from('documentos_embeddings')
+          .upsert(embeddingRecords, { onConflict: ['fuente_url', 'contenido_chunk'] });
+          
+      } catch (error) {
+        console.error(`Error procesando archivo ${file.name}:`, error);
+        // Continuar con otros archivos
+      }
+    }
+  }
+  
+  // 2. Búsqueda RAG para consultas
+  async query(conjuntoId: string, question: string): Promise<string> {
+    // Generar embedding de la pregunta
+    const questionEmbedding = await this.embeddingService.generateEmbeddings([question]);
+    
+    // Buscar fragmentos similares en la base de datos
+    const { data: similarChunks, error } = await supabase
+      .rpc('match_documents', {
+        query_embedding: questionEmbedding[0],
+        match_count: 5,  // Top 5 fragmentos más relevantes
+        p_conjunto_id: conjuntoId
+      });
+      
+    if (error) throw error;
+    
+    if (!similarChunks || similarChunks.length === 0) {
+      return "No se encontró información relevante en la documentación del conjunto para responder esta pregunta.";
+    }
+    
+    // Construir contexto
+    const context = similarChunks
+      .map(chunk => chunk.contenido_chunk)
+      .join('\n\n---\n\n');
+      
+    // Aquí se llamaría al LLM (Gemini o GPT-4o) con el prompt enriquecido
+    // Para simplificar, retornamos solo el contexto en esta implementación básica
+    // En producción, esto se enviaría a un servicio LLM
+    
+    return `Basándome en la documentación del conjunto, aquí está la información relevante:\n\n${context}`;
+  }
+}
+```
+
+#### 4.4 Función SQL para Búsqueda por Similitud
+**Agregar a la migración de embeddings o crear séparada**:
+```sql
+-- Función para buscar documentos por similitud coseno
+CREATE OR REPLACE FUNCTION public.match_documents(
+  query_embedding VECTOR(1536),
+  match_count INT DEFAULT 5,
+  p_conjunto_id TEXT
+)
+RETURNS TABLE (
+  id UUID,
+  contenido_chunk TEXT,
+  fuente_url TEXT,
+  metadata JSONB,
+  similarity FLOAT
+)
+LANGUAGE sql
+AS $$
+  SELECT
+    documentos_embeddings.id,
+    documentos_embeddings.contenido_chunk,
+    documentos_embeddings.fuente_url,
+    documentos_embeddings.metadata,
+    1 - (documentos_embeddings.embedding <=> query_embedding) AS similarity
+  FROM public.documentos_embeddings
+  WHERE documentos_embeddings.conjunto_id = p_conjunto_id
+  ORDER BY documentos_embeddings.embedding <=> query_embedding
+  LIMIT match_count;
+$$;
+```
+
+#### 4.5 Interfaz de Consulta para Administradores
+**Archivo a crear**: `apps/webapp/components/RAGQuery.tsx`
+```typescript
+import { useState } from 'react';
+import { RAGService } from '../../lib/rag-service';
+
+const RAGQuery: React.FC = () => {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const ragService = new RAGService();
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      // Obtener ID del conjunto del perfil del usuario
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('conjunto_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (!profile?.conjunto_id) {
+        setAnswer('Error: No se pudo identificar su conjunto.');
+        return;
+      }
+      
+      const result = await ragService.query(profile.conjunto_id, question);
+      setAnswer(result);
+    } catch (error) {
+      setAnswer(`Error al procesar la consulta: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-xl font-bold mb-4">Asistente IA para Documentación del Conjunto</h2>
+      <form onSubmit={handleSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="block text-sm font-medium mb-2">
+            Pregunte sobre reglamentos, actas, contratos o cualquier documento del conjunto:
+          </label>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            rows={3}
+            className="w-full p-2 border border-gray-300 rounded"
+            placeholder="Ej: ¿Cuál es la multa por ruido excesivo después de las 10 PM?"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {loading ? 'Consultando...' : 'Consultar'}
+        </button>
+      </form>
+      
+      {answer && (
+        <div className="bg-gray-50 p-4 rounded border-l-4 border-blue-500">
+          <h3 className="font-semibold mb-2">Respuesta:</h3>
+          <p className="text-gray-700 whitespace-pre-line">{answer}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RAGQuery;
+```
+
+#### 4.6 Tarea Programada de Sincronización
+Para mantener los embeddings actualizados, necesitamos una tarea periódica que:
+1. Revise la carpeta de Drive del conjunto
+2. Procesen archivos nuevos o modificados
+3. Actualice los embeddings en base de datos
+
+Esto puede implementarse como:
+- Webhook de Google Drive (notificaciones de cambio)
+- Tarea cron en Vercel/Supabase Functions
+- Servicio externo (como un worker simple en Render o similar)
+
+#### 4.7 Pruebas
+- **Testing.md** debe incluir casos para:
+  - Conexión exitosa a Google Drive API
+  - Extracción de texto de PDFs y DOCX
+  - Generación correcta de embeddings
+  - Almacenamiento y recuperación de embeddings en base de datos
+  - Búsqueda por similitud coseno que devuelve resultados relevantes
+  - Respuesta del servicio RAG basada en contexto proporcionado
+  - Manejo de errores (archivos no soportados, límite de cuota de API, etc.)
+
+### Dependencias
+- `@langchain/openai` o `@google-cloud/vertexai` (para embeddings)
+- `googleapis` (para Google Drive API)
+- `langchain` (para loaders y splitters de documentos)
+- `vector` (extensión de PostgreSQL, requiere habilitación en Supabase)
+
+### Tiempo estimado: 6-8 días
+- La mayor parte del tiempo está en la configuración de embeddings y pruebas de relevancia
+- Requiere acceso para habilitar pgvector en Supabase (puede necesitar intervención de soporte)
+
+---
+
+## Estimación Total del Proyecto
+
+| Fase | Duración | Dependencias |
+|------|----------|--------------|
+| 1. Sistema de Enlaces Externos a Google Drive | 2-3 días | Ninguna |
+| 2. Notificaciones Push Nativas | 4-5 días | web-push |
+| 3. Sustitución de Correos Masivos | 2-3 días | Dependiente de la fase 2 |
+| 4. Arquitectura RAG | 6-8 días | pgvector, IA APIs, varios paquetes |
+| **Total Estimado** | **14-19 días** |  |
+
+## Consideraciones Importantes
+
+### Seguridad
+- **Nunca almacenar claves privadas en repositorio**: Usar variables de entorno (GitHub Secrets, Vercel Environment Variables, etc.)
+- **Google Drive API**: Los credenciales deben tener el alcance mínimo necesario (`drive.readonly`)
+- **VAPID keys**: La clave privada debe mantenerse en secreto absoluto
+- **APIs de IA**: Las claves de OpenAI/Google deben almacenarse de forma segura
+
+### Costos Optimizados
+1. **Embeddings**: Usar `text-embedding-3-small` de OpenAI (más económico que alternativas)
+2. **Almacenamiento**: Los embeddings son relativamente pequeños (~1536 números float32 ≈ 6KB por chunk)
+3. **APIs**: Implementar cache de respuestas frecuentes para reducir llamadas a APIs de IA
+4. **Google Drive**: Uso de enlaces públicos elimina costos de almacenamiento y transferencia
+
+### Escalabilidad
+- Las tablas nuevas (`push_subscriptions`, `documentos_embeddings`) están diseñadas con índices apropiados
+- La búsqueda RAG usa índice IVFFlat que escala bien hasta cientos de miles de vectores
+- Las políticas de RLS aseguran aislamiento estricto por conjunto
+
+### Prerrequisitos para Implementación
+1. **Acceso a Supabase** para habilitar la extensión `pgvector` (fase 4)
+2. **Credenciales de Google Cloud API** (ya proporcionadas)
+3. **Capacidad para generar y almacenar de forma segura claves VAPID privadas**
+4. **Acceso para modificar variables de entorno del proyecto**
+
+## Próximos Pasos Sugeridos
+
+1. **Inmediato**: Comenzar con la fase 1 (Drive links) ya que no tiene dependencias externas
+2. **Después de fase 1**: Implementar fase 2 (Push notifications) 
+3. **Después de fase 2**: Implementar fase 3 (Eliminar Resend)
+4. **Finalmente**: Fase 4 (RAG) - requiere habilitación de pgvector en Supabase
+
+Cada fase debe incluir:
+- Desarrollo según especificaciones
+- Pruebas unitarias básicas
+- Actualización de Testing.md con casos de prueba específicos
+- Revisión de código antes de merge
+
+¿Le gustaría que proceda con la implementación de la Fase 1 (Sistema de Enlaces Externos a Google Drive) primero? Puedo comenzar creando los archivos necesarios y realizando los cambios en el frontend para reemplazar el input de file por el input de texto con validación de enlaces de Drive.
+
+He analizado el repositorio de PAIC y toda la información que proporcionaste. Basándome en la especificación de Ajustes5.txt y tus respuestas, aquí está el plan de implementación detallado:
+
+## ✅ PLAN DE IMPLEMENTACIÓN PARA PAIC
+
+### RESUMEN DE LO QUE YA TENEMOS
+- **Repositorio**: Acceso completo a https://github.com/mauriciop-dev/PAIC
+- **Credenciales de Google Drive**: Disponibles (Client ID y secreto)
+- **Supabase**: Esquema existente con tablas como `pwa_communications` (con `attachment_url`), `conjuntos`, `users`, etc.
+- **Resend**: Actualmente configurado y operativo
+- **Carpeta de Drive compartida**: https://drive.google.com/drive/folders/1VX6W46LeoRl3AQNA_xdOcLiWFZq2tdxU?usp=sharing
+- **Documentos para RAG**: 1-10 archivos (PDFs e imágenes en español)
+
+---
+
+## FASE 1: SISTEMA DE ENLACES EXTERNOS A GOOGLE DRIVE (Prioridad #1)
+
+### Objetivo
+Reemplazar el almacenamiento local de archivos pesados por enlaces públicos de Google Drive en comunicados.
+
+### Cambios necesarios:
+
+#### 1.1 Modificaciones en el Frontend Admin
+**Archivo**: Crear/modificar `apps/webapp/components/CommunicationForm.tsx`
+```typescript
+// Reemplazar input tipo file por:
+<input 
+  type="text" 
+  placeholder="Pegue aquí el enlace de Google Drive"
+  value={attachmentUrl}
+  onChange={(e) => {
+    const url = e.target.value;
+    setAttachmentUrl(url);
+    // Validación regex en tiempo real
+    const isValid = /^(https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/)|(https:\/\/drive\.google\.com\/folders\/[a-zA-Z0-9_-]+)/.test(url);
+    setUrlError(!url || isValid ? null : 'Enlace de Google Drive no válido');
+  }}
+/>
+// Mensaje de error debajo del input
+{urlError && <p className="text-red-500 text-sm">{urlError}</p>}
+
+// Banner informativo permanente:
+<div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 my-4">
+  <p className="text-sm text-yellow-800">
+    Asegúrate de que este archivo o carpeta en Google Drive tenga los permisos 
+    configurados como 'Cualquier persona con el enlace puede ver' para evitar 
+    problemas de acceso con los residentes.
+  </p>
+</div>
+```
+
+#### 1.2 Modificaciones en el Componente PWA
+**Archivo**: Modificar `apps/webapp/components/CommunicationItem.tsx`
+```typescript
+{attachmentUrl && (
+  <>
+    {/* Botón de descarga directa */}
+    <a 
+      href={attachmentUrl} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+    >
+      <Icon name="external-link" className="w-4 h-4" />
+      Ver archivo en Drive
+    </a>
+    
+    {/* Previsualización para archivos individuales */}
+    {isFileUrl(attachmentUrl) && (
+      <div className="mt-4">
+        <h3 className="font-semibold mb-2">Previsualización:</h3>
+        <iframe 
+          src={getDrivePreviewUrl(attachmentUrl)} 
+          width="100%" 
+          height="480" 
+          frameBorder="0"
+          allow="autoplay"
+        ></iframe>
+      </div>
+    )}
+  </>
+)}
+```
+
+**Funciones auxiliares**:
+```typescript
+const isFileUrl = (url: string) => url.includes('/file/d/');
+const getDrivePreviewUrl = (url: string) => {
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? `https://drive.google.com/file/d/${match[1]}/preview` : '';
+};
+```
+
+#### 1.3 Testing
+Agregar a `TESTING.md`:
+- [ ] Validación de URL de Drive válida (archivo)
+- [ ] Validación de URL de Drive válida (carpeta)  
+- [ ] Rechazo de URL no de Drive
+- [ ] Envío de comunicado con enlace de Drive
+- [ ] Visualización correcta en PWA (botón de descarga + previsualización si aplica)
+
+**Dependencias**: Ninguna nueva
+**Tiempo estimado**: 2-3 días
+
+---
+
+## FASE 2: NOTIFICACIONES PUSH NATIVAS (Prioridad #2)
+
+### Objetivo
+Reemplazar avisos temporales de la app por notificaciones reales del sistema operativo.
+
+### Cambios necesarios:
+
+#### 2.1 Migración de Base de Datos
+**Archivo**: `apps/webapp/supabase/migrations/202609170001_create_push_subscriptions.sql`
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE public.push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    subscription_json JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, conjunto_id)
+);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own push subscriptions"
+ON public.push_subscriptions
+FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX idx_push_subscriptions_conjunto_id ON public.push_subscriptions(conjunto_id);
+```
+
+#### 2.2 Generar Claves VAPID (Una sola vez)
+```bash
+npm install -g web-push
+web-push generate-vapid-keys
+```
+Guardar:
+- **Pública**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (en frontend)
+- **Privada**: `VAPID_PRIVATE_KEY` (en variables de entorno SECRETAS)
+
+#### 2.3 Hook de Notificaciones
+**Archivo**: `apps/webapp/hooks/usePushNotifications.ts`
+```typescript
+import { useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
+
+export const usePushNotifications = () => {
+  const [subscription, setSubscription] = useState<PushSubscription | null>(null);
+  const [isSupported, setIsSupported] = useState(false);
+
+  useEffect(() => {
+    setIsSupported('serviceWorker' in navigator && 'PushManager' in window);
+  }, []);
+
+  const requestPermission = async () => {
+    if (!isSupported) return null;
+    
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      return await registerServiceWorker();
+    }
+    return null;
+  };
+
+  const registerServiceWorker = async () => {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!)
+    });
+    
+    await supabase.from('push_subscriptions').upsert({
+      user_id: (await supabase.auth.getUser()).data.user?.id,
+      conjunto_id: (await supabase.from('user_profiles').select('conjunto_id').eq('id', (await supabase.auth.getUser()).data.user?.id).single()).data.conjunto_id,
+      subscription_json: sub
+    });
+    
+    setSubscription(sub);
+    return sub;
+  };
+
+  return { requestPermission, subscription, isSupported };
+};
+```
+
+#### 2.4 Service Worker
+**Archivo**: `public/sw.js`
+```javascript
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() || {};
+  const options = {
+    body: data.body || 'Notificación de PAIC',
+    icon: '/icon-192x192.png',
+    badge: '/badge-96x96.png',
+    data: { url: data.url || '/' }
+  };
+  event.waitUntil(self.registration.showNotification(data.title || 'PAIC', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((windowClients) => {
+      for (let client of windowClients) {
+        if (client.url === url && 'focus' in client) return client.focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
+```
+
+#### 2.5 Servicio de Envío
+**Archivo**: `lib/push-notifications.ts`
+```typescript
+import webpush from 'web-push';
+import { supabase } from './supabaseClient';
+
+webpush.setVapidDetails(
+  'mailto:soporte@paicai.com.co',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
+
+export const sendPushNotification = async (conjuntoId: string, payload: { title: string; body: string; url?: string }) => {
+  const { data: subscriptions } = await supabase
+    .from('push_subscriptions')
+    .select('subscription_json')
+    .eq('conjunto_id', conjuntoId);
+
+  await Promise.all(
+    subscriptions.map(sub => 
+      webpush.sendNotification(sub.subscription_json, JSON.stringify(payload))
+        .catch(err => {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            return supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json);
+          }
+          throw err;
+        })
+    )
+  );
+};
+```
+
+#### 2.6 Integración con Comunicados
+**Archivo**: `app/actions/comunicados.ts` (o donde se creen comunicados)
+```typescript
+// Después de guardar el comunicado:
+await sendPushNotification(conjuntoId, {
+  title: comunicado.title,
+  body: comunicado.body,
+  url: `/comunicados/${comunicado.id}`
+});
+```
+
+#### 2.7 Testing
+Agregar a `TESTING.md`:
+- [ ] Registro exitoso de service worker
+- [ ] Solicitud y concesión de permisos
+- [ ] Envío y recepción de notificación push
+- [ ] Manejo de clics en notificaciones (abrir PWA en URL correcta)
+- [ ] Limpieza de suscripciones inválidas (HTTP 410/404)
+- [ ] Indicación clara para iOS: "Agregar a pantalla de inicio requerida para notificaciones"
+
+**Dependencias**: `web-push` (`npm install web-push`)
+**Tiempo estimado**: 4-5 días
+
+---
+
+## FASE 3: SUSTITUCIÓN DE CORREOS MASIVOS (Prioridad #3)
+
+### Objetivo
+Eliminar Resend y usar únicamente notificaciones push + PWA para comunicados masivos.
+
+### Pasos:
+
+#### 3.1 Identificar Uso Actual de Resend
+Buscar en el código:
+```bash
+grep -r "resend\|Resend" apps/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx"
+```
+
+#### 3.2 Reemplazo de Lógica
+Donde actualmente haya:
+```typescript
+// ANTICO
+await resend.sendEmail({
+  from: 'PAIC <notificaciones@paicai.com.co>',
+  to: destinatarios,
+  subject: asunto,
+  html: contenido
+});
+```
+
+Reemplazar por:
+```typescript
+// NUEVO
+// 1. Guardar comunicado en BD
+const { data: comunicado } = await supabase
+  .from('pwa_communications')
+  .insert({
+    conjunto_id: conjuntoId,
+    title: asunto,
+    body: contenido,
+    status: 'publicado',
+    published_at: new Date()
+  })
+  .single();
+
+// 2. Enviar notificaciones push
+await sendPushNotification(conjuntoId, {
+  title: asunto,
+  body: contenido.substring(0, 100) + '...',
+  url: `/comunicados/${comunicado.id}`
+});
+```
+
+#### 3.3 Eliminar Código de Resend
+- Remover: `import resend from 'resend';`
+- Eliminar funciones auxiliares de envío de email
+- Mantener solo registro en BD + push notifications
+
+#### 3.4 Testing
+Agregar a `TESTING.md`:
+- [ ] Verificar que NO se hacen llamadas a Resend
+- [ ] Confirmar que comunicados se guardan en BD
+- [ ] Validar que se disparan notificaciones push apropiadas
+- [ ] Confirmar que usuarios reciben notificaciones en dispositivos
+
+**Dependencias**: Ninguna (se elimina `resend`)
+**Tiempo estimado**: 2-3 días (dependiente de que Fase 2 esté completa)
+
+---
+
+## FASE 4: ARQUITECTURA RAG (Prioridad #4)
+
+### Objetivo
+Permitir al Administrador consultar documentación del conjunto mediante IA.
+
+### Pasos necesarios:
+
+#### 4.1 Habilitar pgvector en Supabase
+**Requerido**: Acceso a Supabase SQL Editor y ejecutar:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+*(Esto puede requerir contacto con soporte de Supabase si no tienes permisos suficientes)*
+
+#### 4.2 Migración para Embeddings
+**Archivo**: `apps/webapp/supabase/migrations/202609170002_create_document_embeddings.sql`
+```sql
+CREATE TABLE public.documentos_embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conjunto_id TEXT NOT NULL REFERENCES public.conjuntos(id) ON DELETE CASCADE,
+    contenido_chunk TEXT NOT NULL,
+    embedding VECTOR(1536) NOT NULL,
+    fuente_url TEXT NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.documentos_embeddings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins can manage documentos embeddings for their conjunto"
+ON public.documentos_embeddings
+FOR ALL
+USING (
+  (SELECT role FROM public.user_profiles WHERE id = auth.uid()) = 'admin'
+  AND conjunto_id = (SELECT conjunto_id FROM public.user_profiles WHERE id = auth.uid())
+)
+WITH CHECK (
+  (SELECT role FROM public.user_profiles WHERE id = auth.uid()) = 'admin'
+  AND conjunto_id = (SELECT conjunto_id FROM public.user_profiles WHERE id = auth.uid())
+);
+
+CREATE INDEX ON public.documentos_embeddings 
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+CREATE INDEX idx_documentos_embeddings_conjunto_id ON public.documentos_embeddings(conjunto_id);
+
+-- Función de búsqueda por similitud
+CREATE OR REPLACE FUNCTION public.match_documents(
+  query_embedding VECTOR(1536),
+  match_count INT DEFAULT 5,
+  p_conjunto_id TEXT
+)
+RETURNS TABLE (
+  id UUID,
+  contenido_chunk TEXT,
+  fuente_url TEXT,
+  metadata JSONB,
+  similarity FLOAT
+)
+LANGUAGE sql
+AS $$
+  SELECT
+    documentos_embeddings.id,
+    documentos_embeddings.contenido_chunk,
+    documentos_embeddings.fuente_url,
+    documentos_embeddings.metadata,
+    1 - (documentos_embeddings.embedding <=> query_embedding) AS similarity
+  FROM public.documentos_embeddings
+  WHERE documentos_embeddings.conjunto_id = p_conjunto_id
+  ORDER BY documentos_embeddings.embedding <=> query_embedding
+  LIMIT match_count;
+$$;
+```
+
+#### 4.3 Servicios de Procesamiento
+Crear en `lib/`:
+- `drive-connector.ts` (Google Drive API)
+- `document-processor.ts` (extracción de texto + chunking)
+- `embedding-service.ts` (OpenAI text-embedding-3-small)
+- `rag-service.ts` (orquestación completa)
+
+#### 4.4 Interfaz de Consulta
+**Archivo**: `apps/webapp/components/RAGQuery.tsx`
+```typescript
+// Formulario simple para hacer preguntas
+// Llama a RAGService.query(conjuntoId, pregunta)
+// Muestra respuesta basada en contexto de documentos
+```
+
+#### 4.5 Tarea Programada de Sincronización
+Implementar mecanismo para:
+- Detectar cambios en carpeta de Drive
+- Procesar nuevos/modificados archivos
+- Actualizar embeddings en BD
+*(Puede ser webhook de Drive o tarea cron externa)*
+
+#### 4.6 Testing
+Agregar a `TESTING.md`:
+- [ ] Conexión exitosa a Google Drive API
+- [ ] Extracción de texto de PDFs/DOCX
+- [ ] Generación correcta de embeddings
+- [ ] Almacenamiento/recuperación en BD
+- [ ] Búsqueda por similitud que devuelve resultados relevantes
+- [ ] Respuesta del RAG basada en contexto proporcionado
+- [ ] Manejo de errores (tipos no soportados, límites de API)
+
+**Dependencias**: 
+- `@langchain/openai` o `@google-cloud/vertexai`
+- `googleapis`
+- `langchain`
+**Tiempo estimado**: 6-8 días
+
+---
+
+## CRONOGRAMA RECOMENDADO
+
+| Semana | Fase | Objetivo |
+|--------|------|----------|
+| 1 | Fase 1 | Implementar sistema de enlaces de Drive completamente funcional y testeado |
+| 2 | Fase 2 | Implementar notificaciones push nativas (incluyendo testing en dispositivos reales) |
+| 3 | Fase 3 | Eliminar Resend y verificar que todo funciona con notificaciones push |
+| 4 | Fase 4 | Implementar arquitectura RAG (dependiente de habilitación de pgvector) |
+
+## REQUISITOS PREvios PARA INICIAR
+
+1. **Acceso a Supabase SQL Editor** para habilitar `pgvector` (necesario para Fase 4)
+2. **Variables de entorno configuradas** para:
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (Fase 2)
+   - `VAPID_PRIVATE_KEY` (Fase 2 - SECRETO)
+   - `OPENAI_API_KEY` (Fase 4 - para embeddings)
+   - Credenciales de Google Cloud (si no se usan las ya proporcionadas de forma segura)
+3. **Confirmación** de que pueden recibir notificaciones de prueba en dispositivos Android/iOS
+
+## PRÓXIMO PASO SUGERIDO
+
+¿Le gustaría que comience inmediatamente con la **Fase 1 (Sistema de Enlaces Externos a Google Drive)**? Puedo:
+
+1. Crear los archivos necesarios para reemplazar el input de file por input de texto con validación de enlaces de Drive
+2. Modificar el componente PWA para mostrar botones de descarga y previsualización
+3. Preparar los casos de prueba para agregar a `TESTING.md`
+4. Hacer un commit inicial con estos cambios para su revisión
+
+Esto no tiene dependencias externas y puede completarse en 2-3 días como acordamos en la priorización.
+
+¿Desea que proceda con la Fase 1 ahora?
+
+
+

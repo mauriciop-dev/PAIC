@@ -1,14 +1,10 @@
 
 import React, { useState } from 'react';
-import { ConjuntoInfo, UserProfile } from '../../types';
+import { ConjuntoInfo, UserProfile, StoredFile } from '../../types';
 import { Icon } from '@paic/ui';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
-import {
-    getGoogleDrivePreviewUrl,
-    isGoogleDriveFileUrl,
-    isValidGoogleDriveLink,
-} from '../../utils/googleDriveLinks';
+import FileSelectorModal from '../FileSelectorModal';
 
 interface ComunicacionesViewProps {
     userProfile: UserProfile;
@@ -20,13 +16,10 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
     const [currentRecipient, setCurrentRecipient] = useState('');
-    const [attachments, setAttachments] = useState<{name: string, url: string}[]>([]);
+    const [attachments, setAttachments] = useState<StoredFile[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isFileSelectorOpen, setIsFileSelectorOpen] = useState(false);
-    const [isDriveLinkInputOpen, setIsDriveLinkInputOpen] = useState(false);
-    const [driveLink, setDriveLink] = useState('');
-    const [driveLinkError, setDriveLinkError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
     
 
@@ -97,48 +90,17 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
         }
     };
 
-const handleRemoveRecipient = (recipientToRemove: string) => {
+    const handleRemoveRecipient = (recipientToRemove: string) => {
         setRecipients(recipients.filter(r => r !== recipientToRemove));
     };
     
-    const validateDriveLink = (url: string): string | null => {
-        if (!url.trim()) return 'Por favor ingrese un enlace';
-
-        if (isValidGoogleDriveLink(url)) {
-            return null;
-        }
-
-        return 'El enlace debe ser un archivo o carpeta de Google Drive público (ej: https://drive.google.com/file/d/FILE_ID/view o https://drive.google.com/folders/FOLDER_ID)';
+    const handleSelectFiles = (selectedFiles: StoredFile[]) => {
+        setAttachments(selectedFiles);
+        setIsFileSelectorOpen(false);
     };
-    
-    const handleAddDriveLink = () => {
-        const error = validateDriveLink(driveLink);
-        if (error) {
-            setDriveLinkError(error);
-            return;
-        }
-        
-        // Extract a name from the URL for display
-        let name = 'Enlace de Google Drive';
-        try {
-            const urlObj = new URL(driveLink);
-            if (driveLink.includes('/file/d/')) {
-                name = `Archivo de Drive`;
-            } else if (driveLink.includes('/folders/')) {
-                name = `Carpeta de Drive`;
-            }
-        } catch (e) {
-            // Use default name if URL parsing fails
-        }
-        
-        setAttachments(prev => [...prev, { name, url: driveLink.trim() }]);
-        setDriveLink('');
-        setDriveLinkError(null);
-        setIsDriveLinkInputOpen(false);
-    };
-    
-    const removeAttachment = (indexToRemove: number) => {
-        setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
+
+    const removeAttachment = (fileToRemove: StoredFile) => {
+        setAttachments(prev => prev.filter(file => file.id !== fileToRemove.id));
     };
 
 
@@ -246,39 +208,30 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                             required
                         />
                     </div>
-{attachments.length > 0 && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Enlaces Adjuntos
-                                </label>
-                                <div className="space-y-2">
-                                    {attachments.map((attachment, index) => (
-                                        <div key={index} 
-                                             className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-md">
-                                            <Icon name="drive" className="w-4 h-4 text-blue-600" />
-                                            <div className="flex-1">
-                                                <p className="font-medium text-gray-800">{attachment.name}</p>
-                                                <p className="text-xs text-gray-500 break-all">{attachment.url}</p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeAttachment(index)}
-                                                className="text-red-500 hover:text-red-700 p-1">
-                                                <Icon name="x" className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
+                     {attachments.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Archivos Adjuntos</label>
+                            <div className="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-md bg-gray-50">
+                                {attachments.map(file => (
+                                     <div key={file.id} className="flex items-center gap-2 bg-indigo-100 text-indigo-800 text-sm font-medium px-2 py-1 rounded-full">
+                                        <Icon name="file-text" className="w-4 h-4"/>
+                                        {file.name}
+                                        <button type="button" onClick={() => removeAttachment(file)} className="text-indigo-600 hover:text-indigo-800">
+                                            <Icon name="x" className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
-                        )}
+                        </div>
+                    )}
                     <div className="flex justify-end items-center gap-4">
                         <button
                             type="button"
-                            onClick={() => setIsDriveLinkInputOpen(true)}
+                            onClick={() => setIsFileSelectorOpen(true)}
                             className="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 flex items-center gap-2"
                         >
-                            <Icon name="drive" className="w-5 h-5" />
-                            Adjuntar desde Google Drive
+                            <Icon name="file-text" className="w-5 h-5" />
+                            Adjuntar desde Archivos
                         </button>
 
                         <button
@@ -290,73 +243,21 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                             {isSending ? 'Enviando...' : `Enviar a ${recipients.length} destinatarios`}
                         </button>
                     </div>
-{feedback && (
+                     {feedback && (
                         <p className={`text-sm mt-4 text-center ${feedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                             {feedback.text}
                         </p>
                     )}
                 </form>
             </div>
-             {isDriveLinkInputOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={() => setIsDriveLinkInputOpen(false)}>
-                    <div className="bg-white rounded-lg shadow-2xl w-11/12 md:w-2/3 lg:w-1/2 relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                        <header className="p-6 border-b border-gray-200">
-                            <button onClick={() => setIsDriveLinkInputOpen(false)} 
-                                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-                                <Icon name="x" className="w-6 h-6" />
-                            </button>
-                            <h2 className="text-2xl font-bold text-gray-800">Adjuntar desde Google Drive</h2>
-                            <p className="text-sm text-gray-600">Pegue el enlace público de un archivo o carpeta de Google Drive</p>
-                        </header>
-                        <div className="p-6 flex-1 overflow-y-auto">
-                            <div className="space-y-4">
-                                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-                                    Asegúrate de que este archivo o carpeta en Google Drive tenga los permisos configurados como "Cualquier persona con el enlace puede ver" para evitar problemas de acceso con los residentes.
-                                </div>
-                                <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
-                                    <Icon name="drive" className="w-5 h-5 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        value={driveLink}
-                                        onChange={(e) => {
-                                            setDriveLink(e.target.value);
-                                            setDriveLinkError(null);
-                                        }}
-                                        placeholder="https://drive.google.com/file/d/FILE_ID/view o https://drive.google.com/folders/FOLDER_ID"
-                                        className="flex-1 bg-transparent focus:outline-none p-0 text-sm"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleAddDriveLink}
-                                        disabled={isSending || isGenerating}
-                                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400">
-                                        Añadir Enlace
-                                    </button>
-                                </div>
-                                {driveLinkError && (
-                                    <p className="text-red-500 text-sm">{driveLinkError}</p>
-                                )}
-                                {driveLink && isGoogleDriveFileUrl(driveLink) && (
-                                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Vista previa</p>
-                                        <iframe
-                                            src={getGoogleDrivePreviewUrl(driveLink)}
-                                            className="h-64 w-full rounded border border-gray-200"
-                                            title="Vista previa de archivo de Google Drive"
-                                            allow="autoplay"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <footer className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-4">
-                            <button type="button" onClick={() => setIsDriveLinkInputOpen(false)} 
-                                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
-                                Cancelar
-                            </button>
-                        </footer>
-                    </div>
-                </div>
+             {isFileSelectorOpen && (
+                <FileSelectorModal
+                    isOpen={isFileSelectorOpen}
+                    onClose={() => setIsFileSelectorOpen(false)}
+                    conjuntoId={userProfile.conjuntoId!}
+                    onSelectFiles={handleSelectFiles}
+                    currentSelection={attachments}
+                />
             )}
         </div>
     );

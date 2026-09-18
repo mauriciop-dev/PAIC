@@ -1,0 +1,149 @@
+===============================================================================
+ESPECIFICACIÓN TÉCNICA Y ARQUITECTURA PAIC: 
+ENLACES EXTERNOS (DRIVE), SUSTITUCIÓN DE EMAILS POR COMUNICADOS, 
+NOTIFICACIONES PUSH NATIVAS Y SISTEMA RAG CON DRIVE/DOCUMENTOS DE CONJUNTOS
+===============================================================================
+
+OBJETIVO GENERAL:
+Optimizar la plataforma PAIC reemplazando el almacenamiento pesado de archivos y 
+el envío de correos tradicionales (Resend) por una arquitectura basada en enlaces 
+de Google Drive, comunicaciones centralizadas en la PWA, notificaciones push 
+nativas del sistema operativo y una capa de RAG (Retrieval-Augmented Generation) 
+sobre la documentación del conjunto para el uso del Administrador con IA.
+
+-------------------------------------------------------------------------------
+1. IMPLEMENTACIÓN DEL SISTEMA DE ENLACES EXTERNOS A ARCHIVOS (GOOGLE DRIVE)
+-------------------------------------------------------------------------------
+- Problema a resolver: Reemplazar el almacenamiento local/directo de archivos 
+  pesados en Supabase Storage para evitar costos de almacenamiento y transferencia.
+- Solución: Permitir al Administrador ingresar un enlace público de Google Drive 
+  (archivo o carpeta) en el formulario de creación de comunicados.
+
+Requerimientos Técnicos:
+A. Base de Datos (Supabase SQL):
+   - Estructura de tabla `comunicados`:
+     * id: uuid (PK)
+     * conjunto_id: uuid (FK)
+     * titulo: text
+     * contenido: text
+     * url_adjunto: text (nullable)
+     * created_at: timestamptz
+
+B. Componente Frontend Admin (Next.js App Router + Tailwind CSS):
+   - Sustituir el input de tipo 'file' por un input de texto para `url_adjunto`.
+   - Validar en tiempo real mediante Expresión Regular (Regex) que la URL corresponda 
+     a un formato válido de Google Drive (detección de patrones `/file/d/[ID]/view` 
+     o `/folders/[ID]`).
+   - Mostrar mensaje de advertencia flotante si el formato no es válido.
+   - Incluir un banner informativo permanente (estilo Material 3):
+     "Asegúrate de que este archivo o carpeta en Google Drive tenga los permisos 
+     configurados como 'Cualquier persona con el enlace puede ver' para evitar 
+     problemas de acceso con los residentes."
+
+C. Componente Residente PWA (Visualización):
+   - Si `url_adjunto` no es nulo, renderizar un botón con acción `target="_blank" rel="noopener noreferrer"`.
+   - Si la URL corresponde a un archivo individual, extraer el ID e incorporar una 
+     opción de previsualización en la PWA mediante un iframe apuntando a 
+     `https://drive.google.com/file/d/[ID]/preview`.
+
+-------------------------------------------------------------------------------
+2. SUSTITUCIÓN DE CORREOS MASIVOS (RESEND) POR COMUNICADOS EN PWA
+-------------------------------------------------------------------------------
+- Problema a resolver: Reducir costos de consumo API de correo (Resend) y mejorar 
+  la tasa de apertura y velocidad de transmisión de avisos importantes.
+- Solución: Eliminar los envíos por mail para avisos masivos rutinarios y mover toda 
+  la lógica de difusión al flujo nativo de la PWA.
+
+Requerimientos Técnicos:
+A. Lógica en Server Action (`app/actions/comunicados.ts`):
+   - Al publicar un comunicado en Supabase, omitir la llamada al servicio de email.
+   - Guardar el registro del comunicado en la base de datos.
+   - Disparar de manera asíncrona un evento interno de broadcast hacia el módulo 
+     de notificaciones Push PWA filtrando por `conjunto_id`.
+
+B. Ventajas Arquitectónicas:
+   - Cero dependencia de créditos de correo saliente para noticias diarias.
+   - Trazabilidad directa de lectura de comunicados dentro de la base de datos de PAIC.
+
+-------------------------------------------------------------------------------
+3. IMPLEMENTACIÓN DE NOTIFICACIONES PUSH NATIVAS DEL SISTEMA OPERATIVO
+-------------------------------------------------------------------------------
+- Problema a resolver: Reemplazar los avisos verdes/toasts temporales dentro del DOM 
+  de la app (in-app notifications) por notificaciones reales del sistema (Android / iOS).
+- Solución: Implementar la API de Web Push con llaves VAPID y Service Workers.
+
+Requerimientos Técnicos:
+A. Base de Datos (Supabase):
+   - Crear la tabla `push_subscriptions`:
+     * id: uuid (PK)
+     * user_id: uuid (FK)
+     * conjunto_id: uuid (FK)
+     * subscription_json: jsonb (Almacena Endpoint y claves p256dh/auth del navegador)
+     * updated_at: timestamptz
+
+B. Cliente (PWA - React / Next.js):
+   - Implementar Hook/Módulo de Registro Push (`usePushNotifications`):
+     * Verificar soporte de `serviceWorker` y `PushManager`.
+     * Ejecutar `Notification.requestPermission()`.
+     * Al ser otorgado, suscribir al usuario con la clave pública `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+     * Guardar/actualizar la suscripción JSON en Supabase.
+   - Requisito de plataforma iOS: Proveer indicación en la PWA para que el residente 
+     agregue la app a la "Pantalla de inicio" (Home Screen), requisito obligatorio de Apple 
+     para habilitar Web Push en iOS 16.4+.
+
+C. Service Worker (`public/sw.js`):
+   - Escuchar el evento `'push'` recibido del servidor.
+   - Invocar `self.registration.showNotification(data.title, options)` con título, 
+     cuerpo, ícono, badge y datos contextuales (URL del comunicado).
+   - Escuchar el evento `'notificationclick'` para cerrar la alerta y abrir/enfocar 
+     la ventana de la PWA directamente en la ruta del comunicado recibido.
+
+D. Servidor (`lib/push-notifications.ts`):
+   - Utilizar la librería `web-push` en Node.js configurada con claves VAPID privadas.
+   - Consultar las suscripciones activas del `conjunto_id` objetivo en Supabase.
+   - Iterar y enviar payloads cifrados en segundo plano. Limpiar suscripciones inactivas (HTTP 410/404).
+
+-------------------------------------------------------------------------------
+4. ARQUITECTURA RAG (RETRIEVAL-AUGMENTED GENERATION) SOBRE DOCUMENTACIÓN DEL CONJUNTO
+-------------------------------------------------------------------------------
+- Objetivo: Permitir al Administrador interactuar con un asistente de IA capaz de 
+  responder preguntas precisas, redactar informes y consultar reglamentos o actas 
+  basándose en la información guardada en Google Drive y archivos del conjunto.
+
+Requerimientos Técnicos:
+
+A. Fuentes de Datos (Data Ingestion):
+   - Carpeta de Google Drive del Conjunto (Reglamento de propiedad horizontal, actas de 
+     asamblea, contratos de proveedores, presupuestos, manuales de convivencia).
+   - Datos estructurados del conjunto desde Supabase (lista de propietarios, unidades, 
+     pagos de administración, comunicados pasados).
+
+B. Pipeline de Indexación y Embeddings:
+   - Conector/Sincronizador: Tarea programada o Webhook que lee archivos nuevos/modificados 
+     en la carpeta de Drive (formatos PDF, DOCX, TXT).
+   - Extracción y Chunking: Convertir documentos a texto plano y dividirlos en fragmentos 
+     semánticos (chunks de ~500-1000 tokens con superposición/overlap de 100 tokens).
+   - Generación de Embeddings: Convertir fragmentos en vectores usando un modelo de 
+     embeddings (ej. OpenAI `text-embedding-3-small` o Google Vertex AI Embeddings).
+   - Base de Datos Vectorial: Guardar los vectores en Supabase utilizando la extensión `pgvector` 
+     en la tabla `documentos_embeddings`:
+     * id: uuid
+     * conjunto_id: uuid
+     * contenido_chunk: text
+     * embedding: vector(1536)
+     * fuente_url: text (enlace de Drive)
+     * metadata: jsonb (nombre del archivo, página, fecha)
+
+C. Flujo de Consulta RAG para el Administrador (Servicio de IA):
+   1. El Administrador realiza una consulta en el panel de PAIC (ej. "¿Cuál es la sanción por ruidos molestos según el manual?").
+   2. La consulta se convierte en vector de búsqueda (query embedding).
+   3. Búsqueda por Similitud de Coseno (`match_documents` en Supabase/pgvector) filtrando estricta y únicamente por `conjunto_id`.
+   4. Construcción del Contexto: Se seleccionan los 3-5 fragmentos más relevantes.
+   5. Generación de Respuesta: Se envía el prompt enriquecido al modelo LLM (ej. Gemini o GPT-4o):
+      "Eres un asistente experto para la administración del conjunto PAIC. Responde la siguiente consulta basándote ÚNICAMENTE en el siguiente contexto extraído de los documentos oficiales del conjunto: [CONTEXTO]. Si la información no está en el contexto, indícalo claramente."
+
+D. Casos de Uso Iniciales para el Administrador:
+   - Redacción automática de comunicados basados en decisiones de actas anteriores.
+   - Búsqueda rápida de cláusulas contractuales de proveedores.
+   - Consultas sobre procedimientos del reglamento de propiedad horizontal.
+===============================================================================
