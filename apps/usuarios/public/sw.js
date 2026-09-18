@@ -4,6 +4,24 @@ self.addEventListener('activate', (event) => { event.waitUntil(self.clients.clai
 self.addEventListener('fetch', (event) => { if (event.request.method === 'GET') event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request))); });
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : { title: 'PAIC Residentes', body: 'Tienes una nueva actualización.' };
-  event.waitUntil(self.registration.showNotification(data.title || 'PAIC Residentes', { body: data.body || '', icon: data.icon || '/logo-paic.png', badge: data.badge || '/logo-paic.png', data: { url: data.url || '/' } }));
+  const payload = {
+    title: data.title || 'PAIC Residentes',
+    body: data.body || '',
+    icon: data.icon || '/logo-paic.png',
+    badge: data.badge || '/logo-paic.png',
+    data: { url: data.url || '/' }
+  };
+  event.waitUntil(self.registration.showNotification(payload.title, payload));
 });
-self.addEventListener('notificationclick', (event) => { event.notification.close(); event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => { const target = event.notification.data?.url || '/'; const existing = clients.find((client) => 'focus' in client); return existing ? existing.focus() : self.clients.openWindow(target); })); });
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((client) => client.url === targetUrl && 'focus' in client);
+      if (existing) return existing.focus();
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});

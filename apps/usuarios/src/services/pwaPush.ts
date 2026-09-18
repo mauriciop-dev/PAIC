@@ -2,6 +2,20 @@ import { supabase } from './pwaAuth';
 
 const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
+export function isPushSupported(): boolean {
+  return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+export function buildNotificationPayload(input: { title: string; body?: string; url?: string; icon?: string; badge?: string }) {
+  return {
+    title: input.title || 'PAIC Residentes',
+    body: input.body || '',
+    url: input.url || '/',
+    icon: input.icon || '/logo-paic.png',
+    badge: input.badge || '/logo-paic.png',
+  };
+}
+
 function decodeKey(value: string) {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
   const raw = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
