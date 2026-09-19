@@ -2,7 +2,8 @@ node_modules/
 **/node_modules/
 dist/
 **/dist/
-.env
+.env*
+.env*.txt
 .env.local
 .env.*.local
 .vercel/
