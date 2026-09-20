@@ -866,9 +866,14 @@ export const apiService = {
     return files;
   },
   async uploadFileForConjunto(conjuntoId: string, file: File): Promise<void> {
+    const sanitizedName = file.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '_');
+
     const { error } = await supabase.storage
       .from('conjunto-files')
-      .upload(`${conjuntoId}/${file.name}`, file, {
+      .upload(`${conjuntoId}/${sanitizedName}`, file, {
         cacheControl: '3600',
         upsert: true,
       });
