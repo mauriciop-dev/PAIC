@@ -224,17 +224,19 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   const today = new Date();
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 md:flex-wrap md:overflow-visible md:gap-3">
+    <div className="space-y-4">
+      {/* Leyenda horizontal y compacta de Áreas Comunes */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Áreas:</span>
         {commonAreas.map(area => {
             const color = area.color || defaultColor; // Defensive check
             return (
                 <div
                   key={area.id}
-                  className={`flex flex-col items-center gap-1.5 shrink-0 min-w-[88px] md:min-w-[120px] px-3 py-3 rounded-xl border ${color.border} ${color.bg} shadow-sm`}
+                  className="flex items-center gap-1.5 shrink-0"
                 >
-                    <AreaIcon name={area.name} className={`w-6 h-6 ${color.text}`} />
-                    <span className="text-xs md:text-sm font-medium text-gray-700 text-center leading-tight">{area.name}</span>
+                    <span className={`w-3 h-3 rounded-full ${color.bg} border ${color.border}`} />
+                    <span className="text-xs md:text-sm font-semibold text-gray-700">{area.name}</span>
                 </div>
             );
         })}
