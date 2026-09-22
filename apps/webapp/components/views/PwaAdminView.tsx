@@ -3,6 +3,11 @@ import { Badge, Button, Card, Icon, Input, Textarea } from '@paic/ui';
 import { ConjuntoInfo, UserProfile } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { notifyPwaResidents } from '../../services/pwaPushService';
+import {
+    getGoogleDrivePreviewUrl,
+    isGoogleDriveFileUrl,
+    isValidGoogleDriveLink,
+} from '../../utils/googleDriveLinks';
 
 type Section = 'Comunicados' | 'Estado de cuenta' | 'Portería' | 'Reservas' | 'PQRs' | 'Documentos' | 'Votaciones' | 'Directorio' | 'Configuración';
 const sections: Array<{ id: Section; icon: string }> = [
