@@ -8,6 +8,7 @@ import {
     isGoogleDriveFileUrl,
     isValidGoogleDriveLink,
 } from '../../utils/googleDriveLinks';
+import { openGoogleDrivePicker } from '../../utils/googleDrivePicker';
 
 type Section = 'Comunicados' | 'Estado de cuenta' | 'Portería' | 'Reservas' | 'PQRs' | 'Documentos' | 'Votaciones' | 'Directorio' | 'Configuración';
 const sections: Array<{ id: Section; icon: string }> = [
@@ -33,7 +34,109 @@ async function signedAdminAttachment(path: string | null) { if (!path || path.st
 
 function AccessInvite({ conjuntoId }: { conjuntoId: string }) { const [copied, setCopied] = useState(false); const url = `https://usuarios.paicai.com.co/?registro=1&conjunto=${encodeURIComponent(conjuntoId)}`; const qr = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(url)}`; const copy = async () => { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }; return <Card className="p-5"><h2 className="font-semibold">Acceso de residentes</h2><p className="mt-1 text-sm text-gray-600">Comparte este enlace o código QR para que los residentes soliciten acceso a la PWA.</p><div className="mt-4 grid gap-5 md:grid-cols-[1fr_auto] md:items-center"><div><label className="text-sm font-medium">Enlace de registro</label><input readOnly value={url} className="mt-1 w-full rounded border bg-gray-50 p-2 text-sm"/><div className="mt-3 flex flex-wrap gap-2"><Button onClick={()=>void copy()}>{copied?'Enlace copiado':'Copiar enlace'}</Button><a className="inline-flex items-center rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" href={url} target="_blank" rel="noreferrer">Abrir PWA</a><a className="inline-flex items-center rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" href={qr} download="paic-registro-residentes.png" target="_blank" rel="noreferrer">Descargar QR</a></div></div><div className="rounded border bg-white p-2"><img src={qr} alt="Código QR para solicitar acceso a PAIC Residentes" className="h-40 w-40"/><p className="mt-1 text-center text-xs text-gray-500">Escanea para solicitar acceso</p></div></div></Card> }
 
-function Communications({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { const [rows,setRows]=useState<any[]>([]); const [title,setTitle]=useState(''); const [body,setBody]=useState(''); const [scheduledAt,setScheduledAt]=useState(''); const [file,setFile]=useState<File|null>(null); const [message,setMessage]=useState(''); const load=async()=>{const {data}=await supabase.from('pwa_communications').select('*').eq('conjunto_id',conjuntoId).order('created_at',{ascending:false});setRows(await Promise.all((data||[]).map(async r=>({...r,attachment_url:await signedAdminAttachment(r.attachment_url)}))))}; useEffect(()=>{void load()},[conjuntoId]); const save=async(e:React.FormEvent)=>{e.preventDefault();try{const attachmentUrl=file?await uploadAdminAttachment(file,'communications',userId):null;const scheduled = scheduledAt ? new Date(scheduledAt).toISOString() : null;const result=await supabase.from('pwa_communications').insert({conjunto_id:conjuntoId,title,body,attachment_url:attachmentUrl,attachment_type:file?.type||null,status:scheduled?'borrador':'publicado',scheduled_at:scheduled,published_at:scheduled?null:new Date().toISOString(),created_by:userId});if(result.error)throw result.error;if(!scheduled)void notifyPwaResidents({conjuntoId,title:'Nuevo comunicado',body:title});setTitle('');setBody('');setScheduledAt('');setFile(null);setMessage(scheduled?'Comunicado programado.':'Comunicado publicado.');void load()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo guardar el comunicado.')}};return <div className="grid gap-6 lg:grid-cols-2"><Card className="p-5"><h2 className="font-semibold">Nuevo comunicado</h2><form onSubmit={save} className="mt-3 space-y-3"><Input label="Título" value={title} onChange={e=>setTitle(e.target.value)} required/><Textarea label="Mensaje" value={body} onChange={e=>setBody(e.target.value)} required/><label className="block text-sm">Programar publicación<input className="mt-1 w-full rounded border p-2" type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)}/></label><input type="file" accept="image/*,.pdf" onChange={e=>setFile(e.target.files?.[0]||null)}/><Button type="submit">{scheduledAt?'Programar':'Publicar'}</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</form></Card><Card className="p-5"><h2 className="font-semibold">Comunicados</h2><div className="mt-3 space-y-3">{rows.map(r=><article className="rounded border p-3" key={r.id}><div className="flex justify-between"><b>{r.title}</b><Badge variant={r.status==='publicado'?'success':'warning'}>{r.status}</Badge></div><p className="mt-2 text-sm">{r.body}</p>{r.scheduled_at&&<p className="text-xs text-gray-500">Programado: {new Date(r.scheduled_at).toLocaleString('es-CO')}</p>}{r.attachment_url&&<a className="text-sm text-blue-600 underline" href={r.attachment_url} target="_blank" rel="noreferrer">Abrir adjunto</a>}</article>)}</div></Card></div> }
+function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: string }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    const { data } = await supabase.from('pwa_communications').select('*').eq('conjunto_id', conjuntoId).order('created_at', { ascending: false });
+    setRows(data || []);
+  };
+
+  useEffect(() => { void load(); }, [conjuntoId]);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const scheduled = scheduledAt ? new Date(scheduledAt).toISOString() : null;
+      const result = await supabase.from('pwa_communications').insert({
+        conjunto_id: conjuntoId,
+        title,
+        body,
+        attachment_url: attachmentUrl || null,
+        status: scheduled ? 'borrador' : 'publicado',
+        scheduled_at: scheduled,
+        published_at: scheduled ? null : new Date().toISOString(),
+        created_by: userId
+      });
+      if (result.error) throw result.error;
+      if (!scheduled) void notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: title });
+      setTitle('');
+      setBody('');
+      setScheduledAt('');
+      setAttachmentUrl('');
+      setMessage(scheduled ? 'Comunicado programado.' : 'Comunicado publicado.');
+      void load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar el comunicado.');
+    }
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card className="p-5">
+        <h2 className="font-semibold">Nuevo comunicado</h2>
+        <form onSubmit={save} className="mt-3 space-y-3">
+          <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} required />
+          <Textarea label="Mensaje" value={body} onChange={e => setBody(e.target.value)} required />
+          <div>
+            <label className="block text-sm font-medium mb-1">Archivo adjunto (Google Drive)</label>
+            <div className="flex gap-2">
+              <Input
+                className="flex-1"
+                value={attachmentUrl}
+                onChange={e => setAttachmentUrl(e.target.value)}
+                placeholder="https://drive.google.com/..."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void openGoogleDrivePicker({ onSelect: (f) => setAttachmentUrl(f.url) })}
+              >
+                Drive
+              </Button>
+            </div>
+          </div>
+          <label className="block text-sm">
+            Programar publicación
+            <input
+              className="mt-1 w-full rounded border p-2"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={e => setScheduledAt(e.target.value)}
+            />
+          </label>
+          <Button type="submit">Publicar</Button>
+          {message && <p className="text-sm text-gray-600 mt-2">{message}</p>}
+        </form>
+      </Card>
+      <div className="space-y-3">
+        <h3 className="font-semibold">Comunicados recientes</h3>
+        {rows.map(r => (
+          <div className="rounded border p-3 text-sm bg-white shadow-sm" key={r.id}>
+            <b>{r.title}</b>
+            <p className="text-gray-600 mt-1">{r.body}</p>
+            {r.attachment_url && (
+              <a
+                href={r.attachment_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block mt-2 text-blue-600 hover:underline text-xs"
+              >
+                Ver archivo en Drive &rarr;
+              </a>
+            )}
+          </div>
+        ))}
+        {!rows.length && <p className="text-sm text-gray-500">No hay comunicados registrados.</p>}
+      </div>
+    </div>
+  );
+}
 
 function Accounts({ conjuntoId }: { conjuntoId:string }) { const [rows,setRows]=useState<any[]>([]); const [message,setMessage]=useState(''); const load=async()=>{const {data}=await supabase.from('pwa_account_status').select('*').eq('conjunto_id',conjuntoId).order('apartment');setRows(data||[])}; useEffect(()=>{void load()},[conjuntoId]); const save=async(r:any)=>{const {error}=await supabase.from('pwa_account_status').upsert({...r,conjunto_id:conjuntoId,updated_at:new Date().toISOString()},{onConflict:'conjunto_id,apartment'});setMessage(error?error.message:'Guardado.');if(!error)void load()}; const importCsv=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];if(!file)return;const text=await file.text();const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const data=lines.slice(1).map(line=>{const [apartment,status,balance,observations='']=line.split(',').map(x=>x.trim());return {conjunto_id:conjuntoId,apartment,status:status||'al_dia',balance:Number(balance||0),observations,updated_at:new Date().toISOString()}}).filter(r=>r.apartment&&['al_dia','pendiente','en_mora'].includes(r.status));if(!data.length){setMessage('El CSV debe tener: apartamento,estado,saldo,observaciones.');return}const {error}=await supabase.from('pwa_account_status').upsert(data,{onConflict:'conjunto_id,apartment'});setMessage(error?error.message:`${data.length} registros importados.`);if(!error)void load()}; return <Card className="p-5"><div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">Estado de cuenta</h2><div className="flex gap-2"><label className="cursor-pointer rounded border px-3 py-2 text-sm">Importar CSV<input className="hidden" type="file" accept=".csv,text/csv" onChange={e=>void importCsv(e)}/></label><Button onClick={()=>setRows([...rows,{apartment:'',status:'al_dia',balance:0,observations:''}])}>Agregar</Button></div></div><p className="mt-2 text-xs text-gray-500">Columnas: apartamento, estado (al_dia/pendiente/en_mora), saldo, observaciones.</p>{message&&<p className="mt-2 text-sm text-gray-600">{message}</p>}<div className="mt-3 space-y-2">{rows.map((r,i)=><div className="grid gap-2 rounded border p-3 md:grid-cols-5" key={r.id||i}><Input aria-label="Apartamento" value={r.apartment} onChange={e=>{const x=[...rows];x[i]={...r,apartment:e.target.value};setRows(x)}}/><select aria-label="Estado" className="rounded border" value={r.status} onChange={e=>{const x=[...rows];x[i]={...r,status:e.target.value};setRows(x)}}><option value="al_dia">Al día</option><option value="pendiente">Pendiente</option><option value="en_mora">En mora</option></select><Input aria-label="Saldo" type="number" value={r.balance} onChange={e=>{const x=[...rows];x[i]={...r,balance:Number(e.target.value)};setRows(x)}}/><Input aria-label="Observaciones" value={r.observations||''} onChange={e=>{const x=[...rows];x[i]={...r,observations:e.target.value};setRows(x)}}/><Button onClick={()=>void save(r)}>Guardar</Button></div>)}</div></Card> }
 
