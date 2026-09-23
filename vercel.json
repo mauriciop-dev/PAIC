@@ -1,6 +1,0 @@
-{
-  "buildCommand": "pnpm --filter webapp build",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "apps/webapp/dist",
-  "framework": "vite"
-}
