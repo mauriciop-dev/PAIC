@@ -13,30 +13,70 @@ declare global {
   }
 }
 
-let pickerApiLoaded = false;
+let gapiLoaded = false;
+let gisLoaded = false;
+let tokenClient: any = null;
 
-export const loadGooglePickerApi = (): Promise<void> => {
+// Carga las librerías oficiales de Google (GAPI y GIS)
+export const loadGooglePickerLibraries = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    if (pickerApiLoaded && window.google?.picker) {
+    if (gapiLoaded && gisLoaded) {
       return resolve();
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
+    // 1. Cargar GAPI (Google API Library) para el Picker
+    const gapiScript = document.createElement('script');
+    gapiScript.src = 'https://apis.google.com/js/api.js';
+    gapiScript.async = true;
+    gapiScript.defer = true;
+    gapiScript.onload = () => {
       if (window.gapi) {
         window.gapi.load('picker', () => {
-          pickerApiLoaded = true;
-          resolve();
+          gapiLoaded = true;
+          if (gisLoaded) resolve();
         });
-      } else {
-        resolve();
       }
     };
-    script.onerror = () => reject(new Error('No se pudo cargar la librería de Google Picker.'));
-    document.body.appendChild(script);
+    gapiScript.onerror = () => reject(new Error('No se pudo cargar GAPI para el Picker.'));
+    document.body.appendChild(gapiScript);
+
+    // 2. Cargar GIS (Google Identity Services) para el Token de Acceso
+    const gisScript = document.createElement('script');
+    gisScript.src = 'https://accounts.google.com/gsi/client';
+    gisScript.async = true;
+    gisScript.defer = true;
+    gisScript.onload = () => {
+      gisLoaded = true;
+      if (gapiLoaded) resolve();
+    };
+    gisScript.onerror = () => reject(new Error('No se pudo cargar GIS para la autenticación.'));
+    document.body.appendChild(gisScript);
+  });
+};
+
+// Solicita un token de acceso OAuth 2.0 de forma dinámica al usuario
+const getOAuthToken = (clientId: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!window.google?.accounts?.oauth2) {
+      return reject(new Error('Google Identity Services no está disponible.'));
+    }
+
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: (response: any) => {
+        if (response.error !== undefined) {
+          reject(response);
+        } else if (response.access_token) {
+          resolve(response.access_token);
+        } else {
+          reject(new Error('No se obtuvo un token de acceso válido.'));
+        }
+      },
+    });
+
+    // Solicitar el token de manera interactiva/fluida
+    tokenClient.requestAccessToken({ prompt: '' });
   });
 };
 
@@ -45,7 +85,7 @@ export const openGoogleDrivePicker = async (options?: {
   onSelect: (file: GooglePickerResult) => void;
   onCancel?: () => void;
 }): Promise<void> => {
-  await loadGooglePickerApi();
+  await loadGooglePickerLibraries();
 
   const apiKey =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_DRIVE_API_KEY) ||
@@ -57,10 +97,24 @@ export const openGoogleDrivePicker = async (options?: {
     (typeof process !== 'undefined' && process.env?.VITE_GOOGLE_CLIENT_ID) ||
     '';
 
+  if (!clientId) {
+    throw new Error('Google Client ID no configurado.');
+  }
+
+  // 1. Obtener Token de Acceso OAuth 2.0 requerido para evitar el 403
+  let oauthToken = '';
+  try {
+    oauthToken = await getOAuthToken(clientId);
+  } catch (error) {
+    console.error('Error al obtener token de Google:', error);
+    throw new Error('Autenticación de Google cancelada o fallida.');
+  }
+
   if (!window.google?.picker) {
     throw new Error('Google Picker no está disponible.');
   }
 
+  // 2. Construir Vista de Archivos
   const view = new window.google.picker.DocsView(window.google.picker.ViewId.DOCS)
     .setIncludeFolders(true)
     .setSelectFolderEnabled(true);
@@ -69,9 +123,11 @@ export const openGoogleDrivePicker = async (options?: {
     view.setParent(options.folderId);
   }
 
+  // 3. Crear el Picker con el Token de Acceso vinculado
   const pickerBuilder = new window.google.picker.PickerBuilder()
     .addView(view)
     .setLocale('es')
+    .setOAuthToken(oauthToken) // El Token elimina el 403
     .setCallback((data: any) => {
       if (data.action === window.google.picker.Action.PICKED) {
         const doc = data.docs?.[0];
