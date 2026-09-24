@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
 import { analytics } from '@paic/analytics';
-import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, type PwaMembership } from './services/pwaAuth';
+import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { subscribeToPush } from './services/pwaPush';
 import './App.css';
@@ -33,6 +33,11 @@ export default function UsuariosApp() {
   const authLoadInFlight = useRef(false);
 
   useEffect(() => {
+    if (supabaseConfigError) {
+      setAuthError(supabaseConfigError);
+      setAuthLoading(false);
+      return;
+    }
     analytics.init();
     let active = true;
     const loadAuth = async () => {
