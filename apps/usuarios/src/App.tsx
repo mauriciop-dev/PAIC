@@ -48,7 +48,7 @@ export default function UsuariosApp() {
         // Con invitación, renueva la sesión primero: un JWT caducado de una sesión
         // anterior (p.ej. la sesión administrativa del mismo origen) hacía fallar
         // la edge function con "non-2xx status code".
-        const session = invitationToken ? await ensureFreshSession() : await getSession();
+        const session = await ensureFreshSession();
         if (!session) return;
         let membership = await getMembership(session.user);
         if (invitationToken && !membership) {
