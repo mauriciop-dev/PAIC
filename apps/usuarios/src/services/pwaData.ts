@@ -26,7 +26,7 @@ export async function loadPwaData(membership: PwaMembership) {
     membership.role === 'residente_principal' ? client.from('pwa_votes').select('id,title,description,pwa_vote_questions(id,question,pwa_vote_options(id,label))').eq('conjunto_id', membership.conjunto_id).eq('status', 'publicada') : Promise.resolve({ data: [], error: null }),
     client.from('pwa_visit_authorizations').select('id,visitor_name,visitor_phone,visit_date,notes,status,created_at').eq('user_id', membership.user_id).order('created_at', { ascending: false }),
   ]);
-  const error = communications.error || account.error || reservations.error || packages.error || visitors.error || pqrs.error || documents.error || directories.error || votes.error || authorizations.error;
+  const error = communications.error || account.error || reservations.error || pqrs.error || documents.error || directories.error || votes.error || authorizations.error;
   if (error) throw error;
   const [safeCommunications, safePqrs, safeDocuments, safeReservations] = await Promise.all([
     Promise.all(((communications.data || []) as Communication[]).map(async (item) => ({ ...item, attachment_url: await getPwaAttachmentUrl(item.attachment_url) }))),

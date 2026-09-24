@@ -64,6 +64,7 @@ export async function getMembership(user: User): Promise<PwaMembership | null> {
     .from('pwa_memberships')
     .select('id, user_id, conjunto_id, apartment, role, status')
     .eq('user_id', user.id)
+    .eq('status', 'activo')
     .maybeSingle();
   if (error) throw error;
   return data as PwaMembership | null;
