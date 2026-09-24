@@ -38,7 +38,12 @@ export async function loadPwaData(membership: PwaMembership) {
 }
 
 export async function uploadPwaAttachment(file: File, userId: string) { if (!supabase) throw new Error('Supabase no está configurado.'); const path = `${userId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`; const { error } = await supabase.storage.from('pwa-attachments').upload(path, file, { contentType: file.type, upsert: false }); if (error) throw error; return path; }
-export async function getPwaAttachmentUrl(path: string | null | undefined) { if (!supabase || !path) return null; const { data, error } = await supabase.storage.from('pwa-attachments').createSignedUrl(path, 3600); if (error) throw error; return data.signedUrl; }
+export async function getPwaAttachmentUrl(path: string | null | undefined) {
+  if (!supabase || !path) return null;
+  if (path.startsWith('http')) return path;
+  const { data, error } = await supabase.storage.from('pwa-attachments').createSignedUrl(path, 3600);
+  return error ? path : data.signedUrl;
+}
 export async function createPqr(input: { conjuntoId: string; apartment: string; userId: string; type: string; title: string; description: string; attachmentUrl?: string | null }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { error } = await supabase.from('pwa_pqrs').insert({ conjunto_id: input.conjuntoId, apartment: input.apartment, user_id: input.userId, type: input.type, title: input.title, description: input.description, attachment_url: input.attachmentUrl || null }); if (error) throw error; }
 export async function answerVote(voteId: string, questionId: string, optionId: string, userId: string) { if (!supabase) throw new Error('Supabase no está configurado.'); const { error } = await supabase.from('pwa_vote_answers').insert({ vote_id: voteId, question_id: questionId, option_id: optionId, user_id: userId }); if (error) throw error; }
 export async function createReservation(input: { conjuntoId: string; apartment: string; userId: string; areaName: string; date: string; startTime: string; endTime: string; paymentProofPath: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { error } = await supabase.rpc('pwa_create_reservation', { target_conjunto: input.conjuntoId, target_apartment: input.apartment, target_area: input.areaName, target_date: input.date, target_start: input.startTime, target_end: input.endTime, target_payment_proof: input.paymentProofPath }); if (error) throw error; }
