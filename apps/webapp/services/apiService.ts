@@ -821,6 +821,44 @@ export const apiService = {
     
     return data;
   },
+  async createCommunicationCampaign(input: {
+    conjuntoId: string;
+    createdBy: string;
+    title: string;
+    body: string;
+    channel: 'email' | 'pwa' | 'both';
+    audience: string;
+    apartments: string[];
+    emails: string[];
+    emailsByApartment: Record<string, string | null>;
+    attachments: {name: string; url: string}[];
+    scheduledAt: string;
+    recurrence: 'none' | 'weekly' | 'monthly';
+  }): Promise<{data: {id: string} | null; error: Error | null}> {
+    const { data: campaign, error: campaignError } = await supabase.from('communication_campaigns').insert({
+      conjunto_id: input.conjuntoId,
+      created_by: input.createdBy,
+      title: input.title,
+      body: input.body,
+      channel: input.channel,
+      audience: input.audience,
+      attachments: input.attachments,
+      scheduled_at: input.scheduledAt,
+      next_run_at: input.scheduledAt,
+      recurrence: input.recurrence,
+    }).select('id').single();
+    if (campaignError || !campaign) return { data: null, error: campaignError ? new Error(campaignError.message) : new Error('No se pudo crear la campaña.') };
+
+    const recipients = input.apartments.map((apartment, index) => ({
+      campaign_id: campaign.id,
+      conjunto_id: input.conjuntoId,
+      apartment,
+      email: input.emailsByApartment[apartment] || null,
+    }));
+    const { error: recipientError } = await supabase.from('communication_campaign_recipients').insert(recipients);
+    if (recipientError) return { data: null, error: new Error(recipientError.message) };
+    return { data: campaign, error: null };
+  },
 
   // --- Super Admin ---
   async fetchAllConjuntos(): Promise<T.ConjuntoInfo[]> {

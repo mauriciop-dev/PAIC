@@ -9,6 +9,7 @@ import {
     isValidGoogleDriveLink,
 } from '../../utils/googleDriveLinks';
 import { openGoogleDrivePicker } from '../../utils/googleDrivePicker';
+import CommunicationRecipientModal, { RecipientSelection } from '../CommunicationRecipientModal';
 
 type Section = 'Comunicados' | 'Estado de cuenta' | 'Portería' | 'Reservas' | 'PQRs' | 'Documentos' | 'Votaciones' | 'Directorio' | 'Configuración';
 const sections: Array<{ id: Section; icon: string }> = [
@@ -39,6 +40,9 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'once' | 'weekly' | 'monthly'>('now');
+  const [recipientSelection, setRecipientSelection] = useState<RecipientSelection>({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
+  const [isRecipientModalOpen, setIsRecipientModalOpen] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [message, setMessage] = useState('');
 
@@ -53,6 +57,29 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
     e.preventDefault();
     try {
       const scheduled = scheduledAt ? new Date(scheduledAt).toISOString() : null;
+      const apartments = recipientSelection.apartments;
+      if (scheduleMode !== 'now' && !scheduled) throw new Error('Selecciona la fecha y hora de inicio.');
+      if (!apartments.length && recipientSelection.audience === 'manual') throw new Error('Selecciona al menos un apartamento.');
+      if (scheduleMode !== 'now') {
+        const campaign = await supabase.from('communication_campaigns').insert({
+          conjunto_id: conjuntoId,
+          channel: 'pwa',
+          title,
+          body,
+          audience: recipientSelection.audience,
+          recurrence: scheduleMode === 'once' ? 'none' : scheduleMode,
+          scheduled_at: scheduled,
+          next_run_at: scheduled,
+          created_by: userId,
+        }).select('id').single();
+        if (campaign.error) throw campaign.error;
+        const campaignRecipients = apartments.map(apartment => ({ campaign_id: campaign.data.id, conjunto_id: conjuntoId, apartment }));
+        const recipientResult = await supabase.from('communication_campaign_recipients').insert(campaignRecipients);
+        if (recipientResult.error) throw recipientResult.error;
+        setTitle(''); setBody(''); setScheduledAt(''); setScheduleMode('now'); setRecipientSelection({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
+        setMessage('Comunicado programado.');
+        return;
+      }
       const result = await supabase.from('pwa_communications').insert({
         conjunto_id: conjuntoId,
         title,
@@ -61,7 +88,9 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
         status: scheduled ? 'borrador' : 'publicado',
         scheduled_at: scheduled,
         published_at: scheduled ? null : new Date().toISOString(),
-        created_by: userId
+        created_by: userId,
+        audience: recipientSelection.audience,
+        target_apartments: apartments,
       });
       if (result.error) throw result.error;
       if (!scheduled) void notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: title });
@@ -69,6 +98,8 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
       setBody('');
       setScheduledAt('');
       setAttachmentUrl('');
+      setScheduleMode('now');
+      setRecipientSelection({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
       setMessage(scheduled ? 'Comunicado programado.' : 'Comunicado publicado.');
       void load();
     } catch (error) {
@@ -83,6 +114,7 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
         <form onSubmit={save} className="mt-3 space-y-3">
           <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} required />
           <Textarea label="Mensaje" value={body} onChange={e => setBody(e.target.value)} required />
+          <button type="button" onClick={() => setIsRecipientModalOpen(true)} className="flex w-full items-center justify-between rounded border p-3 text-left text-sm hover:border-blue-500"><span>{recipientSelection.audience === 'all_residents' && !recipientSelection.apartments.length ? 'Todos los residentes' : `${recipientSelection.apartments.length} apartamento(s) seleccionados`}</span><Icon name="users" className="h-4 w-4 text-blue-600" /></button>
           <div>
             <label className="block text-sm font-medium mb-1">Archivo adjunto (Google Drive)</label>
             <div className="flex gap-2">
@@ -103,14 +135,21 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
           </div>
           <label className="block text-sm">
             Programar publicación
+            <select className="mt-1 w-full rounded border p-2" value={scheduleMode} onChange={event => setScheduleMode(event.target.value as typeof scheduleMode)}>
+              <option value="now">Publicar ahora</option>
+              <option value="once">Programar una vez</option>
+              <option value="weekly">Repetir semanalmente</option>
+              <option value="monthly">Repetir mensualmente</option>
+            </select>
             <input
               className="mt-1 w-full rounded border p-2"
               type="datetime-local"
               value={scheduledAt}
               onChange={e => setScheduledAt(e.target.value)}
+              required={scheduleMode !== 'now'}
             />
           </label>
-          <Button type="submit">Publicar</Button>
+          <Button type="submit">{scheduleMode === 'now' ? 'Publicar' : 'Guardar programación'}</Button>
           {message && <p className="text-sm text-gray-600 mt-2">{message}</p>}
         </form>
       </Card>
@@ -134,6 +173,7 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
         ))}
         {!rows.length && <p className="text-sm text-gray-500">No hay comunicados registrados.</p>}
       </div>
+      <CommunicationRecipientModal conjuntoId={conjuntoId} open={isRecipientModalOpen} initialSelection={recipientSelection} onClose={() => setIsRecipientModalOpen(false)} onConfirm={selection => { setRecipientSelection(selection); setIsRecipientModalOpen(false); }} />
     </div>
   );
 }

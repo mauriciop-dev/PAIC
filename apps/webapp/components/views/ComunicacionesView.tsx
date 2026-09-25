@@ -4,6 +4,7 @@ import { ConjuntoInfo, UserProfile } from '../../types';
 import { Icon } from '@paic/ui';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
+import CommunicationRecipientModal, { RecipientSelection } from '../CommunicationRecipientModal';
 import {
     getGoogleDrivePreviewUrl,
     isGoogleDriveFileUrl,
@@ -19,6 +20,11 @@ const ComunicacionesView: React.FC<ComunicacionesViewProps> = ({ userProfile, co
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [recipients, setRecipients] = useState<string[]>([]);
+    const [selectedApartments, setSelectedApartments] = useState<string[]>([]);
+    const [recipientSelection, setRecipientSelection] = useState<RecipientSelection>({ audience: 'manual', apartments: [], emails: [], emailsByApartment: {} });
+    const [isRecipientModalOpen, setIsRecipientModalOpen] = useState(false);
+    const [scheduleMode, setScheduleMode] = useState<'now' | 'once' | 'weekly' | 'monthly'>('now');
+    const [scheduledAt, setScheduledAt] = useState('');
     const [currentRecipient, setCurrentRecipient] = useState('');
     const [attachments, setAttachments] = useState<{name: string, url: string}[]>([]);
     const [isSending, setIsSending] = useState(false);
@@ -144,7 +150,7 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!subject.trim() || !body.trim() || recipients.length === 0) {
+        if (!subject.trim() || !body.trim() || selectedApartments.length === 0) {
             setFeedback({type: 'error', text: 'Por favor, completa asunto, cuerpo y destinatarios.'});
             return;
         }
@@ -154,6 +160,35 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
         try {
             const attachmentLinks = attachments.map(file => ({ name: file.name, url: file.url }));
 
+            if (scheduleMode !== 'now') {
+                if (!scheduledAt) throw new Error('Selecciona la fecha y hora de inicio.');
+                const { data: campaign, error: campaignError } = await apiService.createCommunicationCampaign({
+                    conjuntoId: conjuntoInfo.id,
+                    createdBy: userProfile.id,
+                    title: subject,
+                    body,
+                    channel: 'email',
+                    audience: recipientSelection.audience,
+                    apartments: selectedApartments,
+                    emails: recipients,
+                    emailsByApartment: recipientSelection.emailsByApartment,
+                    attachments: attachmentLinks,
+                    scheduledAt: new Date(scheduledAt).toISOString(),
+                    recurrence: scheduleMode === 'once' ? 'none' : scheduleMode,
+                });
+                if (campaignError) throw campaignError;
+                setFeedback({type: 'success', text: `Comunicación programada${campaign ? '.' : '.'}`});
+                setSubject('');
+                setBody('');
+                setRecipients([]);
+                setSelectedApartments([]);
+                setRecipientSelection({ audience: 'manual', apartments: [], emails: [], emailsByApartment: {} });
+                setAttachments([]);
+                setScheduledAt('');
+                setScheduleMode('now');
+                return;
+            }
+
             const result = await apiService.sendCommunicationEmail(recipients, subject, body, attachmentLinks, conjuntoInfo.adminName, conjuntoInfo.adminEmail);
             
             if (result.success) {
@@ -161,6 +196,8 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                 setSubject('');
                 setBody('');
                 setRecipients([]);
+                setSelectedApartments([]);
+                setRecipientSelection({ audience: 'manual', apartments: [], emails: [], emailsByApartment: {} });
                 setAttachments([]);
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
@@ -181,37 +218,10 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                 <form id="form-comunicaciones" onSubmit={handleSend} className="space-y-4">
                     <div>
                         <label htmlFor="recipients" className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
-                         <div className="flex flex-wrap gap-2 mb-2">
-                            <button type="button" onClick={() => addRecipientGroup('all')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Todos los residentes</button>
-                            <button type="button" onClick={() => addRecipientGroup('debtors')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Residentes en mora</button>
-                            <button type="button" onClick={() => addRecipientGroup('providers')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Proveedores</button>
-                            <button type="button" onClick={() => addRecipientGroup('internal')} className="px-2 py-1 text-xs bg-gray-200 rounded-full hover:bg-gray-300">Internos</button>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-blue-500">
-                            {recipients.map(recipient => (
-                                <div key={recipient} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
-                                    {recipient}
-                                    <button type="button" onClick={() => handleRemoveRecipient(recipient)} className="text-blue-600 hover:text-blue-800">
-                                        <Icon name="x" className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ))}
-                            <input
-                                type="email"
-                                value={currentRecipient}
-                                onChange={(e) => setCurrentRecipient(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
-                                        e.preventDefault();
-                                        handleAddRecipient();
-                                    }
-                                }}
-                                onBlur={handleAddRecipient}
-                                placeholder={recipients.length === 0 ? "Añadir correos (separados por espacio, coma o Enter)..." : ""}
-                                className="flex-1 bg-transparent focus:outline-none p-1 text-sm"
-                            />
-                        </div>
+                        <button type="button" onClick={() => setIsRecipientModalOpen(true)} className="flex w-full items-center justify-between rounded-md border border-gray-300 p-3 text-left hover:border-blue-500">
+                            <span className={selectedApartments.length ? 'text-gray-900' : 'text-gray-500'}>{selectedApartments.length ? `${selectedApartments.length} apartamento(s) seleccionados · ${recipients.length} correo(s)` : 'Seleccionar unidades o apartamentos'}</span>
+                            <Icon name="users" className="h-5 w-5 text-blue-600" />
+                        </button>
                     </div>
                     <div>
                         <div className="flex justify-between items-center mb-1">
@@ -229,6 +239,19 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                             className="w-full p-2 border border-gray-300 rounded-md"
                             required
                         />
+                    </div>
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+                        <label className="block text-sm font-medium text-gray-700">Programación</label>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                            <select value={scheduleMode} onChange={event => setScheduleMode(event.target.value as typeof scheduleMode)} className="rounded border border-gray-300 bg-white p-2 text-sm">
+                                <option value="now">Enviar ahora</option>
+                                <option value="once">Programar una vez</option>
+                                <option value="weekly">Repetir semanalmente</option>
+                                <option value="monthly">Repetir mensualmente</option>
+                            </select>
+                            {scheduleMode !== 'now' && <input type="datetime-local" value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} className="rounded border border-gray-300 bg-white p-2 text-sm" required />}
+                        </div>
+                        {scheduleMode !== 'now' && <p className="mt-2 text-xs text-gray-500">Los destinatarios se recalcularán en cada ejecución según la segmentación elegida.</p>}
                     </div>
                     <div>
                          <div className="flex justify-between items-center mb-1">
@@ -287,7 +310,7 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                             className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 flex items-center gap-2"
                         >
                             <Icon name="send" className="w-5 h-5" />
-                            {isSending ? 'Enviando...' : `Enviar a ${recipients.length} destinatarios`}
+                            {isSending ? 'Enviando...' : scheduleMode === 'now' ? `Enviar a ${recipients.length} destinatarios` : 'Guardar programación'}
                         </button>
                     </div>
 {feedback && (
@@ -297,6 +320,7 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                     )}
                 </form>
             </div>
+            <CommunicationRecipientModal conjuntoId={conjuntoInfo.id} open={isRecipientModalOpen} initialSelection={recipientSelection} onClose={() => setIsRecipientModalOpen(false)} onConfirm={selection => { setRecipientSelection(selection); setSelectedApartments(selection.apartments); setRecipients(selection.emails); setIsRecipientModalOpen(false); }} />
              {isDriveLinkInputOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={() => setIsDriveLinkInputOpen(false)}>
                     <div className="bg-white rounded-lg shadow-2xl w-11/12 md:w-2/3 lg:w-1/2 relative flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
