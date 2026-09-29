@@ -1,0 +1,17 @@
+.git/
+.github/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+tmp/
+**/tmp/
+.vercel/
+.env
+.env.*
+*.env
+*.env.*
+*.pptx
+docs/technical-wiki/generated/
+PAIC_web/
+Marketing/
