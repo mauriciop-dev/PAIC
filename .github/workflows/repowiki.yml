@@ -45,7 +45,10 @@ jobs:
       - name: Generate technical wiki
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: repowiki scan . --site -o docs/technical-wiki/generated
+        run: |
+          repowiki scan . --format html --full -o docs/technical-wiki/generated
+          mv docs/technical-wiki/generated/repowiki.html docs/technical-wiki/generated/index.html
+          touch docs/technical-wiki/generated/.nojekyll
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
