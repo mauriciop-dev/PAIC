@@ -14,6 +14,7 @@ interface HeaderProps {
   onLogout: () => void;
   onSettingsClick: (tab?: SettingsTab) => void;
   activeTabName: string;
+  isReadOnly?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -25,7 +26,8 @@ const Header: React.FC<HeaderProps> = ({
   conjuntoInfo, 
   onLogout, 
   onSettingsClick, 
-  activeTabName 
+  activeTabName,
+  isReadOnly = false,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,16 +46,15 @@ const Header: React.FC<HeaderProps> = ({
   
   if (!userProfile) return null;
   const isConjuntoAdmin = userProfile.role === UserRole.Trial || userProfile.role === UserRole.Subscriber;
-  const isTrialActive = userProfile.role === UserRole.Trial && userProfile.trialExpiresAt;
+  const isTrialActive = userProfile.role === UserRole.Trial
+    && userProfile.trialExpiresAt
+    && conjuntoInfo?.subscriptionPlan !== 'Paid';
 
   let daysRemaining = 0;
   if (isTrialActive) {
       const trialEndDate = new Date(userProfile.trialExpiresAt!);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      trialEndDate.setHours(0, 0, 0, 0);
-      const diffTime = trialEndDate.getTime() - today.getTime();
-      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 24)));
+      const diffTime = trialEndDate.getTime() - Date.now();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   }
 
   return (
@@ -109,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({
             >
               Soporte
             </button>
-            {isTrialActive && daysRemaining >= 0 && (
+            {isTrialActive && daysRemaining > 0 && !isReadOnly && (
               <button
                 onClick={() => onSettingsClick('Suscripción')}
                 className="hidden lg:flex flex-col items-center px-3 py-2 min-h-[44px] bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all text-xs cursor-pointer"
@@ -118,6 +119,17 @@ const Header: React.FC<HeaderProps> = ({
                 <span className="font-bold text-green-700 leading-tight">Disfruta</span>
                 <span className="font-extrabold text-green-800 text-lg leading-none">{daysRemaining}</span>
                 <span className="font-medium text-green-600 leading-tight">días</span>
+              </button>
+            )}
+            {isReadOnly && (
+              <button
+                onClick={() => onSettingsClick('Suscripción')}
+                className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 sm:px-3"
+                title="Tu acceso está en modo de solo lectura. Consulta los planes disponibles."
+              >
+                <Icon name="clock" className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Solo lectura · Ver planes</span>
+                <span className="sm:hidden">Ver planes</span>
               </button>
             )}
             {showAnimatedButton && onOpenOnboarding ? (

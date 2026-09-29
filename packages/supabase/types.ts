@@ -18,7 +18,11 @@ export interface Database {
           admin_email: string | null;
           admin_phone: string | null;
           subscription_plan: string;
+          plan_name: string | null;
           plan_price: number | null;
+          plan_expires_at: string | null;
+          preapproval_id: string | null;
+          last_payment_id: string | null;
           registration_date: string | null;
         };
         Insert: {
@@ -30,7 +34,11 @@ export interface Database {
           admin_email?: string | null;
           admin_phone?: string | null;
           subscription_plan?: string;
+          plan_name?: string | null;
           plan_price?: number | null;
+          plan_expires_at?: string | null;
+          preapproval_id?: string | null;
+          last_payment_id?: string | null;
           registration_date?: string | null;
         };
         Update: {
@@ -42,7 +50,11 @@ export interface Database {
           admin_email?: string | null;
           admin_phone?: string | null;
           subscription_plan?: string;
+          plan_name?: string | null;
           plan_price?: number | null;
+          plan_expires_at?: string | null;
+          preapproval_id?: string | null;
+          last_payment_id?: string | null;
           registration_date?: string | null;
         };
       };

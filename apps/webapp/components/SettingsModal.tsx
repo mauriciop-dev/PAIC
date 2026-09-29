@@ -8,6 +8,7 @@ import UserModal from './UserModal';
 import RoleModal from './RoleModal';
 import PlansModal from './PlansModal';
 import { findPlanByName, getPlanCapacityText } from '../services/plans';
+import { isReadOnlyAccount } from '../services/trialAccess';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -34,10 +35,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
 
   // Detectar si el trial expiró
-  const isTrialExpired = userProfile.role === 'trial' 
-    && userProfile.trialExpiresAt 
-    && new Date(userProfile.trialExpiresAt).getTime() < Date.now()
-    && conjuntoInfo.subscriptionPlan === 'Free';
+  const isExpiredTrial = isReadOnlyAccount(userProfile, conjuntoInfo);
   
   // --- Estaciones (Puntos de Acceso Físicos) ---
   const [estaciones, setEstaciones] = useState<Estacion[]>([]);
@@ -679,7 +677,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const currentPlan = findPlanByName(conjuntoInfo.planName);
       return (
           <div className="space-y-6">
-              {isTrialExpired && (
+              {isExpiredTrial && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 flex-shrink-0" />
@@ -718,7 +716,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           <p className="mt-1 text-sm text-yellow-700 font-medium">
                               {currentPlan ? getPlanCapacityText(currentPlan) : 'Este plan te permite administrar una copropiedad con PAIC.'}
                           </p>
-                          <p className="mt-2 text-yellow-600">Disfruta de todas las funciones Pro durante tu periodo de prueba.</p>
+                          <p className="mt-2 text-yellow-600">
+                            {isExpiredTrial
+                              ? 'Tu acceso actual es de solo lectura. Elige un plan para volver a realizar cambios.'
+                              : 'Disfruta de todas las funciones Pro durante tu periodo de prueba.'}
+                          </p>
                       </>
                   )}
               </div>

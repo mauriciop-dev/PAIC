@@ -41,6 +41,32 @@ describe('mercadoPagoService', () => {
         expect(result).toBe('https://mp.com/pay/ABC');
     });
 
+    it('creates a subscription using the authenticated tenant and selected plan', async () => {
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ init_point: 'https://mp.com/subscriptions/ABC' }),
+        });
+
+        const result = await mercadoPagoService.createSubscription(
+            conjuntoInfo,
+            'Torre',
+            'monthly'
+        );
+
+        expect(result).toEqual({ init_point: 'https://mp.com/subscriptions/ABC' });
+        expect(mockFetch).toHaveBeenCalledWith(
+            'https://vgmwlzhlpehuvfkgqzja.supabase.co/functions/v1/create-mp-subscription',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    conjuntoId: '123',
+                    planName: 'Torre',
+                    billing: 'monthly',
+                }),
+            })
+        );
+    });
+
     it('sends the request with correct headers and body', async () => {
         mockFetch.mockResolvedValueOnce({
             ok: true,

@@ -124,6 +124,12 @@ Revisa las migraciones antes de aplicarlas a cualquier entorno compartido o de p
 - `SCHEMA_REFERENCE.md`
 - `docs/IMPLEMENTATION_PLAN.md`
 
+### Prueba y suscripción
+
+La migración `202609290001_trial_expired_read_only.sql` configura 14 días para los registros nuevos, conserva las fechas de vencimiento existentes y permite consultar PAIC en modo de solo lectura cuando vence la prueba y no hay un plan activo. El acceso de escritura también se valida mediante RLS en Supabase y se conserva para la cuenta de demostración designada.
+
+Para desplegar la confirmación de pagos, aplica las migraciones, configura `MERCADO_PAGO_ACCESS_TOKEN` como secreto de Supabase y despliega las funciones `create-mp-subscription`, `activate-mp-subscription` y `mercadopago-webhook`. Registra la URL de `mercadopago-webhook` como webhook de pagos y suscripciones en Mercado Pago. La creación y activación verifican la sesión, el plan, el estado, el valor y la cuenta receptora antes de habilitar acceso; no habilites cambios de suscripción directamente desde el cliente.
+
 ## Estructura del repositorio
 
 ```text

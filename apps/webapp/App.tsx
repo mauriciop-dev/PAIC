@@ -14,7 +14,12 @@ import { Tab, UserProfile, ConjuntoInfo, UserRole, SuperAdminProfile, PackageLog
 import { Icon, ToastProvider, useToast } from '@paic/ui';
 import AccessPointSelectionModal from './components/AccessPointSelectionModal';
 import { apiService } from './services/apiService';
-import { supabase } from './services/supabaseClient';
+import {
+  setWriteAccessProvider,
+  supabase,
+  TRIAL_WRITE_BLOCKED_EVENT,
+  TRIAL_WRITE_BLOCKED_MESSAGE,
+} from './services/supabaseClient';
 
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
@@ -25,6 +30,11 @@ import BottomNav from './components/BottomNav';
 import { useOnboardingProgress } from './hooks/useOnboardingProgress';
 import { analytics } from './services/analytics';
 import { getPendingPlan, clearPendingPlan } from './components/PlansModal';
+import {
+  canWriteForAccount,
+  isReadOnlyAccount,
+  TRIAL_DEMO_EMAIL,
+} from './services/trialAccess';
 
 interface LoginError {
   title: string;
@@ -53,6 +63,8 @@ const AppContent: React.FC = () => {
   const [loginError, setLoginError] = useState<LoginError | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const { addToast } = useToast();
+  const [accessClock, setAccessClock] = useState(Date.now());
+  const lastBlockedToastAt = useRef(0);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -72,19 +84,42 @@ const AppContent: React.FC = () => {
     }
   }, [notification, addToast]);
 
+  useEffect(() => {
+    setWriteAccessProvider(() => canWriteForAccount(userProfile, conjuntoInfo));
+  }, [userProfile, conjuntoInfo]);
+
+  useEffect(() => {
+    const handleBlockedWrite = () => {
+      const now = Date.now();
+      if (now - lastBlockedToastAt.current < 5000) return;
+      lastBlockedToastAt.current = now;
+      setNotification(TRIAL_WRITE_BLOCKED_MESSAGE);
+    };
+    window.addEventListener(TRIAL_WRITE_BLOCKED_EVENT, handleBlockedWrite);
+    return () => window.removeEventListener(TRIAL_WRITE_BLOCKED_EVENT, handleBlockedWrite);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setAccessClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [activeDetailedTour, setActiveDetailedTour] = useState<number | null>(null);
   const [welcomePlanName, setWelcomePlanName] = useState<string | null>(null);
   const [initialSettingsTab, setInitialSettingsTab] = useState<SettingsTab>('Perfil');
   const loginTrackedRef = useRef(false);
+  const processedPaymentRef = useRef<string | null>(null);
 
   const onboardingProgress = useOnboardingProgress(userProfile?.id || '');
+  const isReadOnly = isReadOnlyAccount(userProfile, conjuntoInfo, accessClock);
   const showAnimatedButton = userProfile?.role === UserRole.Trial ||
     (userProfile?.role === UserRole.Subscriber && conjuntoInfo?.registrationDate && 
       (new Date().getTime() - new Date(conjuntoInfo.registrationDate).getTime()) < 44 * 24 * 60 * 60 * 1000);
 
   const handleLogout = useCallback(async () => {
+    setWriteAccessProvider(() => true);
     supabase.removeAllChannels();
     await supabase.auth.signOut();
     setUserProfile(null);
@@ -186,19 +221,10 @@ const AppContent: React.FC = () => {
                         let effectiveInfo = info;
                         if (info.subscriptionPlan === 'Paid' && info.planExpiresAt && new Date(info.planExpiresAt).getTime() < Date.now()) {
                             effectiveInfo = { ...info, subscriptionPlan: 'Free' as const, planName: undefined, planPrice: undefined };
-                            apiService.updateConjuntoInfo(effectiveInfo).catch(() => {});
                         }
                         setConjuntoInfo(effectiveInfo);
                     } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                         setIsInitialSetupModalOpen(true);
-                    }
-
-                    const isTrialExpired = profile.role === UserRole.Trial 
-                      && profile.trialExpiresAt 
-                      && new Date(profile.trialExpiresAt).getTime() < Date.now();
-                    if (isTrialExpired && info?.subscriptionPlan === 'Free') {
-                      setInitialSettingsTab('Suscripción');
-                      setIsSettingsModalOpen(true);
                     }
                 } else if (profile.role === UserRole.Trial || profile.role === UserRole.Subscriber) {
                     setIsInitialSetupModalOpen(true);
@@ -238,50 +264,70 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const handlePaymentReturn = async () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const paymentStatus = urlParams.get('collection_status');
+      const paymentId = urlParams.get('payment_id');
+      const preapprovalId = urlParams.get('preapproval_id');
+      const paymentStatus = urlParams.get('collection_status') || urlParams.get('status');
+      if (!paymentId && !preapprovalId) {
+        if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          clearPendingPlan();
+          setNotification('El pago fue rechazado o cancelado. Puedes volver a intentarlo cuando quieras.');
+        }
+        return;
+      }
+      if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        clearPendingPlan();
+        setNotification('El pago fue rechazado o cancelado. Puedes volver a intentarlo cuando quieras.');
+        return;
+      }
+      if (!userProfile || !conjuntoInfo) return;
 
-      if (!paymentStatus) return;
-
+      const paymentKey = preapprovalId || paymentId!;
+      if (processedPaymentRef.current === paymentKey) return;
+      processedPaymentRef.current = paymentKey;
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      if (paymentStatus === 'approved' && userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
+      if (userProfile && conjuntoInfo && conjuntoInfo.subscriptionPlan === 'Free') {
         try {
           const pending = getPendingPlan();
-          const planName = pending?.name || null;
-          const planPrice = pending?.price ?? 140000;
-          const paymentId = urlParams.get('payment_id');
-          const preapprovalId = urlParams.get('preapproval_id');
-          const durationDays = pending?.billing === 'annual' ? 365 : 30;
-          const planExpiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+          if (!pending || !userProfile.conjuntoId || (!paymentId && !preapprovalId)) {
+            throw new Error('No encontramos los datos necesarios para verificar el pago.');
+          }
+          const { data, error } = await supabase.functions.invoke('activate-mp-subscription', {
+            body: {
+              conjuntoId: userProfile.conjuntoId,
+              planName: pending.name,
+              billing: pending.billing,
+              paymentId: preapprovalId ? null : paymentId,
+              preapprovalId,
+            },
+          });
+          if (error) throw error;
+          if (!data?.planName || !data?.planExpiresAt) {
+            throw new Error(data?.error || 'Mercado Pago todavía no confirma la suscripción.');
+          }
 
           const updatedConjunto: ConjuntoInfo = {
             ...conjuntoInfo,
-            subscriptionPlan: 'Paid' as const,
-            planName: planName || undefined,
-            planPrice,
-            planExpiresAt,
-            preapprovalId: preapprovalId || conjuntoInfo.preapprovalId || undefined,
-            lastPaymentId: paymentId || conjuntoInfo.lastPaymentId || undefined,
+            subscriptionPlan: 'Paid',
+            planName: data.planName,
+            planPrice: data.planPrice,
+            planExpiresAt: data.planExpiresAt,
+            preapprovalId: preapprovalId || conjuntoInfo.preapprovalId,
+            lastPaymentId: paymentId || conjuntoInfo.lastPaymentId,
           };
-          await apiService.updateConjuntoInfo(updatedConjunto);
-          
-          const updatedProfile = { ...userProfile, role: UserRole.Subscriber };
-          await apiService.updateUserProfile(updatedProfile);
-          
-          analytics.trackSubscription('Free', planName || 'Paid');
+          analytics.trackSubscription('Free', data.planName);
           setConjuntoInfo(updatedConjunto);
-          setUserProfile(updatedProfile);
           clearPendingPlan();
-          setWelcomePlanName(planName || 'Pro');
-          setNotification(`¡Suscripción exitosa! Tu plan ${planName || 'Pro'} está activo.`);
+          setWelcomePlanName(data.planName);
+          setNotification(`¡Suscripción exitosa! Tu plan ${data.planName} está activo.`);
 
         } catch (error) {
+            processedPaymentRef.current = null;
             console.error("Failed to update subscription status:", error);
             setNotification('Error al actualizar tu suscripción. Contacta a soporte.');
         }
-      } else if (paymentStatus === 'rejected') {
-        clearPendingPlan();
-        setNotification('El pago fue rechazado. Inténtalo nuevamente.');
       }
     };
 
@@ -503,6 +549,7 @@ const AppContent: React.FC = () => {
               onLogout={handleLogout} 
               onSettingsClick={handleSettingsClick} 
               activeTabName={activeTab}
+              isReadOnly={isReadOnly}
           />
           {!needsAdminSetup && (
             <NavBar 

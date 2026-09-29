@@ -20,7 +20,11 @@ CREATE TABLE public.conjuntos (
     admin_email text,
     admin_phone text,
     subscription_plan text DEFAULT 'Free'::text NOT NULL,
+    plan_name text,
     plan_price numeric,
+    plan_expires_at timestamp with time zone,
+    preapproval_id text,
+    last_payment_id text,
     registration_date timestamp with time zone DEFAULT now()
 );
 
@@ -335,7 +339,7 @@ begin
     new.raw_user_meta_data ->> 'avatar_url',
     new.email,
     'trial',
-    now() + interval '30 days'
+    now() + interval '14 days'
   );
   return new;
 end;

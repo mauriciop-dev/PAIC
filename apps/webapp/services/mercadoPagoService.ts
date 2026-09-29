@@ -38,9 +38,17 @@ const postEdgeFunction = async (url: string, body: unknown): Promise<any> => {
 };
 
 export const mercadoPagoService = {
-  async createSubscription(conjuntoInfo: ConjuntoInfo, planName?: string, planPrice?: number, billing?: 'monthly' | 'annual'): Promise<PreferenceResponse | null> {
+  async createSubscription(
+    conjuntoInfo: ConjuntoInfo,
+    planName: string,
+    billing: 'monthly' | 'annual'
+  ): Promise<PreferenceResponse | null> {
     try {
-      return await postEdgeFunction(SUBSCRIPTION_FUNCTION_URL, { conjuntoInfo, planName, planPrice, billing });
+      return await postEdgeFunction(SUBSCRIPTION_FUNCTION_URL, {
+        conjuntoId: conjuntoInfo.id,
+        planName,
+        billing,
+      });
     } catch (error) {
       console.error('Failed to create subscription:', error);
       if (error instanceof Error) {

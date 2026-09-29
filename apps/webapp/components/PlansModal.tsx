@@ -43,7 +43,6 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, conjuntoInfo }
   if (!isOpen) return null;
 
   const handlePay = async (plan: PAICPlan, billing: 'monthly' | 'annual') => {
-    const link = billing === 'monthly' ? plan.monthlyLink : plan.annualLink;
     if (plan.monthlyPrice === null || plan.annualPrice === null) return;
     const price = billing === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
     const key = `${plan.name}-${billing}`;
@@ -51,34 +50,17 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, conjuntoInfo }
     setError(null);
     savePendingPlan({ name: plan.name, billing, price });
 
-    if (link) {
-      window.location.href = link;
-      return;
-    }
-
     try {
-      const subscription = await mercadoPagoService.createSubscription(conjuntoInfo, plan.name, price, billing);
+      const subscription = await mercadoPagoService.createSubscription(conjuntoInfo, plan.name, billing);
       if (subscription?.init_point) {
         window.location.href = subscription.init_point;
         return;
       }
       throw new Error('No se pudo iniciar la suscripción.');
     } catch (err: any) {
-      try {
-        const initPoint = await mercadoPagoService.createPreference(conjuntoInfo, plan.name, price, billing);
-        if (initPoint) {
-          window.location.href = initPoint;
-          return;
-        }
-        throw new Error('No se pudo iniciar el pago.');
-      } catch (err2: any) {
-        if (link) {
-          window.location.href = link;
-          return;
-        }
-        setError(err.message || 'Ocurrió un error al procesar el pago.');
-        setLoadingPlan(null);
-      }
+      clearPendingPlan();
+      setError(err instanceof Error ? err.message : 'Ocurrió un error al procesar el pago.');
+      setLoadingPlan(null);
     }
   };
 
