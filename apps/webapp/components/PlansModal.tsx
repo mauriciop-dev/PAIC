@@ -50,6 +50,12 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, conjuntoInfo }
     setLoadingPlan(key);
     setError(null);
     savePendingPlan({ name: plan.name, billing, price });
+
+    if (link) {
+      window.location.href = link;
+      return;
+    }
+
     try {
       const subscription = await mercadoPagoService.createSubscription(conjuntoInfo, plan.name, price, billing);
       if (subscription?.init_point) {
@@ -96,7 +102,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, conjuntoInfo }
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {PLANS.map(plan => (
               <div
                 key={plan.name}
