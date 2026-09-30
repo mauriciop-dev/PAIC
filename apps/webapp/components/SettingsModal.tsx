@@ -381,34 +381,65 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
   
   const renderProfileTab = () => (
-    <div className="space-y-4">
-        <div className="flex flex-col items-center gap-3 p-5 bg-gray-50 rounded-xl">
-            {profileData.avatarUrl ? <img src={profileData.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full" /> : <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center"><Icon name="user" className="w-10 h-10 text-gray-600" /></div>}
+    <div className="space-y-5">
+        <div className="flex flex-col items-center gap-3 p-6 bg-gradient-to-b from-blue-50 to-slate-50 rounded-2xl border border-slate-100">
+            {profileData.avatarUrl
+                ? <img src={profileData.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-2xl shadow-sm" />
+                : <div className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center"><Icon name="user" className="w-10 h-10 text-blue-600" /></div>
+            }
             <div className="text-center">
-                <p className="font-bold text-lg text-gray-800">{profileData.fullName}</p>
-                <p className="text-sm text-gray-600">{profileData.email}</p>
+                <p className="font-bold text-lg text-gray-900">{profileData.fullName}</p>
+                <p className="text-sm text-gray-500">{profileData.email}</p>
             </div>
         </div>
         <div>
-            <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700">Nombre</label>
-            <input id="profile-name" type="text" value={profileData.fullName} onChange={(e) => {setProfileData(prev => ({...prev, fullName: e.target.value})); setHasChanges(true);}} className="mt-1 w-full p-2 border rounded" />
+            <label htmlFor="profile-name" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Nombre</label>
+            <input id="profile-name" type="text" value={profileData.fullName} onChange={(e) => {setProfileData(prev => ({...prev, fullName: e.target.value})); setHasChanges(true);}} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
         </div>
         <div>
-            <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700">Correo</label>
-            <input id="profile-email" type="email" value={profileData.email} readOnly disabled className="mt-1 w-full p-2 border rounded bg-gray-50 text-gray-500" />
+            <label htmlFor="profile-email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Correo electrónico</label>
+            <input id="profile-email" type="email" value={profileData.email} readOnly disabled className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-400 cursor-not-allowed" />
         </div>
-        <p className="text-xs text-gray-500">Tu correo y foto son gestionados por tu proveedor de autenticación (ej. Google).</p>
+        <p className="text-xs text-gray-400 bg-amber-50 border border-amber-100 p-3 rounded-xl">Tu correo y foto son gestionados por tu proveedor de autenticación (ej. Google) y no pueden modificarse aquí.</p>
     </div>
   );
 
+  const inputCls = "w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all";
+  const labelCls = "block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5";
+
   const renderConjuntoTab = () => (
       <div className="space-y-4">
-        <input type="text" name="name" value={conjuntoData.name} onChange={(e) => {setConjuntoData(prev => ({...prev, name: e.target.value})); setHasChanges(true);}} placeholder="Nombre del conjunto" className="w-full p-2 border rounded" />
-        <input type="text" name="nit" value={conjuntoData.nit} onChange={(e) => {setConjuntoData(prev => ({...prev, nit: e.target.value})); setHasChanges(true);}} placeholder="NIT" className="w-full p-2 border rounded" />
-        <input type="text" name="address" value={conjuntoData.address} onChange={(e) => {setConjuntoData(prev => ({...prev, address: e.target.value})); setHasChanges(true);}} placeholder="Dirección" className="w-full p-2 border rounded" />
-        <input type="text" name="adminName" value={conjuntoData.adminName} onChange={(e) => {setConjuntoData(prev => ({...prev, adminName: e.target.value})); setHasChanges(true);}} placeholder="Nombre del admin" className="w-full p-2 border rounded" />
-        <input type="email" name="adminEmail" value={conjuntoData.adminEmail} onChange={(e) => {setConjuntoData(prev => ({...prev, adminEmail: e.target.value})); setHasChanges(true);}} placeholder="Correo del admin" className="w-full p-2 border rounded" />
-        <input type="tel" name="adminPhone" value={conjuntoData.adminPhone} onChange={(e) => {setConjuntoData(prev => ({...prev, adminPhone: e.target.value})); setHasChanges(true);}} placeholder="Teléfono del admin" className="w-full p-2 border rounded" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Nombre del Conjunto</label>
+            <input type="text" name="name" value={conjuntoData.name} onChange={(e) => {setConjuntoData(prev => ({...prev, name: e.target.value})); setHasChanges(true);}} placeholder="Ej: Conjunto Residencial Los Pinos" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>NIT</label>
+            <input type="text" name="nit" value={conjuntoData.nit} onChange={(e) => {setConjuntoData(prev => ({...prev, nit: e.target.value})); setHasChanges(true);}} placeholder="Ej: 900.123.456-7" className={inputCls} />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Dirección</label>
+          <input type="text" name="address" value={conjuntoData.address} onChange={(e) => {setConjuntoData(prev => ({...prev, address: e.target.value})); setHasChanges(true);}} placeholder="Dirección completa" className={inputCls} />
+        </div>
+        <div className="pt-2 border-t border-gray-100">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Datos del Administrador</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className={labelCls}>Nombre</label>
+              <input type="text" name="adminName" value={conjuntoData.adminName} onChange={(e) => {setConjuntoData(prev => ({...prev, adminName: e.target.value})); setHasChanges(true);}} placeholder="Nombre completo" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Correo</label>
+              <input type="email" name="adminEmail" value={conjuntoData.adminEmail} onChange={(e) => {setConjuntoData(prev => ({...prev, adminEmail: e.target.value})); setHasChanges(true);}} placeholder="admin@ejemplo.com" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Teléfono</label>
+              <input type="tel" name="adminPhone" value={conjuntoData.adminPhone} onChange={(e) => {setConjuntoData(prev => ({...prev, adminPhone: e.target.value})); setHasChanges(true);}} placeholder="+57 300 000 0000" className={inputCls} />
+            </div>
+          </div>
+        </div>
       </div>
   );
 
@@ -754,12 +785,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-end md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-end md:items-center" onClick={onClose}>
       <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:w-3/4 lg:w-[52rem] relative flex flex-col max-h-[95vh] md:max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <header className="p-4 md:p-6 border-b flex justify-between items-center">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800">Configuración</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 p-1 rounded-lg hover:bg-gray-100">
-            <Icon name="x" className="w-6 h-6"/>
+        <header className="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">Configuración</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Gestiona el perfil, conjunto y módulos del sistema.</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">
+            <Icon name="x" className="w-5 h-5"/>
           </button>
         </header>
 
@@ -796,11 +830,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
             {(activeTab === 'Perfil' || activeTab === 'Conjunto') && (
-              <footer className="p-4 border-t bg-gray-50 mt-auto flex justify-end gap-3">
-                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-semibold text-sm">
+              <footer className="p-4 border-t border-gray-100 bg-gray-50/70 mt-auto flex justify-end gap-3">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 font-semibold rounded-xl transition-colors">
                   Cancelar
                 </button>
-                <button type="button" onClick={handleSaveChanges} disabled={!hasChanges} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-bold text-sm">
+                <button type="button" onClick={handleSaveChanges} disabled={!hasChanges} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 font-bold rounded-xl shadow-sm shadow-blue-500/20 transition-all">
                   Guardar Cambios
                 </button>
               </footer>

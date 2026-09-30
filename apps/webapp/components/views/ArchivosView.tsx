@@ -101,98 +101,120 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <p className="text-gray-600">
-          Administra los archivos y documentos importantes de tu conjunto. (Solo PDF, máx. 5MB)
-        </p>
-        <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} accept="application/pdf" />
-        <button
-          onClick={handleUploadClick}
-          disabled={isUploading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 disabled:bg-blue-300"
-        >
-          <Icon name="upload-cloud" className="w-5 h-5" />
-          {isUploading ? 'Subiendo...' : 'Subir Archivo'}
-        </button>
+        <div>
+          <h2 className="text-base font-bold text-slate-800">Repositorio de Documentos</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Administra los archivos y documentos importantes del conjunto. (Solo PDF, máx. 5 MB)</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="file" ref={fileInputRef} onChange={handleFileSelected} style={{ display: 'none' }} accept="application/pdf" />
+          <button
+            onClick={handleUploadClick}
+            disabled={isUploading}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 disabled:bg-blue-300 transition-all"
+          >
+            <Icon name="upload-cloud" className="w-4 h-4" />
+            {isUploading ? 'Subiendo…' : 'Subir Archivo PDF'}
+          </button>
+        </div>
       </div>
 
       {feedback && (
-        <div className={`p-3 rounded-md text-sm ${feedback.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-          {feedback.text}
+        <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          <Icon name={feedback.type === 'error' ? 'alert-triangle' : 'check'} className="w-4 h-4 flex-shrink-0" />
+          <span>{feedback.text}</span>
         </div>
       )}
 
-      <div id="repo-archivos" className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div id="repo-archivos" className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-6 text-center text-gray-500">Cargando archivos...</div>
+          <div className="p-10 text-center text-gray-400">
+            <Icon name="refresh-cw" className="w-7 h-7 animate-spin mx-auto mb-2 text-blue-500" />
+            <p className="text-xs font-medium">Cargando archivos…</p>
+          </div>
         ) : (
           <>
-          {/* Mobile: Card view */}
-          <div className="md:hidden space-y-3 p-4">
-            {files.length > 0 ? files.map(file => (
-              <div key={file.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                    <Icon name="file-text" className="w-5 h-5 text-red-500" />
+            {/* Mobile: Card view */}
+            <div className="md:hidden space-y-3 p-4">
+              {files.length > 0 ? files.map(file => (
+                <div key={file.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                      <Icon name="file-text" className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{file.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{bytesToSize(file.size)} · {new Date(file.createdAt).toLocaleDateString('es-CO')}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 text-sm truncate">{file.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{bytesToSize(file.size)} · {new Date(file.createdAt).toLocaleDateString('es-CO')}</p>
+                  <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl py-2 px-3 text-center transition-colors">
+                      Descargar
+                    </a>
+                    <button onClick={() => setDeleteTarget(file.name)} className="flex-1 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl py-2 px-3 text-center transition-colors">
+                      Eliminar
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
-                  <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 text-center transition-colors">
-                    Descargar
-                  </a>
-                  <button onClick={() => setDeleteTarget(file.name)} className="flex-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 text-center transition-colors">Eliminar</button>
+              )) : (
+                <div className="text-center py-14">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                    <Icon name="file-text" className="w-8 h-8 text-gray-300" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-500">Sin documentos aún</p>
+                  <p className="text-xs text-gray-400 mt-1">Sube tu primer archivo PDF.</p>
                 </div>
-              </div>
-            )) : (
-              <div className="text-center py-12 text-gray-400">
-                <Icon name="file-text" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm">No hay archivos. ¡Sube tu primer documento!</p>
-              </div>
-            )}
-          </div>
-          {/* Desktop: Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-500">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3">Nombre del Archivo</th>
-                  <th scope="col" className="px-6 py-3">Tamaño</th>
-                  <th scope="col" className="px-6 py-3">Fecha de Carga</th>
-                  <th scope="col" className="px-6 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.length > 0 ? files.map(file => (
-                  <tr key={file.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-2">
-                        <Icon name="file-text" className="w-4 h-4 text-gray-400" />
-                        {file.name}
-                    </td>
-                    <td className="px-6 py-4">{bytesToSize(file.size)}</td>
-                    <td className="px-6 py-4">{new Date(file.createdAt).toLocaleDateString('es-CO')}</td>
-                    <td className="px-6 py-4 text-right space-x-4">
-                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
-                        Descargar
-                      </a>
-                      <button onClick={() => setDeleteTarget(file.name)} className="font-medium text-red-600 hover:underline">
-                        Eliminar
-                      </button>
-                    </td>
+              )}
+            </div>
+
+            {/* Desktop: Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-xs text-left text-gray-600">
+                <thead className="text-[11px] text-gray-700 uppercase bg-gray-50 font-bold border-b border-gray-200">
+                  <tr>
+                    <th className="px-5 py-3">Nombre del Archivo</th>
+                    <th className="px-5 py-3">Tamaño</th>
+                    <th className="px-5 py-3">Fecha de Carga</th>
+                    <th className="px-5 py-3 text-right">Acciones</th>
                   </tr>
-                )) : (
-                    <tr>
-                        <td colSpan={4} className="text-center p-10 text-gray-500">
-                            No hay archivos. ¡Sube tu primer documento!
-                        </td>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {files.length > 0 ? files.map(file => (
+                    <tr key={file.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3.5 font-semibold text-gray-900 flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+                          <Icon name="file-text" className="w-4 h-4 text-red-500" />
+                        </div>
+                        <span className="truncate max-w-xs">{file.name}</span>
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-500 font-mono">{bytesToSize(file.size)}</td>
+                      <td className="px-5 py-3.5 text-gray-500">{new Date(file.createdAt).toLocaleDateString('es-CO')}</td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                            Descargar
+                          </a>
+                          <button onClick={() => setDeleteTarget(file.name)} className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )) : (
+                    <tr>
+                      <td colSpan={4} className="text-center py-14">
+                        <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                          <Icon name="file-text" className="w-7 h-7 text-gray-300" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-500">Sin documentos aún</p>
+                        <p className="text-xs text-gray-400 mt-1">Sube tu primer archivo PDF.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

@@ -108,66 +108,71 @@ const DueDatesView: React.FC<DueDatesViewProps> = ({ userProfile }) => {
   return (
     <div>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <p className="text-gray-600">
-                Gestiona las obligaciones de pago de la administración.
+            <p className="text-sm font-medium text-slate-500">
+                Gestiona las obligaciones y fechas límite de pago de la administración.
             </p>
             <div className="flex items-center gap-2">
-                <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
+                <button onClick={handleRefresh} className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors" aria-label="Refrescar datos">
                     <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
                 <button 
                     onClick={handleOpenAddModal}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all text-xs flex items-center gap-1.5"
                 >
+                    <Icon name="plus" className="w-3.5 h-3.5" />
                     Agregar Vencimiento
                 </button>
             </div>
         </div>
 
-      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="mb-6 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-center">
+        <div className="flex-1 w-full min-w-0">
           <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar por concepto, categoría o fecha..." />
         </div>
-        <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-gray-700">Filtrar por:</span>
-            {(['Todos', 'Pendiente', 'Vencido', 'Pagado'] as StatusFilter[]).map(status => (
-                <button 
-                    key={status}
-                    onClick={() => setFilter(status)}
-                    className={`px-3 py-1 text-sm font-medium rounded-full transition-colors ${
-                        filter === status ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                >
-                    {status}
-                </button>
-            ))}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto p-1 bg-slate-100/80 rounded-xl">
+            {(['Todos', 'Pendiente', 'Vencido', 'Pagado'] as StatusFilter[]).map(status => {
+                const isSelected = filter === status;
+                return (
+                    <button 
+                        key={status}
+                        onClick={() => setFilter(status)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                            isSelected ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        {status}
+                    </button>
+                );
+            })}
         </div>
       </div>
       
-      <div id="panel-vencimientos" className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div id="panel-vencimientos" className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {isLoading ? (
-            <div className="p-6 text-center text-gray-500">Cargando vencimientos...</div>
+            <div className="p-8 text-center text-slate-400">Cargando vencimientos...</div>
         ) : (
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-slate-100">
               {filteredDueDates.length > 0 ? filteredDueDates.map(payment => (
-                <li key={payment.id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-gray-50">
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-800">{payment.item}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getCategoryChipStyle(payment.category)}`}>{payment.category}</span>
-                        <p className="text-sm text-gray-500">Vence: {payment.dueDate}</p>
+                <li key={payment.id} className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-slate-50/70 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 text-sm truncate">{payment.item}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getCategoryChipStyle(payment.category)}`}>{payment.category}</span>
+                        <p className="text-xs text-slate-400">Vence: {payment.dueDate}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full w-24 text-center ${getStatusChipStyle(payment.status)}`}>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full w-24 text-center ${getStatusChipStyle(payment.status)}`}>
                       {payment.status}
                     </span>
-                    <button onClick={() => handleOpenEditModal(payment)} className="font-medium text-blue-600 hover:underline text-sm p-1">Editar</button>
-                    <button onClick={() => setDeleteTarget(payment.id)} className="font-medium text-red-600 hover:underline text-sm p-1">Eliminar</button>
+                    <div className="flex items-center gap-1.5">
+                        <button onClick={() => handleOpenEditModal(payment)} className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">Editar</button>
+                        <button onClick={() => setDeleteTarget(payment.id)} className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">Eliminar</button>
+                    </div>
                   </div>
                 </li>
               )) : (
-                  <li className="p-6 text-center text-gray-500">
+                  <li className="p-8 text-center text-slate-400">
                       No hay vencimientos que coincidan con el filtro seleccionado.
                   </li>
               )}

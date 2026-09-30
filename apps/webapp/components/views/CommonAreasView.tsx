@@ -226,7 +226,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
   return (
     <div className="space-y-4">
       {/* Leyenda horizontal y compacta de Áreas Comunes */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Áreas:</span>
         {commonAreas.map(area => {
             const color = area.color || defaultColor; // Defensive check
@@ -246,14 +246,14 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
         <button
           id="btn-agregar-reserva"
           onClick={() => setIsBookingModalOpen(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 text-sm"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all flex items-center gap-2 text-sm"
         >
             <Icon name="calendar" className="w-4 h-4" />
             Agregar Reserva
         </button>
       </div>
       
-      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+      <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
                 <button onClick={handlePrevMonth} aria-label="Mes anterior" className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">&lt;</button>

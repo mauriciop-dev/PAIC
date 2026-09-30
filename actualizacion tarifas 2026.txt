@@ -1,0 +1,42 @@
+Necesito actualizar la lógica de precios, componentes de suscripción y UI de los planes de PAIC en el frontend y backend.
+
+Por favor realiza los siguientes ajustes:
+
+1. Estructura de Planes y Rangos:
+Reemplaza la estructura actual de precios por los siguientes 6 niveles:
+
+- Torre:
+  - Rangos: 1 a 50 unidades
+  - Precio Mensual: $100.000 COP https://www.mercadopago.com.co/subscriptions/checkout?preapproval_plan_id=5e037bc3e10e463ba7224cdcd44d3ad3
+  - Precio Anual: $1.020.000 COP (15% ahorro, equivale a $85.000/mes) https://mpago.la/14W5giX
+
+- Edificio:
+  - Rangos: 51 a 120 unidades
+  - Precio Mensual: $160.000 COP https://mpago.la/12egePm
+  - Precio Anual: $1.632.000 COP (15% ahorro, equivale a $136.000/mes) https://mpago.la/1Y6fA8p
+
+- Copropiedad:
+  - Rangos: 121 a 300 unidades
+  - Precio Mensual: $280.000 COP https://mpago.la/2XfeqEQ
+  - Precio Anual: $2.856.000 COP (15% ahorro, equivale a $238.000/mes)https://mpago.la/1YcQWGH
+
+- Megaproyecto:
+  - Rangos: 301 a 600 unidades
+  - Precio Mensual: $450.000 COP https://mpago.la/21DuR7Z
+  - Precio Anual: $4.590.000 COP (15% ahorro, equivale a $382.500/mes) https://mpago.la/2sfnFHz
+
+- Condominio:
+  - Rangos: 601 a 1.200 unidades
+  - Precio Mensual: $750.000 COP https://mpago.la/2uXRCUP
+  - Precio Anual: $7.650.000 COP (15% ahorro, equivale a $637.500/mes) https://mpago.la/2sJf9y1
+
+- Complejo:
+  - Rangos: 1.201 a 2.500 unidades
+  - Precio Mensual: $1.200.000 COP https://mpago.la/1f6mcWr
+  - Precio Anual: $12.240.000 COP (15% ahorro, equivale a $1.020.000/mes) https://mpago.la/237s6gd
+
+
+2. Ajustes requeridos en el código:
+- Actualizar los objetos/constantes de definición de planes en el archivo correspondiente (e.g., `pricingData.ts`, `subscriptions.ts` o la tabla en Supabase).
+- Validar las reglas de asignación automática de plan cuando la administración configure la cantidad total de unidades del conjunto.
+- Actualizar los componentes de la vista de precios (Pricing Cards / Modals de Checkout) reflejando los valores mensual y anual con su respectiva etiqueta de descuento.
