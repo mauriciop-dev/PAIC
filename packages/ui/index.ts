@@ -28,3 +28,9 @@ export type { ProgressRingProps } from './ProgressRing';
 
 export { SearchBar } from './SearchBar';
 export type { SearchBarProps } from './SearchBar';
+
+export { BottomSheet } from './BottomSheet';
+export type { BottomSheetProps } from './BottomSheet';
+
+export { BottomNav } from './BottomNav';
+export type { BottomNavProps, NavItem } from './BottomNav';

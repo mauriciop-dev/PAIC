@@ -1,23 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
+import { Button, Card, Icon, Input, Badge, Avatar, useToast, BottomNav, type NavItem } from '@paic/ui';
 import { analytics } from '@paic/analytics';
 import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { subscribeToPush } from './services/pwaPush';
 import './App.css';
 
-const NavTabs = [
+const primaryItems: NavItem[] = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
   { id: 'reservas', label: 'Reservas', icon: 'calendar' },
   { id: 'comunicados', label: 'Noticias', icon: 'mail' },
+  { id: 'paquetes', label: 'Paquetes', icon: 'package' },
+  { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
+];
+
+const secondaryItems: NavItem[] = [
   { id: 'cuenta', label: 'Cuenta', icon: 'dollarSign' },
   { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
   { id: 'documentos', label: 'Docs', icon: 'file-text' },
   { id: 'directorio', label: 'Contactos', icon: 'phone' },
   { id: 'votaciones', label: 'Votos', icon: 'checkSquare' },
-  { id: 'paquetes', label: 'Paquetes', icon: 'package' },
-  { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
   { id: 'perfil', label: 'Perfil', icon: 'user' },
+];
+
+const bottomActions = [
+  { id: 'logout', label: 'Salir', icon: 'log-in', handler: () => {} }, // will be overridden
 ];
 
 export default function UsuariosApp() {
@@ -191,28 +198,32 @@ export default function UsuariosApp() {
                 </div>
               </div>
             </Card>
-            <Card className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-4">Notificaciones</h3>
-              <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones', 'error'))}>Activar notificaciones Push</Button>
-              <div className="space-y-3">
-                {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
-                  <label key={i} className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded border-gray-300" />
-                    <span className="text-gray-700">{n}</span>
-                  </label>
-                ))}
-              </div>
-            </Card>
-            {user.role === 'residente_principal' && <InvitationForm membershipId={user.membershipId} />}
-            <Button variant="danger" onClick={() => void signOut().then(() => setUser(null))}>
-              <Icon name="log-in" className="w-4 h-4" /> Cerrar Sesión
-            </Button>
+<Card className="p-4">
+          <h3 className="font-semibold text-gray-900 mb-4">Notificaciones</h3>
+          <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones', 'error'))}>Activar notificaciones Push</Button>
+          <div className="space-y-3">
+            {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
+              <label key={i} className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded border-gray-300" />
+                <span className="text-gray-700">{n}</span>
+              </label>
+            ))}
           </div>
-        );
-      default:
-        return null;
-    }
-  };
+        </Card>
+        {user.role === 'residente_principal' && <InvitationForm membershipId={user.membershipId} />}
+        <Button variant="danger" onClick={() => void signOut().then(() => setUser(null))}>
+          <Icon name="log-in" className="w-4 h-4" /> Cerrar Sesión
+        </Button>
+      </div>
+    );
+  default:
+    return null;
+  }
+};
+
+const bottomActions = [
+  { id: 'logout', label: 'Salir', icon: 'log-in', handler: () => void signOut().then(() => setUser(null)) },
+];
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -234,23 +245,13 @@ export default function UsuariosApp() {
         {renderTab()}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 md:hidden" role="navigation" aria-label="Navegación principal">
-        <div className="flex items-center justify-around h-14">
-          {NavTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center gap-1 flex-1 min-h-[48px] transition-colors ${
-                activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'
-              }`}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-            >
-              <Icon name={tab.icon} className={`w-6 h-6 ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'}`} />
-              <span className="text-[11px] font-medium">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      <BottomNav
+        activeTab={activeTab}
+        onTabSelect={setActiveTab}
+        primaryItems={primaryItems}
+        secondaryItems={secondaryItems}
+        actions={bottomActions}
+      />
     </div>
   );
 }
