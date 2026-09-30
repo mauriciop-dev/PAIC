@@ -225,28 +225,27 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-4">
-      {/* Leyenda horizontal y compacta de Áreas Comunes */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Áreas:</span>
-        {commonAreas.map(area => {
-            const color = area.color || defaultColor; // Defensive check
-            return (
-                <div
-                  key={area.id}
-                  className="flex items-center gap-1.5 shrink-0"
-                >
-                    <span className={`w-3 h-3 rounded-full ${color.bg} border ${color.border}`} />
-                    <span className="text-xs md:text-sm font-semibold text-gray-700">{area.name}</span>
-                </div>
-            );
-        })}
-      </div>
-
-      <div className="flex justify-center md:justify-end">
+      {/* Leyenda horizontal y compacta de Áreas Comunes + Botón Agregar Reserva */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-x-4 gap-y-2 shrink-0">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Áreas:</span>
+          {commonAreas.map(area => {
+              const color = area.color || defaultColor;
+              return (
+                  <div
+                    key={area.id}
+                    className="flex items-center gap-1.5 shrink-0"
+                  >
+                      <span className={`w-3 h-3 rounded-full ${color.bg} border ${color.border}`} />
+                      <span className="text-xs md:text-sm font-semibold text-gray-700">{area.name}</span>
+                  </div>
+              );
+          })}
+        </div>
         <button
           id="btn-agregar-reserva"
           onClick={() => setIsBookingModalOpen(true)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all flex items-center gap-2 text-sm"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all flex items-center gap-2 text-sm whitespace-nowrap shrink-0"
         >
             <Icon name="calendar" className="w-4 h-4" />
             Agregar Reserva
@@ -273,12 +272,12 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                 const isToday = day === today.getDate() && currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
                 const isSelected = day === selectedDay;
                 return (
-                  <div key={i} className={`h-28 md:h-32 rounded-lg border p-1 ${!day ? 'bg-gray-50 border-transparent' : isSelected ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 hover:bg-gray-50'}`}>
+                  <div key={i} className={`min-h-[112px] md:min-h-[128px] rounded-lg border p-1 flex flex-col ${!day ? 'bg-gray-50 border-transparent' : isSelected ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 hover:bg-gray-50'}`}>
                     {day && (
                       <button
                         onClick={() => setSelectedDay(day)}
                         aria-pressed={isSelected}
-                        className={`w-9 h-9 flex items-center justify-center rounded-full text-lg font-medium transition-colors ${
+                        className={`w-9 h-9 flex items-center justify-center rounded-full text-lg font-medium transition-colors flex-shrink-0 ${
                           isSelected
                             ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-300 shadow-md'
                             : isToday
@@ -289,7 +288,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
                         {day}
                       </button>
                     )}
-                    <div className="space-y-1 mt-1 overflow-y-auto max-h-[3.5rem] md:max-h-[6rem]">
+                    <div className="space-y-1 mt-1 overflow-y-auto flex-1 min-h-0">
                         {day && calendarEvents.filter(b => b.day === day).map(booking => {
                             const colors = booking.color;
                             return (

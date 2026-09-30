@@ -17,10 +17,10 @@ const allTabs = [
   { id: Tab.CommonAreas, label: "Áreas comunes", icon: "calendar" },
   { id: Tab.Comunicaciones, label: "Comunicaciones", icon: "mail" },
   { id: Tab.Archivos, label: "Archivos", icon: "file-text" },
-  { id: Tab.Finanzas, label: "Finanzas", icon: "dollar-sign" },
+  { id: Tab.Finanzas, label: "Finanzas", icon: "dollarSign" },
   { id: Tab.Seguridad, label: "Seguridad", icon: "shield" },
   { id: Tab.DueDates, label: "Vencimientos", icon: "clock" },
-  { id: Tab.PendingTasks, label: "Tareas", icon: "check-square" },
+  { id: Tab.PendingTasks, label: "Tareas", icon: "checkSquare" },
   { id: Tab.PWA, label: "PWA residentes", icon: "smartphone" },
 ];
 
