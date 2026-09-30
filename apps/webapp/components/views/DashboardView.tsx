@@ -25,27 +25,38 @@ interface TooltipData {
     y: number;
 }
 
-const StatCard: React.FC<{ title: string; value: number | string; icon: string; iconColor: string; }> = ({ title, value, icon, iconColor }) => (
-    <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
-        <div className={`p-3 rounded-full ${iconColor}`}>
-            <Icon name={icon} className="w-6 h-6 text-white" />
+const StatCard: React.FC<{ title: string; value: number | string; icon: string; iconBg?: string; iconColor?: string; }> = ({ 
+    title, 
+    value, 
+    icon, 
+    iconBg = 'bg-blue-50',
+    iconColor = 'text-blue-600'
+}) => (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-4">
+        <div className={`p-3.5 rounded-2xl ${iconBg} ${iconColor} flex items-center justify-center shrink-0`}>
+            <Icon name={icon} className="w-6 h-6" />
         </div>
-        <div>
-            <p className="text-2xl font-bold text-gray-800">{value}</p>
-            <h3 className="text-sm font-semibold text-gray-500">{title}</h3>
+        <div className="min-w-0">
+            <p className="text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-0.5 truncate">{title}</h3>
         </div>
     </div>
 );
 
-const AlertStatCard: React.FC<{ title: string; value: number | string; subtitle?: string }> = ({ title, value, subtitle }) => (
-    <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
-        <div className="p-3 rounded-full bg-red-100">
-            <Icon name="alert-triangle" className="w-6 h-6 text-red-500" />
+const AlertStatCard: React.FC<{ title: string; value: number | string; subtitle?: string; isUrgent?: boolean }> = ({ 
+    title, 
+    value, 
+    subtitle,
+    isUrgent = true
+}) => (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-4">
+        <div className={`p-3.5 rounded-2xl ${isUrgent ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'} flex items-center justify-center shrink-0`}>
+            <Icon name="alert-triangle" className="w-6 h-6" />
         </div>
-        <div>
-            <p className="text-4xl font-extrabold text-gray-800 leading-none">{value}</p>
-            <h3 className="text-sm font-semibold text-gray-500 mt-1">{title}</h3>
-            {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+        <div className="min-w-0">
+            <p className="text-2xl font-extrabold text-slate-900 tracking-tight leading-none">{value}</p>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mt-1 truncate">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-400 mt-0.5 truncate">{subtitle}</p>}
         </div>
     </div>
 );
@@ -53,14 +64,19 @@ const AlertStatCard: React.FC<{ title: string; value: number | string; subtitle?
 const TasksStatCard: React.FC<{ title: string; pending: number; completed: number; total: number }> = ({ title, pending, completed, total }) => {
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
     return (
-        <div className="bg-white p-5 rounded-lg shadow-md flex items-center gap-4">
-            <ProgressRing percentage={pct}>
-                <span className="text-lg font-bold text-gray-800">{pct}%</span>
-            </ProgressRing>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-4">
+            <div className="shrink-0">
+                <ProgressRing percentage={pct}>
+                    <span className="text-sm font-bold text-slate-800">{pct}%</span>
+                </ProgressRing>
+            </div>
             <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-gray-500">{title}</h3>
-                <p className="text-sm text-gray-600 mt-0.5">{completed} de {total} completadas</p>
-                <p className="text-xs text-yellow-600 font-medium mt-0.5">{pending} pendientes</p>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h3>
+                <p className="text-sm font-medium text-slate-700 mt-0.5">{completed} de {total} listas</p>
+                <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    {pending} pendientes
+                </div>
             </div>
         </div>
     );
@@ -99,12 +115,14 @@ const NotificationCard: React.FC<{ item: NotificationItem; onClick: (tab: Tab) =
     return (
         <button
             onClick={() => onClick(item.linkTo)}
-            className={`w-full text-left p-3 flex items-start gap-3 rounded-lg border ${config.borderColor} ${config.bgColor} hover:shadow-sm transition-shadow`}
+            className={`w-full text-left p-3.5 flex items-start gap-3 rounded-xl border ${config.borderColor} ${config.bgColor} hover:shadow-sm hover:scale-[1.01] transition-all duration-200`}
         >
-            <Icon name={iconMap[item.type]} className={`w-5 h-5 mt-1 flex-shrink-0 ${config.textColor}`} />
-            <div>
-                <p className={`font-semibold text-sm ${config.textColor}`}>{item.text}</p>
-                <p className="text-xs text-gray-500">{item.details}</p>
+            <div className="p-1 rounded-lg shrink-0">
+                <Icon name={iconMap[item.type]} className={`w-5 h-5 ${config.textColor}`} />
+            </div>
+            <div className="min-w-0">
+                <p className={`font-semibold text-sm leading-snug ${config.textColor}`}>{item.text}</p>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.details}</p>
             </div>
         </button>
     );
@@ -453,53 +471,74 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab, userProfile
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Centro de Notificaciones</h3>
-                <div className="space-y-3">
+            <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-bold text-slate-800 tracking-tight">Centro de Notificaciones</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+                        {notifications.length}
+                    </span>
+                </div>
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[380px] pr-1">
                     {notifications.length > 0 ? (
                         notifications.map(item => (
                             <NotificationCard key={item.id} item={item} onClick={setActiveTab} />
                         ))
                     ) : (
-                        <p className="text-sm text-center text-gray-500 p-4 bg-gray-50 rounded-md">¡Todo en orden! No hay notificaciones urgentes.</p>
+                        <div className="text-center py-10 px-4 bg-slate-50/70 border border-slate-100 rounded-2xl flex flex-col items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                                <Icon name="check" className="w-5 h-5" />
+                            </div>
+                            <p className="text-sm font-medium text-slate-700">¡Todo al día!</p>
+                            <p className="text-xs text-slate-400 mt-1">No hay alertas ni notificaciones pendientes.</p>
+                        </div>
                     )}
                 </div>
             </div>
-            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md h-96 flex flex-col">
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm h-[440px] flex flex-col">
                 {charts.length === 0 ? (
                      <div className="text-center p-10 flex-grow flex flex-col justify-center items-center">
-                        <Icon name="alert-triangle" className="w-10 h-10 mx-auto text-yellow-500"/>
-                        <h3 className="mt-4 text-md font-semibold text-yellow-800">Gráficos no disponibles</h3>
-                        <p className="mt-1 text-sm text-yellow-700">No hay suficientes datos para generar los gráficos.</p>
+                        <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+                            <Icon name="alert-triangle" className="w-6 h-6"/>
+                        </div>
+                        <h3 className="text-base font-bold text-slate-800">Gráficos no disponibles</h3>
+                        <p className="mt-1 text-xs text-slate-500 max-w-sm">Aún no hay suficientes registros en este período para proyectar las métricas visuales.</p>
                     </div>
                 ) : (
                     <>
-                        <div className={`${isMobile ? 'text-center mb-3' : 'flex justify-between items-center mb-4'}`}>
-                            <h3 className="text-lg font-semibold text-gray-700">{charts[currentChartIndex].title}</h3>
+                        <div className={`${isMobile ? 'text-center mb-3' : 'flex justify-between items-center mb-4 pb-2 border-b border-slate-100'}`}>
+                            <h3 className="text-base font-bold text-slate-800 tracking-tight">{charts[currentChartIndex].title}</h3>
                             {!isMobile && (
-                                <div className="flex items-center gap-2">
-                                    <button onClick={handlePrevChart} aria-label="Gráfico anterior" className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/60">
+                                    <button 
+                                        onClick={handlePrevChart} 
+                                        aria-label="Gráfico anterior" 
+                                        className="p-1 rounded-lg hover:bg-white text-slate-500 hover:text-slate-800 hover:shadow-xs transition-all"
+                                    >
                                         &lt;
                                     </button>
-                                    <span className="text-xs text-gray-500">{currentChartIndex + 1} / {charts.length}</span>
-                                    <button onClick={handleNextChart} aria-label="Gráfico siguiente" className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800">
+                                    <span className="text-xs font-semibold text-slate-600 px-1">{currentChartIndex + 1} / {charts.length}</span>
+                                    <button 
+                                        onClick={handleNextChart} 
+                                        aria-label="Gráfico siguiente" 
+                                        className="p-1 rounded-lg hover:bg-white text-slate-500 hover:text-slate-800 hover:shadow-xs transition-all"
+                                    >
                                         &gt;
                                     </button>
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 min-h-0">
+                        <div className="flex-1 min-h-0 pt-2">
                             <ResponsiveContainer width="100%" height="100%">
                                 {charts[currentChartIndex].component}
                             </ResponsiveContainer>
                         </div>
                         {isMobile && (
-                            <div className="flex items-center justify-center gap-4 mt-3">
-                                <button onClick={handlePrevChart} aria-label="Gráfico anterior" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 min-h-[40px] min-w-[40px]">
+                            <div className="flex items-center justify-center gap-4 mt-3 pt-2 border-t border-slate-100">
+                                <button onClick={handlePrevChart} aria-label="Gráfico anterior" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 min-h-[40px] min-w-[40px] transition-colors">
                                     &lt;
                                 </button>
-                                <span className="text-xs text-gray-500 font-medium">{currentChartIndex + 1} / {charts.length}</span>
-                                <button onClick={handleNextChart} aria-label="Gráfico siguiente" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 min-h-[40px] min-w-[40px]">
+                                <span className="text-xs text-slate-600 font-semibold">{currentChartIndex + 1} / {charts.length}</span>
+                                <button onClick={handleNextChart} aria-label="Gráfico siguiente" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 min-h-[40px] min-w-[40px] transition-colors">
                                     &gt;
                                 </button>
                             </div>

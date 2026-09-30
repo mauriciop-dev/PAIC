@@ -1,0 +1,67 @@
+:root {
+  /* Brand & Colors */
+  --paic-primary: #2563EB;
+  --paic-primary-hover: #1D4ED8;
+  --paic-primary-light: #EFF6FF;
+  --paic-primary-dark: #1E40AF;
+
+  --paic-secondary: #475569;
+  --paic-secondary-light: #F8FAFC;
+
+  /* Surfaces & Borders */
+  --paic-bg-canvas: #F9FAFB;
+  --paic-bg-card: #FFFFFF;
+  --paic-bg-subtle: #F3F4F6;
+  --paic-border: #E5E7EB;
+  --paic-border-hover: #D1D5DB;
+
+  /* Text */
+  --paic-text-primary: #111827;
+  --paic-text-secondary: #4B5563;
+  --paic-text-muted: #9CA3AF;
+  --paic-text-inverted: #FFFFFF;
+
+  /* Status */
+  --paic-status-success: #10B981;
+  --paic-status-warning: #F59E0B;
+  --paic-status-error: #EF4444;
+  --paic-status-info: #3B82F6;
+
+  /* Border Radii */
+  --paic-radius-sm: 0.375rem;
+  --paic-radius-md: 0.5rem;
+  --paic-radius-lg: 0.75rem;
+  --paic-radius-xl: 1rem;
+  --paic-radius-2xl: 1.5rem;
+  --paic-radius-full: 9999px;
+
+  /* Shadows */
+  --paic-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --paic-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --paic-shadow-bento: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --paic-shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --paic-shadow-elevated: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Bento Grid Enterprise Utilities */
+.paic-bento-card {
+  background-color: var(--paic-bg-card);
+  border: 1px solid var(--paic-border);
+  border-radius: var(--paic-radius-2xl);
+  box-shadow: var(--paic-shadow-bento);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.paic-bento-card:hover {
+  border-color: var(--paic-border-hover);
+  box-shadow: var(--paic-shadow-hover);
+}
+
+.paic-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--paic-radius-full);
+}
