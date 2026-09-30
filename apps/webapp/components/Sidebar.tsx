@@ -47,12 +47,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside 
-      className={`hidden md:flex flex-col bg-white border-r border-slate-200/80 transition-all duration-300 ease-in-out shrink-0 z-30 ${
+      className={`hidden md:flex flex-col bg-white border-r border-slate-200/80 transition-all duration-300 ease-in-out shrink-0 z-30 h-screen ${
         collapsed ? 'w-20' : 'w-64'
       }`}
     >
       {/* Sidebar Header / Brand */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 flex-shrink-0">
         {!collapsed && (
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {collapsed && (
-        <div className="pt-2 flex justify-center">
+        <div className="pt-2 flex justify-center flex-shrink-0">
           <button
             onClick={() => setCollapsed(false)}
             aria-label="Expandir barra lateral"
@@ -94,10 +94,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      {/* Nav List */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      {/* Nav List - scrollable */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 min-h-0">
         {!collapsed && (
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 flex-shrink-0">
             Módulos Principales
           </p>
         )}
@@ -124,9 +124,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Footer / Settings */}
+      {/* Footer / Settings - sticky al bottom del viewport */}
       {isConjuntoAdmin && (
-        <div className="p-3 border-t border-slate-100">
+        <div className="sticky bottom-0 p-3 border-t border-slate-100 bg-white/95 backdrop-blur-sm flex-shrink-0">
           <button
             onClick={() => onSettingsClick()}
             title={collapsed ? 'Configuración' : undefined}
