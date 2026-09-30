@@ -67,7 +67,6 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ isOpen, onClose, onSave, inco
     };
 
     return (
-    return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg border border-slate-100 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
