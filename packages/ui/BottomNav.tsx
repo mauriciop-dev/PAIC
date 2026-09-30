@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Icon } from './Icon';
 import { BottomSheet } from './BottomSheet';
 
-interface NavItem {
+export interface NavItem {
   id: string;
   icon: string;
   label: string;
 }
 
-interface BottomNavProps {
+export interface BottomNavProps {
   activeTab: string;
   onTabSelect: (tab: string) => void;
   primaryItems: NavItem[];

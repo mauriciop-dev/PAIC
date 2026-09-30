@@ -6,9 +6,6 @@ import { SettingsTab } from '../App';
 
 interface HeaderProps {
   onHelpClick: () => void;
-  onStartTour: () => void;
-  onOpenOnboarding?: () => void;
-  showAnimatedButton?: boolean;
   userProfile: UserProfile | null;
   conjuntoInfo: ConjuntoInfo | null;
   onLogout: () => void;
@@ -19,9 +16,6 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ 
   onHelpClick, 
-  onStartTour,
-  onOpenOnboarding,
-  showAnimatedButton,
   userProfile, 
   conjuntoInfo, 
   onLogout, 
@@ -59,28 +53,6 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <style>{`
-        @keyframes btn-soft-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5), 0 0 0 0 rgba(251, 146, 60, 0.2); }
-          50% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0), 0 0 0 20px rgba(251, 146, 60, 0.15); }
-        }
-        @keyframes btn-gentle-shake {
-          0%, 100% { transform: translateX(0); }
-          15% { transform: translateX(-1.5px); }
-          30% { transform: translateX(1.5px); }
-          45% { transform: translateX(-1px); }
-          60% { transform: translateX(1px); }
-          75% { transform: translateX(-0.5px); }
-          90% { transform: translateX(0.5px); }
-        }
-        .btn-animated-init {
-          animation: btn-soft-pulse 2.5s ease-in-out infinite, btn-gentle-shake 4s ease-in-out 1s infinite;
-        }
-        .btn-animated-init:hover {
-          animation: none;
-          transform: scale(1.05);
-        }
-      `}</style>
     <header className="bg-white sticky top-0 z-20 shadow-sm border-b border-gray-200">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 md:py-4">
         <div className="flex justify-between items-center gap-2">
@@ -101,15 +73,8 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right section: Trial badge, Support, Tour & User Profile */}
+          {/* Right section: Trial badge & User Profile */}
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            <button
-              id="btn-soporte"
-              onClick={onHelpClick}
-              className="hidden lg:block px-4 py-2.5 min-h-[44px] bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition-colors text-sm"
-            >
-              Soporte
-            </button>
             {isTrialActive && daysRemaining > 0 && !isReadOnly && (
               <button
                 onClick={() => onSettingsClick('Suscripción')}
@@ -130,30 +95,6 @@ const Header: React.FC<HeaderProps> = ({
                 <Icon name="clock" className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Solo lectura · Ver planes</span>
                 <span className="sm:hidden">Ver planes</span>
-              </button>
-            )}
-            {showAnimatedButton && onOpenOnboarding ? (
-              <button
-                id="btn-inicia-aqui"
-                onClick={onOpenOnboarding}
-                className="hidden lg:flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-lg font-bold text-sm shadow-lg btn-animated-init"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Inicia aquí
-              </button>
-            ) : (
-              <button
-                id="btn-tour-guiado"
-                onClick={onOpenOnboarding || onStartTour}
-                className="hidden lg:flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-amber-100 text-amber-700 rounded-lg font-semibold hover:bg-amber-200 transition-colors text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Tour Guiado
               </button>
             )}
             

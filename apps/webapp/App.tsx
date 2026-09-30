@@ -544,6 +544,8 @@ const AppContent: React.FC = () => {
             setActiveTab={setActiveTab}
             userProfile={userProfile}
             onSettingsClick={handleSettingsClick}
+            onSupportClick={() => setIsHelpModalOpen(true)}
+            onTourClick={handleOpenOnboarding}
             conjuntoName={conjuntoName}
           />
         )}
@@ -551,9 +553,6 @@ const AppContent: React.FC = () => {
         <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
           <Header 
               onHelpClick={() => setIsHelpModalOpen(true)} 
-              onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
-              onOpenOnboarding={handleOpenOnboarding}
-              showAnimatedButton={showAnimatedButton}
               userProfile={userProfile}
               conjuntoInfo={conjuntoInfo} 
               onLogout={handleLogout} 

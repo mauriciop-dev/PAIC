@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-interface BottomSheetProps {
+export interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;

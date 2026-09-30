@@ -8,6 +8,8 @@ interface SidebarProps {
   setActiveTab: (tab: Tab) => void;
   userProfile: UserProfile;
   onSettingsClick: (tab?: SettingsTab) => void;
+  onSupportClick: () => void;
+  onTourClick: () => void;
   conjuntoName?: string;
 }
 
@@ -29,6 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab, 
   userProfile, 
   onSettingsClick,
+  onSupportClick,
+  onTourClick,
   conjuntoName
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -122,6 +126,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })}
+
+        {/* Soporte y Recorrido - integrados en la navegación */}
+        {!collapsed && (
+          <>
+            <button
+              onClick={onSupportClick}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all duration-150"
+            >
+              <div className="shrink-0 text-slate-400">
+                <Icon name="help-circle" className="w-5 h-5" />
+              </div>
+              <span className="truncate">Soporte</span>
+            </button>
+            <button
+              onClick={onTourClick}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all duration-150"
+            >
+              <div className="shrink-0 text-slate-400">
+                <Icon name="book-open" className="w-5 h-5" />
+              </div>
+              <span className="truncate">Recorrido</span>
+            </button>
+          </>
+        )}
       </nav>
 
       {/* Footer / Settings - sticky al bottom del viewport */}
