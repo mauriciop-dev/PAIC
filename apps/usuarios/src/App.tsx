@@ -8,24 +8,22 @@ import './App.css';
 
 const primaryItems: NavItem[] = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
-  { id: 'reservas', label: 'Reservas', icon: 'calendar' },
   { id: 'comunicados', label: 'Noticias', icon: 'mail' },
-  { id: 'paquetes', label: 'Paquetes', icon: 'package' },
-  { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
+  { id: 'documentos', label: 'Docs', icon: 'file-text' },
+  { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
+  { id: 'directorio', label: 'Contactos', icon: 'phone' },
 ];
 
 const secondaryItems: NavItem[] = [
+  { id: 'reservas', label: 'Reservas', icon: 'calendar' },
+  { id: 'paquetes', label: 'Paquetes', icon: 'package' },
+  { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
   { id: 'cuenta', label: 'Cuenta', icon: 'dollarSign' },
-  { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
-  { id: 'documentos', label: 'Docs', icon: 'file-text' },
-  { id: 'directorio', label: 'Contactos', icon: 'phone' },
   { id: 'votaciones', label: 'Votos', icon: 'checkSquare' },
   { id: 'perfil', label: 'Perfil', icon: 'user' },
 ];
 
-const bottomActions = [
-  { id: 'logout', label: 'Salir', icon: 'log-in', handler: () => {} }, // will be overridden
-];
+const bottomActions: { id: string; label: string; icon?: string; handler: () => void }[] = [];
 
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -220,10 +218,6 @@ export default function UsuariosApp() {
     return null;
   }
 };
-
-const bottomActions = [
-  { id: 'logout', label: 'Salir', icon: 'log-in', handler: () => void signOut().then(() => setUser(null)) },
-];
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
