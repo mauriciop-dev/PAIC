@@ -406,6 +406,38 @@ class AdminApiService {
     if (error) throw error;
     return data || [];
   }
+
+  // ============================================
+  // EDGE FUNCTIONS: AGENT ACTIONS
+  // ============================================
+  async executeAgentAction(action: string, payload: Record<string, unknown>): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('agent-actions/execute-action', {
+      body: { action, payload },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data?.error) {
+      return { success: false, error: data.error };
+    }
+
+    return { success: true, data: data?.data };
+  }
+
+  // Convenience methods for each action
+  async blockIp(payload: { ip: string; duration?: string; reason?: string; informeId?: string }) {
+    return this.executeAgentAction('block_ip', payload);
+  }
+
+  async createPrFix(payload: { informeId: string; archivo: string; linea: number; errorMessage: string; stackTrace?: string; suggestedFix?: string }) {
+    return this.executeAgentAction('create_pr_fix', payload);
+  }
+
+  async simplifyForm(payload: { informeId: string; campo: string; accion: string; valorNuevo?: string; razon: string }) {
+    return this.executeAgentAction('simplify_form', payload);
+  }
 }
 
 export const adminApi = new AdminApiService();

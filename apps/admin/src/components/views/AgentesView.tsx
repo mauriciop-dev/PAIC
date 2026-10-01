@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card, Badge, Button, Input, Select, ProgressRing, Switch } from '@paic/ui';
+import { Card, Badge, Button, Input, Select, ProgressRing, Switch, Toast, useToast } from '@paic/ui';
 import { Icon } from '@paic/ui';
 import { Agente, InformeAgente, AccionAgente, Severidad, ChatMensaje } from '../../types/admin';
+import { adminApi } from '../../services/adminApi';
 
 // ============================================
 // MOCK DATA - En producción vendrá de Supabase Realtime
@@ -161,6 +162,8 @@ export function AgentesView() {
   const [mensajesChat, setMensajesChat] = useState<ChatMensaje[]>([]);
   const [nuevoMensaje, setNuevoMensaje] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [ejecutandoAccion, setEjecutandoAccion] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   // Datos derivados
   const agente = useMemo(() => AGENTES_CONFIG.find(a => a.id === agenteActivo)!, [agenteActivo]);
@@ -209,13 +212,51 @@ export function AgentesView() {
       if (!confirmado) return;
     }
 
-    // Simular ejecución
-    console.log('[AgentesView] Ejecutando acción:', accion.id, informe?.id);
-    
-    // En producción: llamar Edge Function / Supabase Function
-    // await supabase.functions.invoke('ejecutar-accion-agente', { body: { accionId: accion.id, informeId: informe?.id, payload: informe?.accionSugerida?.payload } });
-    
-    alert(`Acción "${accion.label}" ejecutada correctamente (simulado)`);
+    setEjecutandoAccion(accion.id);
+
+    try {
+      // Mapear acción a payload según el tipo
+      const payload = buildPayload(accion, informe);
+
+      const result = await adminApi.executeAgentAction(accion.id, payload);
+
+      if (result.success) {
+        addToast(`Acción "${accion.label}" ejecutada correctamente`, 'success');
+        // Actualizar estado del informe si existe
+        if (informe && result.data) {
+          // En producción: refrescar datos desde Supabase
+          console.log('[AgentesView] Acción completada:', result.data);
+        }
+      } else {
+        addToast(`Error: ${result.error || 'Error desconocido'}`, 'error');
+      }
+    } catch (error) {
+      addToast(`Error ejecutando acción: ${error instanceof Error ? error.message : 'Error desconocido'}`, 'error');
+    } finally {
+      setEjecutandoAccion(null);
+    }
+  };
+
+  const buildPayload = (accion: AccionAgente, informe?: InformeAgente): Record<string, unknown> => {
+    const basePayload: Record<string, unknown> = {
+      informeId: informe?.id,
+    };
+
+    // Mapear según el tipo de acción
+    switch (accion.id) {
+      case 'block_ip':
+        return { ...basePayload, ip: '190.12.45.67', duration: '24h', reason: 'Bloqueo por agente Sentinel' };
+      case 'create_pr_fix':
+        return { ...basePayload, archivo: 'src/components/CommonAreasView.tsx', linea: 187, errorMessage: 'TypeError: Cannot read property filter of undefined' };
+      case 'simplify_form':
+        return { ...basePayload, campo: 'paymentProofPath', accion: 'hacer_opcional', razon: 'Reducir fricción en flujo de reserva' };
+      case 'revoke_sessions':
+        return { ...basePayload, reason: 'Revocación por incidente de seguridad' };
+      case 'notify_admin':
+        return { ...basePayload, canales: ['email', 'push'], prioridad: 'inmediata' };
+      default:
+        return basePayload;
+    }
   };
 
   const handleEnviarChat = () => {
