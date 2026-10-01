@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from './components/AdminLayout';
 import { AdminLogin } from './components/views/AdminLogin';
 import { AdminDashboard } from './components/views/AdminDashboard';
+import { AgentesView } from './components/views/AgentesView';
 import { ConjuntosView } from './components/views/ConjuntosView';
 import { UsuariosView } from './components/views/UsuariosView';
 import { SuscripcionesView } from './components/views/SuscripcionesView';
@@ -50,6 +51,7 @@ function AdminRoutes() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<AdminDashboard />} />
+        <Route path="/agentes" element={<AgentesView />} />
         <Route path="/conjuntos" element={<ConjuntosView />} />
         <Route path="/usuarios" element={<UsuariosView />} />
         <Route path="/suscripciones" element={<SuscripcionesView />} />

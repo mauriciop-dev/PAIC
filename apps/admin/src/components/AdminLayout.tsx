@@ -6,6 +6,7 @@ import { useAdminAuth } from '../hooks/useAdminAuth';
 
 const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
   { id: 'Dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { id: 'Agentes', label: 'Agentes IA', icon: 'cpu' },
   { id: 'Conjuntos', label: 'Conjuntos', icon: 'building' },
   { id: 'Usuarios', label: 'Usuarios', icon: 'users' },
   { id: 'Suscripciones', label: 'Suscripciones', icon: 'credit-card' },

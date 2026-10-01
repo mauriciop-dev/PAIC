@@ -1,5 +1,6 @@
 export type AdminTab = 
   | 'Dashboard'
+  | 'Agentes'
   | 'Conjuntos'
   | 'Usuarios'
   | 'Suscripciones'
@@ -67,4 +68,73 @@ export interface AlertaBug {
   creadoEn: string;
   actualizadoEn: string;
   asignadoA?: string;
+}
+
+// ============================================
+// TIPOS PARA AGENTES INTELIGENTES (Fase 2)
+// ============================================
+
+export type AgenteId = 'sentinel' | 'debug' | 'wald' | 'behavioral';
+
+export type Severidad = 'critica' | 'alta' | 'media' | 'baja';
+
+export type EstadoInforme = 'pendiente' | 'en_progreso' | 'aprobado' | 'resuelto' | 'descartado';
+
+export type CategoriaInforme = 
+  | 'seguridad' 
+  | 'excepcion_frontend' 
+  | 'excepcion_backend' 
+  | 'memory_leak' 
+  | 'churn_silencioso' 
+  | 'flujo_truncado' 
+  | 'patron_uso' 
+  | 'adopcion_pwa' 
+  | 'optimizacion_ux';
+
+export interface Agente {
+  id: AgenteId;
+  nombre: string;
+  icono: string;
+  color: 'red' | 'orange' | 'blue' | 'green' | 'purple';
+  descripcion: string;
+  estado: 'activo' | 'pausado' | 'error';
+  ultimaEjecucion: string;
+  proximaEjecucion: string;
+  metricas: Record<string, number>;
+}
+
+export interface AccionSugerida {
+  tipo: string;
+  descripcion: string;
+  payload: Record<string, unknown>;
+}
+
+export interface InformeAgente {
+  id: string;
+  agenteId: AgenteId;
+  titulo: string;
+  descripcion: string;
+  severidad: Severidad;
+  categoria: CategoriaInforme;
+  estado: EstadoInforme;
+  creadoEn: string;
+  actualizadoEn?: string;
+  metadata: Record<string, unknown>;
+  accionSugerida?: AccionSugerida;
+}
+
+export interface AccionAgente {
+  id: string;
+  label: string;
+  icono: string;
+  color: 'red' | 'orange' | 'blue' | 'green' | 'purple';
+  requiereConfirmacion: boolean;
+}
+
+export interface ChatMensaje {
+  id: string;
+  agenteId: AgenteId;
+  remitente: 'superadmin' | 'agente';
+  contenido: string;
+  timestamp: string;
 }
