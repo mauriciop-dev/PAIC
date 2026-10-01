@@ -1,0 +1,31 @@
+{
+  "name": "admin",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^6.26.0",
+    "@supabase/supabase-js": "2",
+    "@paic/ui": "file:../../packages/ui",
+    "@paic/types": "file:../../packages/types",
+    "@paic/supabase": "file:../../packages/supabase",
+    "@paic/config": "file:../../packages/config",
+    "@paic/analytics": "file:../../packages/analytics",
+    "@paic/design-tokens": "file:../../packages/design-tokens"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
