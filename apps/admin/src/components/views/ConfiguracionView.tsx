@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Input, Select, Badge, Button, Switch, Modal } from '@paic/ui';
 import { Icon } from '@paic/ui';
 import { usePostHog } from '../../hooks/usePostHog';
+import { supabase } from '@paic/supabase';
+
+interface PushSubscription {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
 
 type DangerAction = 'eliminar_conjunto' | 'suspender_usuario' | 'resetear_plataforma' | 'eliminar_todos_logs' | 'revocar_todas_sesiones';
 
@@ -69,6 +78,12 @@ export function ConfiguracionView() {
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [maxFileSize, setMaxFileSize] = useState('10');
 
+  // Push Notifications
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushSubscription, setPushSubscription] = useState<PushSubscription | null>(null);
+
   // Zona Peligro - Re-autenticación
   const [dangerModalOpen, setDangerModalOpen] = useState(false);
   const [selectedDangerAction, setSelectedDangerAction] = useState<DangerActionConfig | null>(null);
@@ -77,16 +92,155 @@ export function ConfiguracionView() {
   const [authenticating, setAuthenticating] = useState(false);
   const [authError, setAuthError] = useState('');
 
+  // Push Notifications - Check support and load subscription
+  useEffect(() => {
+    const checkPushSupport = async () => {
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+      setPushSupported(supported);
+      
+      if (!supported) return;
+
+      // Check existing subscription
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          setPushSubscription({
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: arrayBufferToBase64(subscription.getKey('p256dh')!),
+              auth: arrayBufferToBase64(subscription.getKey('auth')!),
+            },
+          });
+          setPushEnabled(true);
+        }
+      } catch (e) {
+        console.error('[Config] Error checking push subscription:', e);
+      }
+    };
+
+    checkPushSupport();
+  }, []);
+
+  // Helper functions for push
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
+
+  const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  };
+
+  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const subscribeToPush = async () => {
+    if (!pushSupported) return;
+    
+    setPushLoading(true);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        throw new Error('VAPID public key not configured');
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+
+      // Save to Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const pushSub: PushSubscription = {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: arrayBufferToBase64(subscription.getKey('p256dh')!),
+          auth: arrayBufferToBase64(subscription.getKey('auth')!),
+        },
+      };
+
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          user_id: user.id,
+          endpoint: pushSub.endpoint,
+          p256dh: pushSub.keys.p256dh,
+          auth: pushSub.keys.auth,
+        }, { onConflict: 'user_id,endpoint' });
+
+      if (error) throw error;
+
+      setPushSubscription(pushSub);
+      setPushEnabled(true);
+      
+      // Track in PostHog
+      // trackConfigChange('pushNotifications', false, true);
+    } catch (error) {
+      console.error('[Config] Error subscribing to push:', error);
+      alert(`Error al suscribirse: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const unsubscribeFromPush = async () => {
+    if (!pushSubscription) return;
+    
+    setPushLoading(true);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      
+      if (subscription) {
+        await subscription.unsubscribe();
+      }
+
+      // Remove from Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('push_subscriptions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('endpoint', pushSubscription.endpoint);
+      }
+
+      setPushSubscription(null);
+      setPushEnabled(false);
+      
+      // Track in PostHog
+      // trackConfigChange('pushNotifications', true, false);
+    } catch (error) {
+      console.error('[Config] Error unsubscribing from push:', error);
+      alert(`Error al desuscribirse: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
   const sections = [
-    {
-      title: 'Pagos - Stripe',
-      icon: 'credit-card',
-      fields: [
-        { label: 'Clave Secreta (Secret Key)', type: 'password', value: stripeKey, onChange: setStripeKey, placeholder: 'sk_live_...' },
-        { label: 'Clave Publicable (Publishable Key)', type: 'text', value: 'pk_live_************************', onChange: () => {}, placeholder: 'pk_live_...' },
-        { label: 'Webhook Secret', type: 'password', value: 'whsec_************************', onChange: () => {}, placeholder: 'whsec_...' },
-      ]
-    },
     {
       title: 'Pagos - MercadoPago (Latam)',
       icon: 'dollar-sign',
@@ -139,6 +293,27 @@ export function ConfiguracionView() {
           onChange: () => {}, 
           placeholder: 'v2.4.1',
           readonly: true
+        },
+      ]
+    },
+    {
+      title: 'Notificaciones Push',
+      icon: 'bell',
+      fields: [
+        { 
+          label: 'Notificaciones Push', 
+          type: 'switch', 
+          value: pushEnabled, 
+          onChange: (v) => { 
+            if (v) {
+              subscribeToPush();
+            } else {
+              unsubscribeFromPush();
+            }
+          },
+          description: pushSupported 
+            ? (pushEnabled ? 'Recibirás alertas críticas en tiempo real' : 'Activa para recibir alertas en segundo plano')
+            : 'Tu navegador no soporta notificaciones push'
         },
       ]
     },

@@ -49,13 +49,14 @@ export async function notifyAdmin(supabase: ReturnType<typeof createClient>, pay
       }
     }
 
-    // Push notification
+    // Push notification - call send-push Edge Function
     if (canales.includes('push')) {
       try {
-        await sendPush(supabase, admin.user_id, titulo, mensaje);
+        await sendPushNotification(admin.user_id, titulo, mensaje, informe.severidad, informe.id);
         resultados.push.enviados++;
       } catch (e) {
         resultados.push.fallidos++;
+        console.error(`Error push to ${admin.user_id}:`, e);
       }
     }
 
@@ -121,10 +122,55 @@ async function sendEmail(supabase: any, to: string, subject: string, body: strin
   // await supabase.functions.invoke('send-email', { body: { to, subject, html: body } });
 }
 
-async function sendPush(supabase: any, userId: string, title: string, body: string) {
-  // In production: use Supabase Realtime + Web Push API
-  console.log(`[Push] User: ${userId}, Title: ${title}`);
-  // await supabase.functions.invoke('send-push', { body: { userId, title, body } });
+async function sendPushNotification(userId: string, title: string, body: string, severity: string, informeId: string) {
+  // Get push subscriptions for this user
+  const { data: subscriptions, error } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+    .eq('user_id', userId);
+
+  if (error || !subscriptions || subscriptions.length === 0) {
+    console.log(`[Push] No subscriptions for user ${userId}`);
+    return;
+  }
+
+  // Call send-push Edge Function
+  const { data, error } = await supabase.functions.invoke('send-push', {
+    body: {
+      subscriptions: subscriptions.map(s => ({
+        endpoint: s.endpoint,
+        keys: { p256dh: s.p256dh, auth: s.auth },
+      })),
+      payload: {
+        title,
+        body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-72.png',
+        vibrate: [200, 100, 200],
+        data: { informeId, severity },
+        actions: [
+          { action: 'view', title: 'Ver en Admin' },
+          { action: 'dismiss', title: 'Descartar' },
+        ],
+        requireInteraction: true,
+        tag: `paic-${informeId}`,
+        url: `/logs?filter=informe_${informeId}`,
+      },
+    });
+
+  if (error) {
+    console.error(`[Push] Error invoking send-push:`, error);
+    throw new Error(`Push failed: ${error.message}`);
+  }
+
+  console.log(`[Push] Sent to user ${userId}:`, data);
+}
+
+async function sendEmail(supabase: any, to: string, subject: string, body: string) {
+  // In production: use Resend, SendGrid, or Supabase Edge Function for email
+  // For now, log
+  console.log(`[Email] To: ${to}, Subject: ${subject}`);
+  // await supabase.functions.invoke('send-email', { body: { to, subject, html: body } });
 }
 
 async function sendWhatsApp(email: string, message: string) {
