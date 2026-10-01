@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AdminLayout } from './components/AdminLayout';
 import { AdminLogin } from './components/views/AdminLogin';
 import { AdminDashboard } from './components/views/AdminDashboard';
@@ -11,11 +11,13 @@ import { LogsView } from './components/views/LogsView';
 import { MetricasView } from './components/views/MetricasView';
 import { ConfiguracionView } from './components/views/ConfiguracionView';
 import { AdminAuthProvider, useAdminAuth } from './hooks/useAdminAuth';
+import { usePostHogPageTracking } from './hooks/usePostHog';
 import { SuperAdminProfile } from './types';
 
 function AdminRoutes() {
   const { isAuthenticated, isLoading, user } = useAdminAuth();
   const isSuperAdmin = user?.rol === 'superadmin';
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -45,6 +47,9 @@ function AdminRoutes() {
       </div>
     );
   }
+
+  // Track page views
+  usePostHogPageTracking(location.pathname);
 
   return (
     <AdminLayout>

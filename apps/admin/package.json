@@ -10,16 +10,17 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@paic/analytics": "file:../../packages/analytics",
+    "@paic/config": "file:../../packages/config",
+    "@paic/design-tokens": "file:../../packages/design-tokens",
+    "@paic/supabase": "file:../../packages/supabase",
+    "@paic/types": "file:../../packages/types",
+    "@paic/ui": "file:../../packages/ui",
+    "@supabase/supabase-js": "2",
+    "posthog-js": "^1.435.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^6.26.0",
-    "@supabase/supabase-js": "2",
-    "@paic/ui": "file:../../packages/ui",
-    "@paic/types": "file:../../packages/types",
-    "@paic/supabase": "file:../../packages/supabase",
-    "@paic/config": "file:../../packages/config",
-    "@paic/analytics": "file:../../packages/analytics",
-    "@paic/design-tokens": "file:../../packages/design-tokens"
+    "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

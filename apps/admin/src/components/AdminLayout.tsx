@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { AdminTab, SuperAdminProfile } from '../types';
 import { Icon } from '@paic/ui';
 import { useAdminAuth } from '../hooks/useAdminAuth';
+import { usePostHogTabTracking } from '../hooks/usePostHog';
 
 const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
   { id: 'Dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -24,6 +25,9 @@ export function AdminLayout() {
     const path = location.pathname.replace('/', '');
     return (adminTabs.find(t => t.id.toLowerCase() === path.toLowerCase())?.id) || 'Dashboard';
   }, [location.pathname]);
+
+  // Track tab changes
+  usePostHogTabTracking(activeTab);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
