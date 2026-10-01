@@ -1,24 +1,35 @@
-import React, { useState } from 'react';
-import { Card, Badge, Input, Select } from '@paic/ui';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Badge, Input, Select, Button } from '@paic/ui';
 import { Icon } from '@paic/ui';
 import { LogEntry } from '../../types';
-
-const mockLogs: LogEntry[] = [
-  { id: '1', timestamp: '2024-12-19T10:30:15Z', level: 'error', source: 'payments', message: 'Webhook MercadoPago falló: timeout al procesar notificación', metadata: { paymentId: 'pay_123', retry: 3 }, conjuntoId: 'torres-norte' },
-  { id: '2', timestamp: '2024-12-19T10:28:42Z', level: 'warn', source: 'auth', message: 'Múltiples intentos de login fallidos', metadata: { ip: '190.12.45.67', attempts: 5 }, userId: 'user_456' },
-  { id: '3', timestamp: '2024-12-19T10:25:10Z', level: 'info', source: 'api', message: 'Nuevo conjunto creado: Residencial Los Andes', metadata: { plan: 'Trial' }, conjuntoId: 'los-andes' },
-  { id: '4', timestamp: '2024-12-19T10:20:05Z', level: 'error', source: 'realtime', message: 'Canal de paquetes desconectado inesperadamente', metadata: { channel: 'package-updates', code: 'CHANNEL_ERROR' }, conjuntoId: 'el-prado' },
-  { id: '5', timestamp: '2024-12-19T10:15:33Z', level: 'info', source: 'functions', message: 'Campaña de comunicaciones enviada: 245 destinatarios', metadata: { campaignId: 'camp_789', delivered: 242, failed: 3 } },
-  { id: '6', timestamp: '2024-12-19T10:10:01Z', level: 'debug', source: 'storage', message: 'Archivo subido: reglamento-interno.pdf (2.3MB)', metadata: { bucket: 'documents', path: 'el-prado/reglamento.pdf' }, conjuntoId: 'el-prado' },
-  { id: '7', timestamp: '2024-12-19T10:05:22Z', level: 'warn', source: 'payments', message: 'Suscripción por expirar en 3 días', metadata: { conjuntoId: 'torres-norte', plan: 'Pro', daysLeft: 3 }, conjuntoId: 'torres-norte' },
-];
+import { useLogsHistoricos, useLogsRealtime } from '../../hooks/useAdminData';
 
 export function LogsView() {
   const [search, setSearch] = useState('');
-  const [filterLevel, setFilterLevel] = useState('all');
-  const [filterSource, setFilterSource] = useState('all');
+  const [filterLevel, setFilterLevel] = useState<LogEntry['level'] | 'all'>('all');
+  const [filterSource, setFilterSource] = useState<LogEntry['source'] | 'all'>('all');
 
-  const filtered = mockLogs.filter(log => {
+  const { data: logsHistoricos, loading, error, refetch } = useLogsHistoricos({
+    level: filterLevel === 'all' ? undefined : filterLevel,
+    source: filterSource === 'all' ? undefined : filterSource,
+    limite: 200,
+  });
+
+  const { logs: logsRealtime, connected } = useLogsRealtime({
+    level: filterLevel === 'all' ? undefined : filterLevel,
+    source: filterSource === 'all' ? undefined : filterSource,
+  });
+
+  // Combinar logs históricos + tiempo real (evitar duplicados por ID)
+  const allLogs = useCallback(() => {
+    const historicos = logsHistoricos || [];
+    const realtime = logsRealtime || [];
+    const map = new Map<string, LogEntry>();
+    [...historicos, ...realtime].forEach(log => map.set(log.id, log));
+    return Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [logsHistoricos, logsRealtime]);
+
+  const filtered = allLogs().filter(log => {
     const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase());
     const matchesLevel = filterLevel === 'all' || log.level === filterLevel;
     const matchesSource = filterSource === 'all' || log.source === filterSource;
@@ -27,10 +38,10 @@ export function LogsView() {
 
   const getLevelBadge = (level: LogEntry['level']) => {
     switch (level) {
-      case 'error': return { variant: 'danger' as const, color: 'bg-red-100 text-red-700' };
-      case 'warn': return { variant: 'warning' as const, color: 'bg-amber-100 text-amber-700' };
-      case 'info': return { variant: 'success' as const, color: 'bg-blue-100 text-blue-700' };
-      default: return { variant: 'default' as const, color: 'bg-gray-100 text-gray-700' };
+      case 'error': return { color: 'bg-red-100 text-red-700' };
+      case 'warn': return { color: 'bg-amber-100 text-amber-700' };
+      case 'info': return { color: 'bg-blue-100 text-blue-700' };
+      default: return { color: 'bg-gray-100 text-gray-700' };
     }
   };
 
@@ -53,12 +64,26 @@ export function LogsView() {
           <p className="text-gray-500 mt-1">Monitoreo y debugging en tiempo real</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="success" className="text-sm">LIVE</Badge>
-          <Button variant="ghost" size="sm">
+          <Badge variant={connected ? 'success' : 'default'} className="text-sm">
+            {connected ? 'LIVE' : 'OFFLINE'}
+          </Badge>
+          <Button variant="ghost" size="sm" onClick={refetch}>
             <Icon name="refresh-cw" className="w-4 h-4" /> Actualizar
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Card className="p-3 border-red-200 bg-red-50 mb-4">
+          <div className="flex items-center gap-3">
+            <Icon name="alert-triangle" className="w-5 h-5 text-red-600" />
+            <p className="text-sm text-red-800">{error}</p>
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -70,14 +95,14 @@ export function LogsView() {
               leftIcon={<Icon name="search" className="w-4 h-4 text-gray-400" />}
             />
           </div>
-          <Select value={filterLevel} onChange={(e) => setFilterLevel(e.target.value)} className="w-full sm:w-36">
+          <Select value={filterLevel} onChange={(e) => setFilterLevel(e.target.value as any)} className="w-full sm:w-36">
             <option value="all">Todos los niveles</option>
             <option value="error">Error</option>
             <option value="warn">Warning</option>
             <option value="info">Info</option>
             <option value="debug">Debug</option>
           </Select>
-          <Select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="w-full sm:w-36">
+          <Select value={filterSource} onChange={(e) => setFilterSource(e.target.value as any)} className="w-full sm:w-36">
             <option value="all">Todas las fuentes</option>
             <option value="auth">Auth</option>
             <option value="payments">Payments</option>
@@ -90,6 +115,13 @@ export function LogsView() {
       </Card>
 
       <Card className="overflow-hidden">
+        {loading && (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
+            <p className="text-gray-500">Cargando logs...</p>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -131,7 +163,34 @@ export function LogsView() {
             </tbody>
           </table>
         </div>
+
+        {(filtered.length === 0 && !loading) && (
+          <div className="p-8 text-center text-gray-500">
+            <Icon name="filter" className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+            <p>No se encontraron logs con los filtros actuales</p>
+          </div>
+        )}
       </Card>
     </div>
   );
+}
+
+function getLevelBadge(level: LogEntry['level']) {
+  switch (level) {
+    case 'error': return { color: 'bg-red-100 text-red-700' };
+    case 'warn': return { color: 'bg-amber-100 text-amber-700' };
+    case 'info': return { color: 'bg-blue-100 text-blue-700' };
+    default: return { color: 'bg-gray-100 text-gray-700' };
+  }
+}
+
+function getSourceIcon(source: LogEntry['source']) {
+  switch (source) {
+    case 'auth': return 'shield';
+    case 'payments': return 'credit-card';
+    case 'api': return 'globe';
+    case 'realtime': return 'wifi';
+    case 'storage': return 'database';
+    default: return 'terminal';
+  }
 }
