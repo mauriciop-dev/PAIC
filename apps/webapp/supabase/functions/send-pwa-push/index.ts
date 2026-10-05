@@ -20,15 +20,39 @@ Deno.serve(async (request) => {
     const memberIds = (members || []).map((row) => row.user_id).filter((id) => !payload.userIds?.length || payload.userIds.includes(id));
     const { data: subscriptions, error } = memberIds.length ? await supabase.from('pwa_push_subscriptions').select('subscription,user_id').in('user_id', memberIds) : { data: [], error: null };
     if (error) throw error;
+    if (payload.dryRun) {
+      return Response.json({
+        total: subscriptions?.length || 0,
+        activeMembers: memberIds.length,
+        sent: 0,
+        failed: 0,
+        removed: 0,
+      });
+    }
     const vapidSubject = Deno.env.get('VAPID_SUBJECT');
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
     if (!vapidSubject || !vapidPublicKey || !vapidPrivateKey) throw new Error('VAPID no está configurado.');
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-    const result = await Promise.allSettled((subscriptions || []).map((row) => webpush.sendNotification(row.subscription, JSON.stringify({ title: payload.title || 'PAIC Residentes', body: payload.body || '', url: payload.url || '/' }))));
-    const expired = (subscriptions || []).filter((_, index) => result[index].status === 'rejected' && (result[index] as PromiseRejectedResult).reason?.statusCode === 410).map((row) => row.user_id);
+    const result = await Promise.allSettled((subscriptions || []).map((row) => webpush.sendNotification(row.subscription, JSON.stringify({
+      title: payload.title || 'PAIC Residentes',
+      body: payload.body || '',
+      url: payload.url || '/',
+      icon: payload.icon || '/logo-paic.png',
+      badge: payload.badge || '/logo-paic.png',
+    }))));
+    const expired = (subscriptions || []).filter((_, index) => {
+      if (result[index].status !== 'rejected') return false;
+      const statusCode = (result[index] as PromiseRejectedResult).reason?.statusCode;
+      return statusCode === 404 || statusCode === 410;
+    }).map((row) => row.user_id);
     if (expired.length) await supabase.from('pwa_push_subscriptions').delete().in('user_id', expired);
-    return Response.json({ sent: result.filter((item) => item.status === 'fulfilled').length, removed: expired.length });
+    return Response.json({
+      total: subscriptions?.length || 0,
+      sent: result.filter((item) => item.status === 'fulfilled').length,
+      failed: result.filter((item) => item.status === 'rejected').length,
+      removed: expired.length,
+    });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Push failed' }, { status: 500 });
   }

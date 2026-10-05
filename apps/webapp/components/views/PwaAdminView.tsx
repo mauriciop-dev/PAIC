@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Badge, Button, Card, Icon, Input, Textarea } from '@paic/ui';
 import { ConjuntoInfo, UserProfile } from '../../types';
 import { supabase } from '../../services/supabaseClient';
-import { notifyPwaResidents } from '../../services/pwaPushService';
+import { getPwaPushAudienceStats, notifyPwaResidents } from '../../services/pwaPushService';
 import {
     getGoogleDrivePreviewUrl,
     isGoogleDriveFileUrl,
@@ -25,7 +25,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
       </div>
     </div>
     <div role="tabpanel">
-      {active === 'Comunicados' && <Communications conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Estado de cuenta' && <Accounts conjuntoId={conjuntoInfo.id}/>} {active === 'Portería' && <GateAdmin conjuntoId={conjuntoInfo.id}/>} {active === 'Reservas' && <Reservations conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'PQRs' && <Pqrs conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Documentos' && <Documents conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Directorio' && <Directory conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Votaciones' && <VotesAdmin conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Configuración' && <><AccessInvite conjuntoId={conjuntoInfo.id}/><RequestsAdmin conjuntoId={conjuntoInfo.id}/></>} 
+      {active === 'Comunicados' && <Communications conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Estado de cuenta' && <Accounts conjuntoId={conjuntoInfo.id}/>} {active === 'Portería' && <GateAdmin conjuntoId={conjuntoInfo.id}/>} {active === 'Reservas' && <Reservations conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'PQRs' && <Pqrs conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Documentos' && <Documents conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Directorio' && <Directory conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Votaciones' && <VotesAdmin conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} {active === 'Configuración' && <><AccessInvite conjuntoId={conjuntoInfo.id}/><PushDiagnostics conjuntoId={conjuntoInfo.id}/><RequestsAdmin conjuntoId={conjuntoInfo.id}/></>} 
     </div>
   </div>;
 }
@@ -34,6 +34,40 @@ async function uploadAdminAttachment(file: File, folder: string, userId: string)
 async function signedAdminAttachment(path: string | null) { if (!path || path.startsWith('http')) return path; const { data, error } = await supabase.storage.from('pwa-attachments').createSignedUrl(path, 3600); if (error) return path; return data.signedUrl; }
 
 function AccessInvite({ conjuntoId }: { conjuntoId: string }) { const [copied, setCopied] = useState(false); const url = `https://usuarios.paicai.com.co/?registro=1&conjunto=${encodeURIComponent(conjuntoId)}`; const qr = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(url)}`; const copy = async () => { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }; return <Card className="p-5"><h2 className="font-semibold">Acceso de residentes</h2><p className="mt-1 text-sm text-gray-600">Comparte este enlace o código QR para que los residentes soliciten acceso a la PWA.</p><div className="mt-4 grid gap-5 md:grid-cols-[1fr_auto] md:items-center"><div><label className="text-sm font-medium">Enlace de registro</label><input readOnly value={url} className="mt-1 w-full rounded border bg-gray-50 p-2 text-sm"/><div className="mt-3 flex flex-wrap gap-2"><Button onClick={()=>void copy()}>{copied?'Enlace copiado':'Copiar enlace'}</Button><a className="inline-flex items-center rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" href={url} target="_blank" rel="noreferrer">Abrir PWA</a><a className="inline-flex items-center rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" href={qr} download="paic-registro-residentes.png" target="_blank" rel="noreferrer">Descargar QR</a></div></div><div className="rounded border bg-white p-2"><img src={qr} alt="Código QR para solicitar acceso a PAIC Residentes" className="h-40 w-40"/><p className="mt-1 text-center text-xs text-gray-500">Escanea para solicitar acceso</p></div></div></Card> }
+
+function PushDiagnostics({ conjuntoId }: { conjuntoId: string }) {
+  const [stats, setStats] = useState<{ activeMembers?: number; total?: number; sent?: number; failed?: number; removed?: number } | null>(null);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const refresh = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const result = await getPwaPushAudienceStats(conjuntoId);
+      setStats(result);
+      if (!result) setMessage('No se pudo consultar el estado de notificaciones.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, [conjuntoId]);
+
+  const sendTest = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const result = await notifyPwaResidents({ conjuntoId, title: 'Prueba de PAIC', body: 'Si ves este aviso, tu teléfono ya recibe notificaciones.', url: '/' });
+      setStats(result);
+      setMessage(result ? `Prueba enviada: ${result.sent} recibieron el aviso, ${result.failed || 0} fallaron.` : 'No se pudo enviar la prueba.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return <Card className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Notificaciones móviles</h2><p className="mt-1 text-sm text-gray-600">Verifica cuántos residentes activos ya tienen un teléfono suscrito y envía una prueba real.</p></div><Badge variant={stats?.total ? 'success' : 'warning'}>{stats?.total || 0} teléfono(s)</Badge></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded border bg-gray-50 p-3"><p className="text-xs text-gray-500">Residentes activos</p><p className="text-xl font-semibold">{stats?.activeMembers ?? '-'}</p></div><div className="rounded border bg-gray-50 p-3"><p className="text-xs text-gray-500">Teléfonos suscritos</p><p className="text-xl font-semibold">{stats?.total ?? '-'}</p></div><div className="rounded border bg-gray-50 p-3"><p className="text-xs text-gray-500">Vencidas eliminadas</p><p className="text-xl font-semibold">{stats?.removed ?? 0}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" loading={loading} onClick={()=>void refresh()}>Revisar estado</Button><Button loading={loading} disabled={!stats?.total} onClick={()=>void sendTest()}>Enviar prueba</Button></div>{message&&<p className="mt-3 text-sm text-gray-600">{message}</p>}</Card>;
+}
 
 function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: string }) {
   const [rows, setRows] = useState<any[]>([]);
@@ -93,14 +127,14 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
         target_apartments: apartments,
       });
       if (result.error) throw result.error;
-      if (!scheduled) void notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: title });
+      const pushResult = !scheduled ? await notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: title }) : null;
       setTitle('');
       setBody('');
       setScheduledAt('');
       setAttachmentUrl('');
       setScheduleMode('now');
       setRecipientSelection({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
-      setMessage(scheduled ? 'Comunicado programado.' : 'Comunicado publicado.');
+      setMessage(scheduled ? 'Comunicado programado.' : `Comunicado publicado.${pushResult ? ` Notificaciones enviadas: ${pushResult.sent}/${pushResult.total || pushResult.sent}.` : ''}`);
       void load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo guardar el comunicado.');

@@ -18,8 +18,6 @@ export interface BottomNavProps {
   onExpandChange?: (expanded: boolean) => void;
 }
 
-const BAR_HEIGHT = 'calc(64px + env(safe-area-inset-bottom, 0px))';
-
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabSelect,

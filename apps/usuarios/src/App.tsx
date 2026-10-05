@@ -3,7 +3,7 @@ import { Button, Card, Icon, Input, Badge, Avatar, useToast, BottomNav, type Nav
 import { analytics } from '@paic/analytics';
 import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
-import { subscribeToPush } from './services/pwaPush';
+import { getPushSubscriptionState, isLikelyIos, isPushSupported, isRunningAsInstalledPwa, subscribeToPush, unsubscribeFromPush, type PushSubscriptionState } from './services/pwaPush';
 import './App.css';
 
 const primaryItems: NavItem[] = [
@@ -23,7 +23,7 @@ const secondaryItems: NavItem[] = [
   { id: 'perfil', label: 'Perfil', icon: 'user' },
 ];
 
-const bottomActions: { id: string; label: string; icon?: string; handler: () => void }[] = [];
+const bottomActions: { id: string; label: string; icon: string; handler: () => void }[] = [];
 
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -196,18 +196,7 @@ export default function UsuariosApp() {
                 </div>
               </div>
             </Card>
-<Card className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">Notificaciones</h3>
-          <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones', 'error'))}>Activar notificaciones Push</Button>
-          <div className="space-y-3">
-            {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
-              <label key={i} className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded border-gray-300" />
-                <span className="text-gray-700">{n}</span>
-              </label>
-            ))}
-          </div>
-        </Card>
+        <NotificationSettings userId={user.id} onToast={addToast} />
         {user.role === 'residente_principal' && <InvitationForm membershipId={user.membershipId} />}
         <Button variant="danger" onClick={() => void signOut().then(() => setUser(null))}>
           <Icon name="log-in" className="w-4 h-4" /> Cerrar Sesión
@@ -251,6 +240,100 @@ export default function UsuariosApp() {
 }
 
 function InvitationForm({ membershipId }: { membershipId: string }) { const [email, setEmail] = useState(''); const [message, setMessage] = useState(''); const submit = async (e: React.FormEvent) => { e.preventDefault(); try { await inviteAdditionalUser(membershipId, email); setMessage('Invitación registrada.'); setEmail(''); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo enviar la invitación.'); } }; return <Card className="p-4"><h3 className="font-semibold">Invitar usuario adicional</h3><p className="mt-1 text-sm text-gray-600">Puedes tener hasta cuatro invitaciones pendientes.</p><form onSubmit={submit} className="mt-3 flex gap-2"><Input type="email" placeholder="correo Gmail" value={email} onChange={e => setEmail(e.target.value)} required/><Button type="submit">Invitar</Button></form>{message && <p className="mt-2 text-sm text-gray-600">{message}</p>}</Card>; }
+
+function NotificationSettings({ userId, onToast }: { userId: string; onToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error', duration?: number) => void }) {
+  const [state, setState] = useState<PushSubscriptionState>('unsupported');
+  const [loading, setLoading] = useState(true);
+  const supported = isPushSupported();
+  const installed = isRunningAsInstalledPwa();
+  const ios = isLikelyIos();
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      setState(await getPushSubscriptionState());
+    } catch {
+      setState('unsupported');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const activate = async () => {
+    try {
+      setLoading(true);
+      await subscribeToPush(userId);
+      setState(await getPushSubscriptionState());
+      onToast('Notificaciones activadas en este teléfono.', 'success');
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones.', 'error');
+      void refresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deactivate = async () => {
+    try {
+      setLoading(true);
+      await unsubscribeFromPush(userId);
+      setState(await getPushSubscriptionState());
+      onToast('Notificaciones desactivadas en este teléfono.', 'success');
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : 'No se pudieron desactivar las notificaciones.', 'error');
+      void refresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const labelByState: Record<PushSubscriptionState, string> = {
+    unsupported: 'No compatible',
+    'missing-vapid-key': 'Configuración pendiente',
+    'permission-default': 'Sin activar',
+    'permission-denied': 'Bloqueadas',
+    subscribed: 'Activas',
+    'not-subscribed': 'Sin suscripción',
+  };
+
+  const details = (() => {
+    if (!supported) return 'Este navegador no permite notificaciones web push.';
+    if (ios && !installed) return 'En iPhone, instala PAIC en la pantalla de inicio y ábrela desde el ícono antes de activar las notificaciones.';
+    if (state === 'permission-denied') return 'El permiso quedó bloqueado. Actívalo desde los ajustes del navegador o del teléfono.';
+    if (state === 'missing-vapid-key') return 'Falta configurar la clave pública VAPID del sitio.';
+    if (state === 'subscribed') return 'Este teléfono está suscrito para recibir comunicados, reservas, PQRs y avisos de administración.';
+    return 'Actívalas desde este botón para registrar este teléfono en PAIC.';
+  })();
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-gray-900">Notificaciones</h3>
+          <p className="mt-1 text-sm text-gray-600">{details}</p>
+        </div>
+        <Badge variant={state === 'subscribed' ? 'success' : state === 'permission-denied' || state === 'unsupported' ? 'error' : 'warning'}>{loading ? 'Revisando' : labelByState[state]}</Badge>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="outline" disabled={loading || !supported || state === 'permission-denied' || state === 'missing-vapid-key' || (ios && !installed)} onClick={() => void activate()}>
+          Activar en este teléfono
+        </Button>
+        {state === 'subscribed' && <Button variant="outline" disabled={loading} onClick={() => void deactivate()}>Desactivar</Button>}
+        <Button variant="outline" disabled={loading} onClick={() => void refresh()}>Revisar estado</Button>
+      </div>
+      <div className="mt-4 space-y-3">
+        {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
+          <label key={i} className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" defaultChecked disabled={state !== 'subscribed'} className="w-5 h-5 text-blue-600 rounded border-gray-300" />
+            <span className={state === 'subscribed' ? 'text-gray-700' : 'text-gray-400'}>{n}</span>
+          </label>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function VisitAuthorizationForm({ user, onCreated }: { user: { id: string; conjuntoId: string; apt: string }; onCreated: () => void }) { const [form,setForm]=useState({visitorName:'',visitorPhone:'',visitDate:'',notes:''}); const [message,setMessage]=useState(''); const [open,setOpen]=useState(false); const submit=async(e:React.FormEvent)=>{e.preventDefault();try{await createVisitAuthorization({conjuntoId:user.conjuntoId,apartment:user.apt,userId:user.id,...form});setMessage('Autorización enviada a portería.');setForm({visitorName:'',visitorPhone:'',visitDate:'',notes:''});setOpen(false);onCreated()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo registrar la visita.')}};return <details className="rounded-xl border bg-white p-4" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary className="cursor-pointer font-semibold">Autorizar nueva visita</summary><form onSubmit={submit} className="mt-3 grid gap-3"><Input placeholder="Nombre del visitante" value={form.visitorName} onChange={e=>setForm({...form,visitorName:e.target.value})} required/><Input type="tel" placeholder="Teléfono (opcional)" value={form.visitorPhone} onChange={e=>setForm({...form,visitorPhone:e.target.value})}/><input className="rounded border p-2" type="date" min={new Date().toISOString().slice(0,10)} value={form.visitDate} onChange={e=>setForm({...form,visitDate:e.target.value})} required/><textarea className="min-h-20 rounded border p-2" placeholder="Observaciones (opcional)" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/><Button type="submit">Enviar autorización</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</form></details>; }
 
