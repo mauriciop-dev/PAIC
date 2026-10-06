@@ -102,26 +102,44 @@ useEffect(() => {
       if (authLoadInFlight.current) return;
       authLoadInFlight.current = true;
       try {
+        console.log('[Auth] Starting loadAuth...');
         // Con invitación, renueva la sesión primero: un JWT caducado de una sesión
         // anterior (p.ej. la sesión administrativa del mismo origen) hacía fallar
         // la edge function con "non-2xx status code".
         const session = await ensureFreshSession();
-        if (!session) return;
+        console.log('[Auth] Session:', session ? 'exists' : 'null');
+        if (!session) {
+          console.log('[Auth] No session, stopping');
+          return;
+        }
         let membership = await getMembership(session.user);
+        console.log('[Auth] Membership:', membership ? 'found' : 'none');
         if (invitationToken && !membership) {
           const activation = await consumeResidentInvitation(invitationToken);
           membership = activation.membership;
           window.history.replaceState({}, document.title, window.location.pathname);
         }
-        if (active && membership) { setUser({ id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role }); setPwaData(await loadPwaData(membership)); }
+        if (active && membership) { 
+          console.log('[Auth] Setting user and loading data...');
+          setUser({ id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role }); 
+          await loadPwaData(membership).then(data => { console.log('[Auth] PWA data loaded'); setPwaData(data); });
+        }
         if (active && !membership) setAuthError('Tu cuenta aún no tiene una unidad vinculada. Solicita aprobación a la administración.');
       } catch (error) {
+        console.error('[Auth] Error:', error);
         if (active) setAuthError(error instanceof Error ? error.message : 'No fue posible validar la cuenta.');
       } finally { authLoadInFlight.current = false; if (active) setAuthLoading(false); }
     };
+    // Safety timeout: force authLoading=false after 10s
+    const safetyTimeout = setTimeout(() => {
+      if (active) {
+        console.warn('[Auth] Safety timeout triggered');
+        setAuthLoading(false);
+      }
+    }, 10000);
     void loadAuth();
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });
-    return () => { active = false; subscription?.data.subscription.unsubscribe(); };
+    return () => { active = false; clearTimeout(safetyTimeout); subscription?.data.subscription.unsubscribe(); };
   }, [invitationToken]);
 
   // Scroll to deep link element when tab changes or deepLinkId is set
