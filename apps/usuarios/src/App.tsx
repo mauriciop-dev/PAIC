@@ -23,15 +23,15 @@ const secondaryItems: NavItem[] = [
   { id: 'perfil', label: 'Perfil', icon: 'user' },
 ];
 
-const bottomActions: { id: string; label: string; icon: string; handler: () => void }[] = [];
-
 // Deep link handler: parse URL and set active tab + data
-function handleDeepLink() {
+let deepLinkIdStore: string | null = null;
+
+function handleDeepLink(setTab: (tab: string) => void, setDeepLinkId: (id: string | null) => void) {
   const path = window.location.pathname;
   const match = path.match(/^\/(comunicados|reservas|paquetes|visitantes|pqrs|documentos|cuenta|votaciones|directorio|perfil)(?:\/(.+))?$/);
   if (match) {
     const tab = match[1];
-    const id = match[2];
+    const id = match[2] || null;
     const tabMap: Record<string, string> = {
       comunicados: 'comunicados',
       reservas: 'reservas',
@@ -45,14 +45,15 @@ function handleDeepLink() {
       perfil: 'perfil',
     };
     if (tabMap[tab]) {
-      setActiveTab(tabMap[tab]);
-      // Could store id in state to scroll/highlight specific item
+      setTab(tabMap[tab]);
+      setDeepLinkId(id);
     }
   }
 }
 
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
+  const [deepLinkId, setDeepLinkId] = useState<string | null>(null);
   const [user, setUser] = useState<{ id: string; membershipId: string; conjuntoId: string; name: string; email: string; apt: string; avatar?: string; role: PwaMembership['role'] } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ useEffect(() => {
       return;
     }
     analytics.init();
-    handleDeepLink();
+    handleDeepLink(setActiveTab, setDeepLinkId);
     // Listen for navigation messages from Service Worker
     const handleSWMessage = (event: MessageEvent) => {
       if (event.data?.type === 'navigate' && event.data.url) {
@@ -105,6 +106,26 @@ useEffect(() => {
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });
     return () => { active = false; subscription?.data.subscription.unsubscribe(); };
   }, [invitationToken]);
+
+  // Scroll to deep link element when tab changes or deepLinkId is set
+  useEffect(() => {
+    if (deepLinkId && activeTab !== 'inicio') {
+      const prefixMap: Record<string, string> = {
+        comunicados: 'comunicado-',
+        reservas: 'reserva-',
+        paquetes: 'paquete-',
+        visitantes: 'visita-',
+        pqrs: 'pqr-',
+        documentos: 'documento-',
+        directorio: 'directorio-',
+      };
+      const prefix = prefixMap[activeTab] || activeTab + '-';
+      const element = document.getElementById(`${prefix}${deepLinkId}`);
+      if (element) {
+        setTimeout(() => element.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
+    }
+  }, [deepLinkId, activeTab]);
 
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;
@@ -167,7 +188,7 @@ useEffect(() => {
             </div>
             <div className="space-y-3">
               {(pwaData?.reservations || []).map((r, i) => (
-                <Card key={i} className="p-4 flex items-center justify-between">
+                <Card key={r.id} id={`reserva-${r.id}`} className="p-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{r.area_name}</h3>
                     <p className="text-sm text-gray-500">{r.reservation_date} · {r.start_time} - {r.end_time}</p>
@@ -184,7 +205,7 @@ useEffect(() => {
             <h2 className="text-xl font-bold text-gray-900">Mis Paquetes</h2>
             <div className="space-y-3">
               {(pwaData?.packages || []).map((p, i) => (
-                <Card key={i} className="p-4 flex items-center justify-between">
+                <Card key={p.id} id={`paquete-${p.id}`} className="p-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{p.courier}</h3>
                     <p className="text-sm text-gray-500">Guía: {p.tracking_number || 'Sin guía'} · {p.received_date || 'Sin fecha'}</p>
@@ -202,19 +223,19 @@ useEffect(() => {
               <h2 className="text-xl font-bold text-gray-900">Autorizar Visitas</h2>
               <VisitAuthorizationForm user={user} onCreated={() => void getSession().then(async session => { if (session) { const membership = await getMembership(session.user); if (membership) setPwaData(await loadPwaData(membership)); } })} />
             </div>
-            <Card className="p-4"><h3 className="font-semibold">Autorizaciones enviadas</h3>{(pwaData?.authorizations || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p> : <div className="space-y-3">{pwaData!.authorizations.map((v) => <div key={v.id} className="flex justify-between"><div><span>{v.visitor_name}</span><p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p></div><Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge></div>)}</div>}</Card>
+            <Card className="p-4"><h3 className="font-semibold">Autorizaciones enviadas</h3>{(pwaData?.authorizations || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p> : <div className="space-y-3">{pwaData!.authorizations.map((v) => <div key={v.id} id={`visita-${v.id}`} className="flex justify-between"><div><span>{v.visitor_name}</span><p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p></div><Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge></div>)}</div>}</Card>
           </div>
         );
       case 'comunicados':
-        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold text-gray-900">Comunicados</h2>{(pwaData?.communications || []).map((c) => <Card key={c.id} className="p-4"><h3 className="font-semibold text-gray-900">{c.title}</h3><p className="text-xs text-gray-500 mt-1">{c.published_at ? new Date(c.published_at).toLocaleDateString('es-CO') : ''}</p><p className="mt-3 text-gray-700 whitespace-pre-wrap">{c.body}</p>{c.attachment_url && (c.attachment_url.match(/\.(png|jpe?g|gif|webp)(\?|$)/i) ? <img className="mt-3 max-h-64 w-full rounded object-contain" src={c.attachment_url} alt="Adjunto del comunicado" /> : <a className="mt-3 inline-block text-blue-600 underline" href={c.attachment_url} target="_blank" rel="noreferrer">Abrir adjunto</a>)}</Card>)}{!pwaData?.communications.length && <Card className="p-6 text-center text-gray-500">No hay comunicados publicados.</Card>}</div>;
+        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold text-gray-900">Comunicados</h2>{(pwaData?.communications || []).map((c) => <Card key={c.id} id={`comunicado-${c.id}`} className="p-4"><h3 className="font-semibold text-gray-900">{c.title}</h3><p className="text-xs text-gray-500 mt-1">{c.published_at ? new Date(c.published_at).toLocaleDateString('es-CO') : ''}</p><p className="mt-3 text-gray-700 whitespace-pre-wrap">{c.body}</p>{c.attachment_url && (c.attachment_url.match(/\.(png|jpe?g|gif|webp)(\?|$)/i) ? <img className="mt-3 max-h-64 w-full rounded object-contain" src={c.attachment_url} alt="Adjunto del comunicado" /> : <a className="mt-3 inline-block text-blue-600 underline" href={c.attachment_url} target="_blank" rel="noreferrer">Abrir adjunto</a>)}</Card>)}{!pwaData?.communications.length && <Card className="p-6 text-center text-gray-500">No hay comunicados publicados.</Card>}</div>;
       case 'cuenta':
         return <div className="p-4 space-y-4"><h2 className="text-xl font-bold text-gray-900">Estado de cuenta</h2><Card className="p-5"><p className="font-semibold">Apartamento {user?.apt}</p><Badge variant={pwaData?.account?.status === 'al_dia' ? 'success' : 'warning'}>{pwaData?.account?.status || 'Sin información'}</Badge><p className="mt-4 text-2xl font-bold">${(pwaData?.account?.balance || 0).toLocaleString('es-CO')}</p><p className="mt-2 text-sm text-gray-600">{pwaData?.account?.observations || 'Sin observaciones.'}</p><p className="mt-4 text-xs text-gray-500">Información de referencia. Si considera que no está actualizada, comuníquese con la administración.</p></Card></div>;
       case 'pqrs':
         return <PqrsTab user={user} items={pwaData?.pqrs || []} />;
       case 'documentos':
-        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Documentos</h2>{(pwaData?.documents || []).map((d) => <Card key={d.id} className="p-4"><p className="text-xs text-blue-600">{d.category}</p><h3 className="font-semibold">{d.name}</h3>{d.description && <p className="mt-1 text-sm text-gray-600">{d.description}</p>}<a className="mt-3 inline-block text-blue-600 underline" href={d.file_url} target="_blank" rel="noreferrer">Abrir documento</a></Card>)}{!pwaData?.documents.length && <Card className="p-6 text-center text-gray-500">No hay documentos publicados.</Card>}</div>;
+        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Documentos</h2>{(pwaData?.documents || []).map((d) => <Card key={d.id} id={`documento-${d.id}`} className="p-4"><p className="text-xs text-blue-600">{d.category}</p><h3 className="font-semibold">{d.name}</h3>{d.description && <p className="mt-1 text-sm text-gray-600">{d.description}</p>}<a className="mt-3 inline-block text-blue-600 underline" href={d.file_url} target="_blank" rel="noreferrer">Abrir documento</a></Card>)}{!pwaData?.documents.length && <Card className="p-6 text-center text-gray-500">No hay documentos publicados.</Card>}</div>;
       case 'directorio':
-        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Directorio</h2>{(pwaData?.directories || []).map((d) => <Card key={d.id} className="flex items-center justify-between p-4"><div><p className="text-xs text-blue-600">{d.category}</p><h3 className="font-semibold">{d.entity_name}</h3></div><a className="text-blue-600 underline" href={`tel:${d.phone}`}>{d.phone}</a></Card>)}{!pwaData?.directories.length && <Card className="p-6 text-center text-gray-500">No hay contactos publicados.</Card>}</div>;
+        return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Directorio</h2>{(pwaData?.directories || []).map((d) => <Card key={d.id} id={`directorio-${d.id}`} className="flex items-center justify-between p-4"><div><p className="text-xs text-blue-600">{d.category}</p><h3 className="font-semibold">{d.entity_name}</h3></div><a className="text-blue-600 underline" href={`tel:${d.phone}`}>{d.phone}</a></Card>)}{!pwaData?.directories.length && <Card className="p-6 text-center text-gray-500">No hay contactos publicados.</Card>}</div>;
       case 'votaciones':
         return user?.role === 'residente_principal' ? <VotesTab userId={user.id} votes={pwaData?.votes || []} /> : <Card className="m-4 p-6 text-center text-gray-500">Las votaciones están disponibles únicamente para residentes principales.</Card>;
       case 'perfil':
@@ -380,7 +401,7 @@ function ReservationForm({ user, onCreated }: { user: { id: string; conjuntoId: 
 function PqrsTab({ user, items }: { user: { id: string; conjuntoId: string; apt: string }; items: Pqr[] }) {
   const [form, setForm] = useState({ type: 'peticion', title: '', description: '' }); const [file, setFile] = useState<File | null>(null); const [message, setMessage] = useState('');
   const submit = async (event: React.FormEvent) => { event.preventDefault(); try { let attachmentUrl: string | null = null; if (file) attachmentUrl = await uploadPwaAttachment(file, user.id); await createPqr({ conjuntoId: user.conjuntoId, apartment: user.apt, userId: user.id, type: form.type, title: form.title, description: form.description, attachmentUrl }); setMessage('PQR radicada correctamente.'); setForm({ type: 'peticion', title: '', description: '' }); setFile(null); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo radicar la PQR.'); } };
-  return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Mis PQRs</h2><Card className="p-4"><form onSubmit={submit} className="space-y-3"><select className="w-full rounded border p-2" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option value="peticion">Petición</option><option value="queja">Queja</option><option value="reclamo">Reclamo</option><option value="felicitacion">Felicitación</option><option value="informacion">Información</option><option value="otros">Otros</option></select><Input placeholder="Título" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required/><textarea className="min-h-24 w-full rounded border p-2" placeholder="Descripción" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required/><input type="file" accept="image/*,.pdf" onChange={e => setFile(e.target.files?.[0] || null)}/><Button type="submit">Radicar PQR</Button>{message && <p className="text-sm text-gray-600">{message}</p>}</form></Card>{items.map(p => <Card key={p.id} className="p-4"><div className="flex justify-between"><h3 className="font-semibold">{p.title}</h3><Badge variant={p.status === 'respondido' ? 'success' : 'warning'}>{p.status}</Badge></div><p className="mt-2 text-sm">{p.description}</p>{p.response_body && <div className="mt-3 rounded bg-green-50 p-3 text-sm"><p className="font-semibold">{p.response_title || 'Respuesta de administración'}</p><p className="mt-1">{p.response_body}</p>{p.response_attachment_url&&<a className="mt-2 inline-block text-blue-700 underline" href={p.response_attachment_url} target="_blank" rel="noreferrer">Abrir documento de respuesta</a>}</div>}</Card>)}</div>;
+  return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Mis PQRs</h2><Card className="p-4"><form onSubmit={submit} className="space-y-3"><select className="w-full rounded border p-2" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option value="peticion">Petición</option><option value="queja">Queja</option><option value="reclamo">Reclamo</option><option value="felicitacion">Felicitación</option><option value="informacion">Información</option><option value="otros">Otros</option></select><Input placeholder="Título" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required/><textarea className="min-h-24 w-full rounded border p-2" placeholder="Descripción" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required/><input type="file" accept="image/*,.pdf" onChange={e => setFile(e.target.files?.[0] || null)}/><Button type="submit">Radicar PQR</Button>{message && <p className="text-sm text-gray-600">{message}</p>}</form></Card>{items.map(p => <Card key={p.id} id={`pqr-${p.id}`} className="p-4"><div className="flex justify-between"><h3 className="font-semibold">{p.title}</h3><Badge variant={p.status === 'respondido' ? 'success' : 'warning'}>{p.status}</Badge></div><p className="mt-2 text-sm">{p.description}</p>{p.response_body && <div className="mt-3 rounded bg-green-50 p-3 text-sm"><p className="font-semibold">{p.response_title || 'Respuesta de administración'}</p><p className="mt-1">{p.response_body}</p>{p.response_attachment_url&&<a className="mt-2 inline-block text-blue-700 underline" href={p.response_attachment_url} target="_blank" rel="noreferrer">Abrir documento de respuesta</a>}</div>}</Card>)}</div>;
 }
 
 function VotesTab({ userId, votes }: { userId: string; votes: PwaVote[] }) { const [message, setMessage] = useState(''); const submit = async (vote: PwaVote, questionId: string, optionId: string) => { try { await answerVote(vote.id, questionId, optionId, userId); setMessage('Voto registrado.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo registrar el voto.'); } }; return <div className="p-4 space-y-4"><h2 className="text-xl font-bold">Votaciones</h2>{votes.map(v => <Card key={v.id} className="p-4"><h3 className="font-semibold">{v.title}</h3>{v.description && <p className="mt-1 text-sm text-gray-600">{v.description}</p>}{v.questions.map(q => <div key={q.id} className="mt-4"><p className="font-medium">{q.question}</p><div className="mt-2 space-y-2">{q.options.map(o => <button key={o.id} className="block w-full rounded border p-2 text-left hover:bg-blue-50" onClick={() => void submit(v, q.id, o.id)}>{o.label}</button>)}</div></div>)}</Card>)}{!votes.length && <Card className="p-6 text-center text-gray-500">No hay votaciones activas.</Card>}{message && <p className="text-sm text-gray-600">{message}</p>}</div>; }
