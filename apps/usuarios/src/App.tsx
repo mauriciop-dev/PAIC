@@ -49,8 +49,24 @@ function handleDeepLink(setActiveTab: (tab: string) => void) {
   }
 }
 
+// Map push notification types to tab IDs
+const TYPE_TO_TAB: Record<string, string> = {
+  comunicado: 'comunicados',
+  reserva: 'reservas',
+  paquete: 'paquetes',
+  visita: 'visitantes',
+  porteria: 'paquetes',
+  pqr: 'pqrs',
+  documento: 'documentos',
+  directorio: 'directorio',
+  contacto: 'directorio',
+  solicitud: 'perfil',
+  test: 'inicio',
+};
+
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
+  const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
   const [user, setUser] = useState<{ id: string; membershipId: string; conjuntoId: string; name: string; email: string; apt: string; avatar?: string; role: PwaMembership['role'] } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -96,6 +112,36 @@ export default function UsuariosApp() {
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });
     return () => { active = false; subscription?.data.subscription.unsubscribe(); };
   }, [invitationToken]);
+
+  // Handle tab selection - clear badge for selected tab
+  const handleTabSelect = (tab: string) => {
+    setActiveTab(tab);
+    if (notificationCounts[tab] && notificationCounts[tab] > 0) {
+      setNotificationCounts(prev => ({ ...prev, [tab]: 0 }));
+    }
+  };
+
+  // Listen for push notification messages from Service Worker
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'push' && event.data.payload) {
+        const payload = event.data.payload;
+        const type = payload.type || 'default';
+        const tab = TYPE_TO_TAB[type] || 'inicio';
+        
+        console.log('[App] Push received for type:', type, '-> tab:', tab);
+        setNotificationCounts(prev => ({
+          ...prev,
+          [tab]: (prev[tab] || 0) + 1
+        }));
+      }
+    };
+    
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+  }, []);
 
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;
@@ -255,10 +301,11 @@ export default function UsuariosApp() {
 
       <BottomNav
         activeTab={activeTab}
-        onTabSelect={setActiveTab}
+        onTabSelect={handleTabSelect}
         primaryItems={primaryItems}
         secondaryItems={secondaryItems}
         actions={bottomActions}
+        badges={notificationCounts}
       />
     </div>
   );

@@ -16,6 +16,7 @@ export interface BottomNavProps {
   actions: { id: string; icon: string; label: string; handler: () => void }[];
   isExpanded?: boolean;
   onExpandChange?: (expanded: boolean) => void;
+  badges?: Record<string, number>; // tabId -> count
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -78,11 +79,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <div className="grid grid-cols-4 gap-2 mb-4">
             {secondaryItems.map((item) => {
               const isActive = isActiveTab(item.id);
+              const badgeCount = badges?.[item.id] ?? 0;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleTabPress(item.id)}
-                  className={`flex flex-col items-center justify-center gap-1.5 min-w-0 min-h-[68px] rounded-2xl py-2.5 transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1.5 min-w-0 min-h-[68px] rounded-2xl py-2.5 transition-all relative ${
                     isActive ? 'text-blue-600 bg-blue-50 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -93,6 +95,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   <span className="text-[11px] text-center leading-tight">
                     {item.label}
                   </span>
+                  {badgeCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -125,11 +132,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           {primaryItems.map((item) => {
             const isActive = isActiveTab(item.id);
+            const badgeCount = badges?.[item.id] ?? 0;
             return (
               <button
                 key={item.id}
                 onClick={() => handleTabPress(item.id)}
-                className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-[52px] min-h-[48px] rounded-xl transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-[52px] min-h-[48px] rounded-xl transition-colors relative ${
                   isActive
                     ? 'text-blue-600 bg-blue-50'
                     : 'text-gray-500 hover:text-gray-700'
@@ -142,6 +150,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <span className={`text-[11px] font-medium ${isActive ? 'text-blue-600 font-semibold' : 'text-gray-500'}`}>
                   {item.label}
                 </span>
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {badgeCount > 9 ? '9+' : badgeCount}
+                  </span>
+                )}
               </button>
             );
           })}

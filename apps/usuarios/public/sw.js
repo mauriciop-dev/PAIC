@@ -1,5 +1,5 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v9';
+const CACHE = 'paic-usuarios-v10';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -80,6 +80,16 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, payload)
   );
+
+  // Notify app to update badge
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'push',
+        payload: { type: data.type || 'default', title: data.title, body: data.body }
+      });
+    });
+  });
 });
 
 self.addEventListener('notificationclick', (event) => {
