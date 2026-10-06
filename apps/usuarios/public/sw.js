@@ -1,5 +1,5 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v5';
+const CACHE = 'paic-usuarios-v6';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -85,8 +85,22 @@ self.addEventListener('notificationclick', (event) => {
 
   event.notification.close();
 
+  // Handle action button clicks (open/close)
+  if (event.action) {
+    console.log('[ServiceWorker] Action clicked:', event.action);
+    if (event.action === 'close') {
+      return;
+    }
+    // For 'open' action, fall through to navigation
+  }
+
   const data = event.notification.data || {};
-  const targetUrl = data.url || '/';
+  let targetUrl = data.url || '/';
+
+  // Ensure absolute URL
+  if (targetUrl.startsWith('/')) {
+    targetUrl = self.location.origin + targetUrl;
+  }
 
   console.log('[ServiceWorker] Navegando a:', targetUrl);
 
@@ -122,7 +136,14 @@ self.addEventListener('notificationaction', (event) => {
 
   if (event.action === 'open') {
     const data = event.notification.data || {};
-    const targetUrl = data.url || '/';
+    let targetUrl = data.url || '/';
+
+    // Ensure absolute URL
+    if (targetUrl.startsWith('/')) {
+      targetUrl = self.location.origin + targetUrl;
+    }
+
+    console.log('[ServiceWorker] Action open -> navegando a:', targetUrl);
 
     event.waitUntil(
       self.clients
