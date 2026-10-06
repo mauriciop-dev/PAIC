@@ -1,5 +1,5 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v7';
+const CACHE = 'paic-usuarios-v8';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -101,12 +101,20 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data || {};
   let targetUrl = data.url || '/';
 
+  console.log('[ServiceWorker] Raw targetUrl from data:', targetUrl);
+
   // Ensure absolute URL
   if (targetUrl.startsWith('/')) {
     targetUrl = self.location.origin + targetUrl;
   }
 
-  console.log('[ServiceWorker] Navegando a:', targetUrl);
+  // SANITY CHECK: targetUrl must be our origin, not an image URL
+  if (!targetUrl.startsWith(self.location.origin) || targetUrl.includes('.png') || targetUrl.includes('.jpg') || targetUrl.includes('.ico')) {
+    console.error('[ServiceWorker] INVALID targetUrl detected, defaulting to origin:', targetUrl);
+    targetUrl = self.location.origin + '/';
+  }
+
+  console.log('[ServiceWorker] Final targetUrl:', targetUrl);
 
   event.waitUntil(
     self.clients
@@ -124,8 +132,16 @@ self.addEventListener('notificationclick', (event) => {
           return existing.focus();
         }
 
-        console.log('[ServiceWorker] Abriendo ventana nueva');
-        return self.clients.openWindow(targetUrl);
+        console.log('[ServiceWorker] Abriendo ventana nueva con:', targetUrl);
+        return self.clients.openWindow(targetUrl).catch(err => {
+          console.error('[ServiceWorker] openWindow failed:', err);
+          // Fallback: try to open root
+          return self.clients.openWindow(self.location.origin + '/');
+        });
+      })
+      .catch(err => {
+        console.error('[ServiceWorker] matchAll failed:', err);
+        return self.clients.openWindow(self.location.origin + '/');
       })
   );
 });
@@ -143,9 +159,17 @@ self.addEventListener('notificationaction', (event) => {
     const data = event.notification.data || {};
     let targetUrl = data.url || '/';
 
+    console.log('[ServiceWorker] Action open - raw targetUrl:', targetUrl);
+
     // Ensure absolute URL
     if (targetUrl.startsWith('/')) {
       targetUrl = self.location.origin + targetUrl;
+    }
+
+    // SANITY CHECK
+    if (!targetUrl.startsWith(self.location.origin) || targetUrl.includes('.png') || targetUrl.includes('.jpg') || targetUrl.includes('.ico')) {
+      console.error('[ServiceWorker] INVALID targetUrl in action, defaulting to origin:', targetUrl);
+      targetUrl = self.location.origin + '/';
     }
 
     console.log('[ServiceWorker] Action open -> navegando a:', targetUrl);
@@ -159,7 +183,14 @@ self.addEventListener('notificationaction', (event) => {
               return client.focus();
             }
           }
-          return self.clients.openWindow(targetUrl);
+          return self.clients.openWindow(targetUrl).catch(err => {
+            console.error('[ServiceWorker] action openWindow failed:', err);
+            return self.clients.openWindow(self.location.origin + '/');
+          });
+        })
+        .catch(err => {
+          console.error('[ServiceWorker] action matchAll failed:', err);
+          return self.clients.openWindow(self.location.origin + '/');
         })
     );
   }
