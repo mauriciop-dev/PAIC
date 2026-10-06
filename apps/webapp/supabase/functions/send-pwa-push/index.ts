@@ -3,18 +3,29 @@ import webpush from 'npm:web-push';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (request) => {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader) return new Response('Unauthorized', { status: 401 });
+    if (!authHeader) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     const token = authHeader.replace('Bearer ', '');
     const { data: caller } = await supabase.auth.getUser(token);
-    if (!caller.user) return new Response('Unauthorized', { status: 401 });
+    if (!caller.user) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     const { data: profile } = await supabase.from('user_profiles').select('role,conjunto_id').eq('id', caller.user.id).maybeSingle();
-    if (!profile || !['trial', 'subscriber'].includes(profile.role)) return new Response('Forbidden', { status: 403 });
+    if (!profile || !['trial', 'subscriber'].includes(profile.role)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
     const payload = await request.json();
-    if (!payload.conjuntoId) return new Response('conjuntoId is required', { status: 400 });
-    if (profile.conjunto_id !== payload.conjuntoId) return new Response('Forbidden', { status: 403 });
+    if (!payload.conjuntoId) return new Response('conjuntoId is required', { status: 400, headers: corsHeaders });
+    if (profile.conjunto_id !== payload.conjuntoId) return new Response('Forbidden', { status: 403, headers: corsHeaders });
     const { data: members, error: membersError } = await supabase.from('pwa_memberships').select('user_id').eq('conjunto_id', payload.conjuntoId).eq('status', 'activo');
     if (membersError) throw membersError;
     const memberIds = (members || []).map((row) => row.user_id).filter((id) => !payload.userIds?.length || payload.userIds.includes(id));
@@ -27,7 +38,7 @@ Deno.serve(async (request) => {
         sent: 0,
         failed: 0,
         removed: 0,
-      });
+      }, { headers: corsHeaders });
     }
     const vapidSubject = Deno.env.get('VAPID_SUBJECT');
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
@@ -54,8 +65,8 @@ Deno.serve(async (request) => {
       sent: result.filter((item) => item.status === 'fulfilled').length,
       failed: result.filter((item) => item.status === 'rejected').length,
       removed: expired.length,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Push failed' }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : 'Push failed' }, { status: 500, headers: corsHeaders });
   }
 });
