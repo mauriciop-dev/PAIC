@@ -37,6 +37,8 @@ Deno.serve(async (request) => {
     const result = await Promise.allSettled((subscriptions || []).map((row) => webpush.sendNotification(row.subscription, JSON.stringify({
       title: payload.title || 'PAIC Residentes',
       body: payload.body || '',
+      type: payload.type || 'default',
+      id: payload.id || 'default',
       url: payload.url || '/',
       icon: payload.icon || '/logo-paic.png',
       badge: payload.badge || '/logo-paic.png',
