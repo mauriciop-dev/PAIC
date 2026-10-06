@@ -127,7 +127,7 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
         target_apartments: apartments,
       });
       if (result.error) throw result.error;
-      const pushResult = !scheduled ? await notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: title }) : null;
+      const pushResult = !scheduled ? await notifyPwaResidents({ conjuntoId, title: 'Nuevo comunicado', body: body }) : null;
       setTitle('');
       setBody('');
       setScheduledAt('');
