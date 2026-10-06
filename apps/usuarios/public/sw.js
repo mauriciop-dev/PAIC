@@ -1,10 +1,10 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v4';
+const CACHE = 'paic-usuarios-v5';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache.addAll(['/', '/manifest.json', '/logo-paic.png'])
+      cache.addAll(['/', '/manifest.json', '/logo-paic.png', '/badge-paic.png'])
     )
   );
   self.skipWaiting();
@@ -58,7 +58,7 @@ self.addEventListener('push', (event) => {
     title: data.title || 'PAIC Residentes',
     body: data.body || '',
     icon: data.icon || '/logo-paic.png',
-    badge: data.badge || '/logo-paic.png',
+    badge: data.badge || '/badge-paic.png',
     tag: data.type || 'default',
     requireInteraction: true,
     data: {
