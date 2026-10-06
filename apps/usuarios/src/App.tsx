@@ -70,15 +70,32 @@ useEffect(() => {
       setAuthLoading(false);
       return;
     }
-    analytics.init();
-    handleDeepLink(setActiveTab, setDeepLinkId);
+    try {
+      analytics.init();
+    } catch (e) {
+      console.warn('analytics.init failed', e);
+    }
+    try {
+      handleDeepLink(setActiveTab, setDeepLinkId);
+    } catch (e) {
+      console.warn('handleDeepLink failed', e);
+    }
     // Listen for navigation messages from Service Worker
-    const handleSWMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'navigate' && event.data.url) {
-        window.location.href = event.data.url;
+    try {
+      if (navigator.serviceWorker) {
+        const handleSWMessage = (event: MessageEvent) => {
+          if (event.data?.type === 'navigate' && event.data.url) {
+            window.location.href = event.data.url;
+          }
+        };
+        navigator.serviceWorker.addEventListener('message', handleSWMessage);
+        return () => {
+          navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+        };
       }
-    };
-    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    } catch (e) {
+      console.warn('serviceWorker listener failed', e);
+    }
     let active = true;
     const loadAuth = async () => {
       // Evita consumir la invitación dos veces en paralelo (efecto + onAuthStateChange)
