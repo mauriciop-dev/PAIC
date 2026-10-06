@@ -25,6 +25,32 @@ const secondaryItems: NavItem[] = [
 
 const bottomActions: { id: string; label: string; icon: string; handler: () => void }[] = [];
 
+// Deep link handler: parse URL and set active tab + data
+function handleDeepLink() {
+  const path = window.location.pathname;
+  const match = path.match(/^\/(comunicados|reservas|paquetes|visitantes|pqrs|documentos|cuenta|votaciones|directorio|perfil)(?:\/(.+))?$/);
+  if (match) {
+    const tab = match[1];
+    const id = match[2];
+    const tabMap: Record<string, string> = {
+      comunicados: 'comunicados',
+      reservas: 'reservas',
+      paquetes: 'paquetes',
+      visitantes: 'visitantes',
+      pqrs: 'pqrs',
+      documentos: 'documentos',
+      cuenta: 'cuenta',
+      votaciones: 'votaciones',
+      directorio: 'directorio',
+      perfil: 'perfil',
+    };
+    if (tabMap[tab]) {
+      setActiveTab(tabMap[tab]);
+      // Could store id in state to scroll/highlight specific item
+    }
+  }
+}
+
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [user, setUser] = useState<{ id: string; membershipId: string; conjuntoId: string; name: string; email: string; apt: string; avatar?: string; role: PwaMembership['role'] } | null>(null);
@@ -37,13 +63,21 @@ export default function UsuariosApp() {
   const invitationToken = new URLSearchParams(window.location.search).get('token');
   const authLoadInFlight = useRef(false);
 
-  useEffect(() => {
+useEffect(() => {
     if (supabaseConfigError) {
       setAuthError(supabaseConfigError);
       setAuthLoading(false);
       return;
     }
     analytics.init();
+    handleDeepLink();
+    // Listen for navigation messages from Service Worker
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'navigate' && event.data.url) {
+        window.location.href = event.data.url;
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
     let active = true;
     const loadAuth = async () => {
       // Evita consumir la invitación dos veces en paralelo (efecto + onAuthStateChange)
