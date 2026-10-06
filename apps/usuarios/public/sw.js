@@ -1,5 +1,5 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v6';
+const CACHE = 'paic-usuarios-v7';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -54,6 +54,8 @@ self.addEventListener('push', (event) => {
         url: '/'
       };
 
+  console.log('[ServiceWorker] Push data URL:', data.url);
+
   const payload = {
     title: data.title || 'PAIC Residentes',
     body: data.body || '',
@@ -73,7 +75,7 @@ self.addEventListener('push', (event) => {
     ]
   };
 
-  console.log('[ServiceWorker] Mostrando notificación:', payload);
+  console.log('[ServiceWorker] Mostrando notificación:', JSON.stringify(payload));
 
   event.waitUntil(
     self.registration.showNotification(payload.title, payload)
@@ -82,12 +84,14 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   console.log('[ServiceWorker] Notificación clickeada:', event);
+  console.log('[ServiceWorker] event.action:', event.action);
+  console.log('[ServiceWorker] event.notification.data:', event.notification.data);
 
   event.notification.close();
 
   // Handle action button clicks (open/close)
   if (event.action) {
-    console.log('[ServiceWorker] Action clicked:', event.action);
+    console.log('[ServiceWorker] Action button clicked:', event.action);
     if (event.action === 'close') {
       return;
     }
@@ -128,6 +132,7 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('notificationaction', (event) => {
   console.log('[ServiceWorker] Acción en notificación:', event.action);
+  console.log('[ServiceWorker] notification.data:', event.notification.data);
 
   if (event.action === 'close') {
     event.notification.close();
