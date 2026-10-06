@@ -130,7 +130,7 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
       const comunicadoId = result.data?.id;
       const pushResult = !scheduled ? await notifyPwaResidents({ 
         conjuntoId, 
-        title: 'Nuevo comunicado', 
+        title: title, 
         body: body, 
         type: 'comunicado',
         id: comunicadoId,
