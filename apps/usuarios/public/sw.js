@@ -1,5 +1,5 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v10';
+const CACHE = 'paic-usuarios-v11';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -80,6 +80,13 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, payload)
   );
+
+  // Update badge in localStorage for persistence
+  const type = data.type || 'default';
+  const badgeKey = 'paic_badge_' + type;
+  const currentBadge = parseInt(self.localStorage.getItem(badgeKey) || '0', 10);
+  self.localStorage.setItem(badgeKey, String(currentBadge + 1));
+  console.log('[ServiceWorker] Badge incremented for', type, ':', currentBadge + 1);
 
   // Notify app to update badge
   self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
@@ -174,6 +181,12 @@ self.addEventListener('message', (event) => {
         });
       });
     });
+  }
+
+  // Clear badge for a type when user views that tab
+  if (event.data && event.data.type === 'clearBadge' && event.data.badgeType) {
+    self.localStorage.removeItem('paic_badge_' + event.data.badgeType);
+    console.log('[ServiceWorker] Badge cleared for:', event.data.badgeType);
   }
 });
 

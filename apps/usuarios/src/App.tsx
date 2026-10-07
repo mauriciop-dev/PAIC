@@ -64,6 +64,19 @@ const TYPE_TO_TAB: Record<string, string> = {
   test: 'inicio',
 };
 
+// Reverse map: tab -> localStorage key
+const TAB_TO_STORAGE_KEY: Record<string, string> = {
+  comunicados: 'paic_badge_comunicado',
+  reservas: 'paic_badge_reserva',
+  paquetes: 'paic_badge_paquete',
+  visitantes: 'paic_badge_visita',
+  pqrs: 'paic_badge_pqr',
+  documentos: 'paic_badge_documento',
+  directorio: 'paic_badge_directorio',
+  perfil: 'paic_badge_solicitud',
+  inicio: 'paic_badge_test',
+};
+
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
@@ -119,7 +132,34 @@ export default function UsuariosApp() {
     if (notificationCounts[tab] && notificationCounts[tab] > 0) {
       setNotificationCounts(prev => ({ ...prev, [tab]: 0 }));
     }
+    // Clear badge in localStorage
+    const storageKey = TAB_TO_STORAGE_KEY[tab];
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+      // Notify SW to clear its localStorage too
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'clearBadge',
+          badgeType: tab
+        });
+      }
+    }
   };
+
+  // Initialize notificationCounts from localStorage on mount
+  useEffect(() => {
+    const initialCounts: Record<string, number> = {};
+    Object.entries(TAB_TO_STORAGE_KEY).forEach(([tab, key]) => {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        initialCounts[tab] = parseInt(stored, 10);
+      }
+    });
+    if (Object.keys(initialCounts).length > 0) {
+      console.log('[App] Loaded badges from localStorage:', initialCounts);
+      setNotificationCounts(initialCounts);
+    }
+  }, []);
 
   // Refresh PWA data from server
   const refreshPwaData = async () => {
@@ -151,6 +191,12 @@ export default function UsuariosApp() {
           ...prev,
           [tab]: (prev[tab] || 0) + 1
         }));
+        // Update localStorage for persistence
+        const storageKey = TAB_TO_STORAGE_KEY[tab];
+        if (storageKey) {
+          const newCount = (notificationCounts[tab] || 0) + 1;
+          localStorage.setItem(storageKey, String(newCount));
+        }
 
         // Auto-refresh data if app is visible (in foreground)
         if (document.visibilityState === 'visible') {
