@@ -121,6 +121,21 @@ export default function UsuariosApp() {
     }
   };
 
+  // Refresh PWA data from server
+  const refreshPwaData = async () => {
+    if (!user) return;
+    try {
+      const membership = await getMembership({ id: user.id } as any);
+      if (membership) {
+        const data = await loadPwaData(membership);
+        setPwaData(data);
+        console.log('[App] PWA data refreshed after push');
+      }
+    } catch (error) {
+      console.warn('[App] Failed to refresh PWA data:', error);
+    }
+  };
+
   // Listen for push notification messages from Service Worker
   useEffect(() => {
     if (!navigator.serviceWorker) return;
@@ -136,12 +151,30 @@ export default function UsuariosApp() {
           ...prev,
           [tab]: (prev[tab] || 0) + 1
         }));
+
+        // Auto-refresh data if app is visible (in foreground)
+        if (document.visibilityState === 'visible') {
+          console.log('[App] App visible, refreshing data...');
+          refreshPwaData();
+        }
       }
     };
     
     navigator.serviceWorker.addEventListener('message', handleSWMessage);
     return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
   }, []);
+
+  // Refresh data when app becomes visible (user returns to app)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log('[App] App became visible, refreshing data...');
+        refreshPwaData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
 
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;
