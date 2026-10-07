@@ -27,6 +27,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   actions,
   isExpanded = false,
   onExpandChange,
+  badges = {},
 }) => {
   const [expanded, setExpanded] = useState(isExpanded);
   const swipeStartY = React.useRef<number | null>(null);
