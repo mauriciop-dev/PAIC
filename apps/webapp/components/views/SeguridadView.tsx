@@ -130,6 +130,16 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         date: visitorDate,
         status: "Autorizado",
       });
+      // Push notification to resident
+      await apiService.sendPushNotification({
+        conjuntoId: userProfile.conjuntoId,
+        apartment: visitorApartment,
+        title: "Visita Autorizada",
+        body: `Se ha autorizado el ingreso de ${visitorName} para el ${visitorDate}`,
+        type: "porteria",
+        resourceId: `visitor-${Date.now()}`,
+        url: "/visitantes",
+      });
       setVisitorName("");
       setVisitorFeedback("✅ Visitante autorizado exitosamente.");
       setTimeout(() => setVisitorFeedback(null), 3000);
@@ -150,6 +160,16 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         apartment: pkgApartment,
         courier: pkgCourier,
         trackingNumber: pkgTracking || undefined,
+      });
+      // Push notification to resident
+      await apiService.sendPushNotification({
+        conjuntoId: userProfile.conjuntoId,
+        apartment: pkgApartment,
+        title: "Nuevo Paquete en Portería",
+        body: `Llegó un paquete de ${pkgCourier}${pkgTracking ? ` (Guía: ${pkgTracking})` : ""}`,
+        type: "porteria",
+        resourceId: `package-${Date.now()}`,
+        url: "/paquetes",
       });
       setPkgCourier("");
       setPkgTracking("");
@@ -172,6 +192,19 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         status: "Ingresó",
         entryTime: now,
       });
+      // Push notification
+      const log = visitorLogs.find(l => l.id === logId);
+      if (log) {
+        await apiService.sendPushNotification({
+          conjuntoId: userProfile.conjuntoId,
+          apartment: log.apartment,
+          title: "Visitante Ingresó",
+          body: `${log.visitorName} ha ingresado al conjunto a las ${now}`,
+          type: "porteria",
+          resourceId: `visitor-entry-${logId}`,
+          url: "/visitantes",
+        });
+      }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Ingresó", entryTime: now } : log))
       );
@@ -191,6 +224,19 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
         status: "Salió",
         exitTime: now,
       });
+      // Push notification
+      const log = visitorLogs.find(l => l.id === logId);
+      if (log) {
+        await apiService.sendPushNotification({
+          conjuntoId: userProfile.conjuntoId,
+          apartment: log.apartment,
+          title: "Visitante Salió",
+          body: `${log.visitorName} ha salido del conjunto a las ${now}`,
+          type: "porteria",
+          resourceId: `visitor-exit-${logId}`,
+          url: "/visitantes",
+        });
+      }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Salió", exitTime: now } : log))
       );
@@ -205,6 +251,19 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     if (!userProfile.conjuntoId) return;
     try {
       await apiService.updatePackageLogStatus(userProfile.conjuntoId, packageId, "Entregado");
+      // Push notification
+      const pkg = packageLogs.find(p => p.id === packageId);
+      if (pkg) {
+        await apiService.sendPushNotification({
+          conjuntoId: userProfile.conjuntoId,
+          apartment: pkg.apartment,
+          title: "Paquete Entregado",
+          body: `Tu paquete de ${pkg.courier} ha sido marcado como entregado`,
+          type: "porteria",
+          resourceId: `package-delivered-${packageId}`,
+          url: "/paquetes",
+        });
+      }
       setPackageLogs((prev) =>
         prev.map((p) => (p.id === packageId ? { ...p, status: "Entregado" } : p))
       );
