@@ -124,20 +124,20 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     if (!visitorName || !visitorApartment || !userProfile.conjuntoId) return;
     setIsSubmittingVisitor(true);
     try {
-      await apiService.addVisitorLog(userProfile.conjuntoId, {
+      const newLog = await apiService.addVisitorLog(userProfile.conjuntoId, {
         visitorName,
         apartment: visitorApartment,
         date: visitorDate,
         status: "Autorizado",
       });
-      // Push notification to resident
+      // Push notification to resident with real ID
       await apiService.sendPushNotification({
         conjuntoId: userProfile.conjuntoId,
         apartment: visitorApartment,
         title: "Visita Autorizada",
         body: `Se ha autorizado el ingreso de ${visitorName} para el ${visitorDate}`,
         type: "porteria",
-        resourceId: `visitor-${Date.now()}`,
+        resourceId: `visitor-${newLog.id}`,
         url: "/visitantes",
       });
       setVisitorName("");
@@ -156,19 +156,19 @@ const SeguridadView: React.FC<SeguridadViewProps> = ({ userProfile }) => {
     if (!pkgApartment || !pkgCourier || !userProfile.conjuntoId) return;
     setIsSubmittingPackage(true);
     try {
-      await apiService.addPackageLog(userProfile.conjuntoId, {
+      const newLog = await apiService.addPackageLog(userProfile.conjuntoId, {
         apartment: pkgApartment,
         courier: pkgCourier,
         trackingNumber: pkgTracking || undefined,
       });
-      // Push notification to resident
+      // Push notification to resident with real ID
       await apiService.sendPushNotification({
         conjuntoId: userProfile.conjuntoId,
         apartment: pkgApartment,
         title: "Nuevo Paquete en Portería",
         body: `Llegó un paquete de ${pkgCourier}${pkgTracking ? ` (Guía: ${pkgTracking})` : ""}`,
         type: "porteria",
-        resourceId: `package-${Date.now()}`,
+        resourceId: `package-${newLog.id}`,
         url: "/paquetes",
       });
       setPkgCourier("");

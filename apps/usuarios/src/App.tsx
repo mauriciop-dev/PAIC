@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Icon, Input, Badge, Avatar, useToast, BottomNav, type NavItem } from '@paic/ui';
 import { analytics } from '@paic/analytics';
 import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
-import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
+import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, updateVisitorLogStatus, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
 import { getPushSubscriptionState, isLikelyIos, isPushSupported, isRunningAsInstalledPwa, subscribeToPush, unsubscribeFromPush, type PushSubscriptionState } from './services/pwaPush';
 import './App.css';
 
@@ -315,10 +315,100 @@ export default function UsuariosApp() {
         return (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Autorizar Visitas</h2>
+              <h2 className="text-xl font-bold text-gray-900">Mis Visitas</h2>
               <VisitAuthorizationForm user={user} onCreated={() => void getSession().then(async session => { if (session) { const membership = await getMembership(session.user); if (membership) setPwaData(await loadPwaData(membership)); } })} />
             </div>
-            <Card className="p-4"><h3 className="font-semibold">Autorizaciones enviadas</h3>{(pwaData?.authorizations || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p> : <div className="space-y-3">{pwaData!.authorizations.map((v) => <div key={v.id} className="flex justify-between"><div><span>{v.visitor_name}</span><p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p></div><Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge></div>)}</div>}</Card>
+
+            {/* Visitas registradas por portería */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Icon name="user-check" className="w-5 h-5 text-blue-600" />
+                Visitas de Portería
+              </h3>
+              {(pwaData?.visitors || []).length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No hay visitas registradas por portería</p>
+              ) : (
+                <div className="space-y-3">
+                  {pwaData!.visitors.map((v) => (
+                    <div key={v.id} className="border rounded-xl p-3 bg-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">{v.visitor_name}</p>
+                          <p className="text-xs text-gray-500">
+                            {v.date} {v.entry_time && `· Ingreso: ${v.entry_time}`}
+                          </p>
+                          <Badge variant={v.status === 'Aprobado' ? 'success' : v.status === 'Rechazado' ? 'error' : 'warning'} className="mt-1">
+                            {v.status}
+                          </Badge>
+                        </div>
+                        {v.status === 'Autorizado' && (
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              className="bg-green-600 hover:bg-green-700"
+                              size="sm"
+                              onClick={async () => {
+                                await updateVisitorLogStatus({
+                                  conjuntoId: user.conjuntoId,
+                                  logId: v.id,
+                                  status: 'Aprobado',
+                                  userId: user.id,
+                                });
+                                const session = await getSession();
+                                if (session) {
+                                  const membership = await getMembership(session.user);
+                                  if (membership) setPwaData(await loadPwaData(membership));
+                                }
+                              }}
+                            >
+                              Aprobar
+                            </Button>
+                            <Button
+                              className="bg-red-600 hover:bg-red-700"
+                              size="sm"
+                              onClick={async () => {
+                                await updateVisitorLogStatus({
+                                  conjuntoId: user.conjuntoId,
+                                  logId: v.id,
+                                  status: 'Rechazado',
+                                  userId: user.id,
+                                });
+                                const session = await getSession();
+                                if (session) {
+                                  const membership = await getMembership(session.user);
+                                  if (membership) setPwaData(await loadPwaData(membership));
+                                }
+                              }}
+                            >
+                              Rechazar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Autorizaciones propias enviadas */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3">Autorizaciones enviadas</h3>
+              {(pwaData?.authorizations || []).length === 0 ? (
+                <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p>
+              ) : (
+                <div className="space-y-3">
+                  {pwaData!.authorizations.map((v) => (
+                    <div key={v.id} className="flex justify-between">
+                      <div>
+                        <span>{v.visitor_name}</span>
+                        <p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p>
+                      </div>
+                      <Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
         );
       case 'comunicados':

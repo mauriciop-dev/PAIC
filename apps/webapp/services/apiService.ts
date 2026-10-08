@@ -497,13 +497,13 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addVisitorLog(conjuntoId: string, log: Omit<T.VisitorLog, 'id'>) {
-    const { error } = await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId });
+    const { data, error } = await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId }).select().single();
     if (error) {
       console.error('Error adding visitor log:', error);
       throw error;
     }
     
-    // Notificación de autorización de visitante
+    // Notificación de autorización de visitante (email)
     const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
     const info = await this.fetchConjuntoInfo(conjuntoId);
     if (resident && info) {
@@ -517,6 +517,7 @@ export const apiService = {
         `;
         this.sendCommunicationEmail([resident.email], 'Autorización de Visitante', content, [], info.adminName, info.adminEmail);
     }
+    return data;
   },
   async updateVisitorLog(conjuntoId: string, id: number, updates: Partial<Omit<T.VisitorLog, 'id'>>) {
     const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('conjunto_id', conjuntoId).eq('id', id);
@@ -551,10 +552,10 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addPackageLog(conjuntoId: string, log: Partial<T.PackageLog>) {
-    const { error } = await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' });
+    const { data, error } = await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' }).select().single();
     if (error) throw error;
 
-    // Notificación de recepción de paquete
+    // Notificación de recepción de paquete (email)
     const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment!);
     const info = await this.fetchConjuntoInfo(conjuntoId);
     if (resident && info) {
@@ -569,6 +570,7 @@ export const apiService = {
         `;
         this.sendCommunicationEmail([resident.email], 'Nuevo Paquete en Recepción', content, [], info.adminName, info.adminEmail);
     }
+    return data;
   },
   async updatePackageLogStatus(conjuntoId: string, id: number, status: T.PackageLog['status']) {
     const { error } = await supabase.from('package_logs').update({ status }).eq('conjunto_id', conjuntoId).eq('id', id);
