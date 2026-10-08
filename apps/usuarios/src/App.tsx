@@ -347,12 +347,18 @@ export default function UsuariosApp() {
                               className="bg-green-600 hover:bg-green-700"
                               size="sm"
                               onClick={async () => {
-                                await updateVisitorLogStatus({
+                                const updates = await updateVisitorLogStatus({
                                   conjuntoId: user.conjuntoId,
                                   logId: v.id,
                                   status: 'Aprobado',
                                   userId: user.id,
                                 });
+                                // Optimistic update: immediately show "Ingresó" with entry_time
+                                setPwaData(prev => prev ? {
+                                  ...prev,
+                                  visitors: prev.visitors.map(vv => vv.id === v.id ? { ...vv, ...updates } : vv)
+                                } : prev);
+                                // Full refresh to sync
                                 const session = await getSession();
                                 if (session) {
                                   const membership = await getMembership(session.user);
