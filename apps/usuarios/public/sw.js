@@ -1,13 +1,15 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
 const CACHE = 'paic-usuarios-v12';
 
-// Mapping: backend notification type -> app tab -> localStorage key
+// Mapping: backend notification type -> localStorage key
+// Also includes app tab IDs for clearBadge messages
 const TYPE_TO_STORAGE_KEY = {
+  // Notification types (from backend)
   comunicado: 'paic_badge_comunicado',
   reserva: 'paic_badge_reserva',
   paquete: 'paic_badge_paquete',
   visita: 'paic_badge_visita',
-  porteria: 'paic_badge_paquete',  // portería -> paquetes tab
+  porteria: 'paic_badge_paquete',
   pqr: 'paic_badge_pqr',
   documento: 'paic_badge_documento',
   directorio: 'paic_badge_directorio',
@@ -15,6 +17,16 @@ const TYPE_TO_STORAGE_KEY = {
   solicitud: 'paic_badge_solicitud',
   default: 'paic_badge_default',
   test: 'paic_badge_test',
+  // App tab IDs (from clearBadge messages)
+  comunicados: 'paic_badge_comunicado',
+  reservas: 'paic_badge_reserva',
+  paquetes: 'paic_badge_paquete',
+  visitantes: 'paic_badge_visita',
+  pqrs: 'paic_badge_pqr',
+  documentos: 'paic_badge_documento',
+  directorio: 'paic_badge_directorio',
+  perfil: 'paic_badge_solicitud',
+  inicio: 'paic_badge_test',
 };
 
 self.addEventListener('install', (event) => {
