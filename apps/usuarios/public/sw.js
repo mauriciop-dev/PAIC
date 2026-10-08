@@ -1,5 +1,21 @@
 // apps/usuarios/public/sw.js - VERSIÓN MEJORADA
-const CACHE = 'paic-usuarios-v11';
+const CACHE = 'paic-usuarios-v12';
+
+// Mapping: backend notification type -> app tab -> localStorage key
+const TYPE_TO_STORAGE_KEY = {
+  comunicado: 'paic_badge_comunicado',
+  reserva: 'paic_badge_reserva',
+  paquete: 'paic_badge_paquete',
+  visita: 'paic_badge_visita',
+  porteria: 'paic_badge_paquete',  // portería -> paquetes tab
+  pqr: 'paic_badge_pqr',
+  documento: 'paic_badge_documento',
+  directorio: 'paic_badge_directorio',
+  contacto: 'paic_badge_directorio',
+  solicitud: 'paic_badge_solicitud',
+  default: 'paic_badge_default',
+  test: 'paic_badge_test',
+};
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -56,16 +72,22 @@ self.addEventListener('push', (event) => {
 
   console.log('[ServiceWorker] Push data URL:', data.url);
 
+  // Use mapping for badge storage key
+  const pushType = data.type || 'default';
+  const badgeKey = TYPE_TO_STORAGE_KEY[pushType] || TYPE_TO_STORAGE_KEY.default;
+
   const payload = {
     title: data.title || 'PAIC Residentes',
     body: data.body || '',
+    // Use transparent logo for notification icon, fallback to logo-paic.png
     icon: data.icon || '/logo-paic.png',
+    // Use bell icon for notification badge (monochrome)
     badge: data.badge || '/badge-paic.png',
-    tag: data.type || 'default',
+    tag: pushType,
     requireInteraction: true,
     data: {
       url: data.url || '/',
-      type: data.type || 'default',
+      type: pushType,
       id: data.id || 'default',
       timestamp: data.timestamp || new Date().toISOString()
     },
@@ -81,19 +103,17 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(payload.title, payload)
   );
 
-  // Update badge in localStorage for persistence
-  const type = data.type || 'default';
-  const badgeKey = 'paic_badge_' + type;
+  // Update badge in localStorage for persistence using correct mapping
   const currentBadge = parseInt(self.localStorage.getItem(badgeKey) || '0', 10);
   self.localStorage.setItem(badgeKey, String(currentBadge + 1));
-  console.log('[ServiceWorker] Badge incremented for', type, ':', currentBadge + 1);
+  console.log('[ServiceWorker] Badge incremented for', pushType, '->', badgeKey, ':', currentBadge + 1);
 
   // Notify app to update badge
   self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
     clients.forEach(client => {
       client.postMessage({
         type: 'push',
-        payload: { type: data.type || 'default', title: data.title, body: data.body }
+        payload: { type: pushType, title: data.title, body: data.body }
       });
     });
   });
@@ -185,8 +205,9 @@ self.addEventListener('message', (event) => {
 
   // Clear badge for a type when user views that tab
   if (event.data && event.data.type === 'clearBadge' && event.data.badgeType) {
-    self.localStorage.removeItem('paic_badge_' + event.data.badgeType);
-    console.log('[ServiceWorker] Badge cleared for:', event.data.badgeType);
+    const badgeKey = TYPE_TO_STORAGE_KEY[event.data.badgeType] || 'paic_badge_' + event.data.badgeType;
+    self.localStorage.removeItem(badgeKey);
+    console.log('[ServiceWorker] Badge cleared for:', event.data.badgeType, '->', badgeKey);
   }
 });
 

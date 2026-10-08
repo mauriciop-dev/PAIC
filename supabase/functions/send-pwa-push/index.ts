@@ -51,8 +51,10 @@ Deno.serve(async (request) => {
       type: payload.type || 'default',
       id: payload.id || 'default',
       url: payload.url || '/',
-      icon: payload.icon || '/logo-paic.png',
-      badge: payload.badge || '/logo-paic.png',
+      // Use maskable icon for notification (transparent background)
+      icon: payload.icon || '/android-icon-192x192.png',
+      // Use bell icon for notification badge (monochrome)
+      badge: payload.badge || '/badge-paic.png',
     }))));
     const expired = (subscriptions || []).filter((_, index) => {
       if (result[index].status !== 'rejected') return false;
