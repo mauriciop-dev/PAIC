@@ -10,10 +10,10 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@paic/analytics": "workspace:*",
-    "@paic/config": "workspace:*",
-    "@paic/types": "workspace:*",
-    "@paic/ui": "workspace:*",
+    "@paic/analytics": "*",
+    "@paic/config": "*",
+    "@paic/types": "*",
+    "@paic/ui": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

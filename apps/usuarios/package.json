@@ -14,11 +14,11 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "@supabase/supabase-js": "2",
-    "@paic/ui": "workspace:*",
-    "@paic/types": "workspace:*",
-    "@paic/supabase": "workspace:*",
-    "@paic/config": "workspace:*",
-    "@paic/analytics": "workspace:*"
+    "@paic/ui": "*",
+    "@paic/types": "*",
+    "@paic/supabase": "*",
+    "@paic/config": "*",
+    "@paic/analytics": "*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

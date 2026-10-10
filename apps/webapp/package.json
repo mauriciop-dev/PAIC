@@ -18,11 +18,11 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.3.0",
-    "@paic/ui": "workspace:*",
-    "@paic/types": "workspace:*",
-    "@paic/supabase": "workspace:*",
-    "@paic/config": "workspace:*",
-    "@paic/analytics": "workspace:*",
+    "@paic/ui": "*",
+    "@paic/types": "*",
+    "@paic/supabase": "*",
+    "@paic/config": "*",
+    "@paic/analytics": "*",
     "vite": "^6.2.0"
   },
   "devDependencies": {
