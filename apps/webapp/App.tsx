@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import Sidebar from './components/Sidebar';
+import NavBar from './components/NavBar';
 import Chatbot from './components/Chatbot';
 import DraggableChatButton from './components/DraggableChatButton';
 import HelpModal from './components/HelpModal';
@@ -20,7 +20,6 @@ import {
   TRIAL_WRITE_BLOCKED_EVENT,
   TRIAL_WRITE_BLOCKED_MESSAGE,
 } from './services/supabaseClient';
-import usePWAServiceWorker from './hooks/usePWAServiceWorker';
 
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
@@ -104,9 +103,6 @@ const AppContent: React.FC = () => {
     const timer = window.setInterval(() => setAccessClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-
-  // PWA Service Worker
-  const { serviceWorker, subscription: pushSubscription } = usePWAServiceWorker();
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -542,21 +538,12 @@ const AppContent: React.FC = () => {
           />
         )}
 
-        {!needsAdminSetup && (
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            userProfile={userProfile}
-            onSettingsClick={handleSettingsClick}
-            onSupportClick={() => setIsHelpModalOpen(true)}
-            onTourClick={handleOpenOnboarding}
-            conjuntoName={conjuntoName}
-          />
-        )}
-
-        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
+        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out min-w-0 overflow-x-hidden w-full ${isChatbotOpen ? 'ml-0 md:ml-[30%]' : 'ml-0'}`}>
           <Header 
               onHelpClick={() => setIsHelpModalOpen(true)} 
+              onStartTour={() => { analytics.trackOnboarding('started'); setShowOnboardingModal(true); }}
+              onOpenOnboarding={handleOpenOnboarding}
+              showAnimatedButton={showAnimatedButton}
               userProfile={userProfile}
               conjuntoInfo={conjuntoInfo} 
               onLogout={handleLogout} 
@@ -564,10 +551,18 @@ const AppContent: React.FC = () => {
               activeTabName={activeTab}
               isReadOnly={isReadOnly}
           />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-slate-50">
+          {!needsAdminSetup && (
+            <NavBar 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              userProfile={userProfile} 
+              onSettingsClick={handleSettingsClick}
+            />
+          )}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 bg-gray-100">
             <div className="max-w-screen-2xl mx-auto w-full">
               {needsAdminSetup ? (
-                 <div className="text-center p-10 text-gray-600 bg-white rounded-2xl shadow-sm border border-gray-200">
+                 <div className="text-center p-10 text-gray-600 bg-white rounded-xl shadow-sm border border-gray-200">
                     <Icon name="settings" className="w-12 h-12 mx-auto text-gray-400" />
                     <h2 className="text-xl font-semibold mt-4">Configuración Inicial Requerida</h2>
                     <p className="mt-2">
@@ -578,8 +573,8 @@ const AppContent: React.FC = () => {
                 <Dashboard activeTab={activeTab} setActiveTab={setActiveTab} conjuntoName={conjuntoName} userProfile={userProfile} conjuntoInfo={conjuntoInfo} selectedAccessPointId={selectedAccessPointId} />
               )}
             </div>
-          </main>
-        </div>
+          </div>
+        </main>
 
         {!needsAdminSetup && isConjuntoAdmin && (
           <BottomNav

@@ -1,85 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Icon, Input, Badge, Avatar, useToast, BottomNav, type NavItem } from '@paic/ui';
+import { Button, Card, Icon, Input, Badge, Avatar, useToast } from '@paic/ui';
 import { analytics } from '@paic/analytics';
 import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
-import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, updateVisitorLogStatus, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
-import { getPushSubscriptionState, isLikelyIos, isPushSupported, isRunningAsInstalledPwa, subscribeToPush, unsubscribeFromPush, type PushSubscriptionState } from './services/pwaPush';
+import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
+import { subscribeToPush } from './services/pwaPush';
 import './App.css';
 
-const primaryItems: NavItem[] = [
+const NavTabs = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
-  { id: 'comunicados', label: 'Noticias', icon: 'mail' },
-  { id: 'documentos', label: 'Docs', icon: 'file-text' },
-  { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
-  { id: 'directorio', label: 'Contactos', icon: 'phone' },
-];
-
-const secondaryItems: NavItem[] = [
   { id: 'reservas', label: 'Reservas', icon: 'calendar' },
+  { id: 'comunicados', label: 'Noticias', icon: 'mail' },
+  { id: 'cuenta', label: 'Cuenta', icon: 'dollarSign' },
+  { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
+  { id: 'documentos', label: 'Docs', icon: 'file-text' },
+  { id: 'directorio', label: 'Contactos', icon: 'phone' },
+  { id: 'votaciones', label: 'Votos', icon: 'checkSquare' },
   { id: 'paquetes', label: 'Paquetes', icon: 'package' },
   { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
-  { id: 'cuenta', label: 'Cuenta', icon: 'dollarSign' },
-  { id: 'votaciones', label: 'Votos', icon: 'checkSquare' },
   { id: 'perfil', label: 'Perfil', icon: 'user' },
 ];
 
-const bottomActions: { id: string; label: string; icon: string; handler: () => void }[] = [];
-
-// Deep link handler: parse URL and set active tab
-function handleDeepLink(setActiveTab: (tab: string) => void) {
-  const path = window.location.pathname;
-  const match = path.match(/^\/(comunicados|reservas|paquetes|visitantes|pqrs|documentos|cuenta|votaciones|directorio|perfil)(?:\/.*)?$/);
-  if (match) {
-    const tab = match[1];
-    const tabMap: Record<string, string> = {
-      comunicados: 'comunicados',
-      reservas: 'reservas',
-      paquetes: 'paquetes',
-      visitantes: 'visitantes',
-      pqrs: 'pqrs',
-      documentos: 'documentos',
-      cuenta: 'cuenta',
-      votaciones: 'votaciones',
-      directorio: 'directorio',
-      perfil: 'perfil',
-    };
-    if (tabMap[tab]) {
-      setActiveTab(tabMap[tab]);
-    }
-  }
-}
-
-// Map push notification types to tab IDs
-const TYPE_TO_TAB: Record<string, string> = {
-  comunicado: 'comunicados',
-  reserva: 'reservas',
-  paquete: 'paquetes',
-  visita: 'visitantes',
-  porteria: 'paquetes',
-  pqr: 'pqrs',
-  documento: 'documentos',
-  directorio: 'directorio',
-  contacto: 'directorio',
-  solicitud: 'perfil',
-  test: 'inicio',
-};
-
-// Reverse map: tab -> localStorage key
-const TAB_TO_STORAGE_KEY: Record<string, string> = {
-  comunicados: 'paic_badge_comunicado',
-  reservas: 'paic_badge_reserva',
-  paquetes: 'paic_badge_paquete',
-  visitantes: 'paic_badge_visita',
-  pqrs: 'paic_badge_pqr',
-  documentos: 'paic_badge_documento',
-  directorio: 'paic_badge_directorio',
-  perfil: 'paic_badge_solicitud',
-  inicio: 'paic_badge_test',
-};
-
 export default function UsuariosApp() {
   const [activeTab, setActiveTab] = useState('inicio');
-  const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
   const [user, setUser] = useState<{ id: string; membershipId: string; conjuntoId: string; name: string; email: string; apt: string; avatar?: string; role: PwaMembership['role'] } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -97,7 +39,6 @@ export default function UsuariosApp() {
       return;
     }
     analytics.init();
-    handleDeepLink(setActiveTab);
     let active = true;
     const loadAuth = async () => {
       // Evita consumir la invitación dos veces en paralelo (efecto + onAuthStateChange)
@@ -125,102 +66,6 @@ export default function UsuariosApp() {
     const subscription = supabase?.auth.onAuthStateChange(() => { void loadAuth(); });
     return () => { active = false; subscription?.data.subscription.unsubscribe(); };
   }, [invitationToken]);
-
-  // Handle tab selection - clear badge for selected tab
-  const handleTabSelect = (tab: string) => {
-    setActiveTab(tab);
-    if (notificationCounts[tab] && notificationCounts[tab] > 0) {
-      setNotificationCounts(prev => ({ ...prev, [tab]: 0 }));
-    }
-    // Clear badge in localStorage
-    const storageKey = TAB_TO_STORAGE_KEY[tab];
-    if (storageKey) {
-      localStorage.removeItem(storageKey);
-      // Notify SW to clear its localStorage too
-      if (navigator.serviceWorker?.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'clearBadge',
-          badgeType: tab
-        });
-      }
-    }
-  };
-
-  // Initialize notificationCounts from localStorage on mount
-  useEffect(() => {
-    const initialCounts: Record<string, number> = {};
-    Object.entries(TAB_TO_STORAGE_KEY).forEach(([tab, key]) => {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        initialCounts[tab] = parseInt(stored, 10);
-      }
-    });
-    if (Object.keys(initialCounts).length > 0) {
-      console.log('[App] Loaded badges from localStorage:', initialCounts);
-      setNotificationCounts(initialCounts);
-    }
-  }, []);
-
-  // Refresh PWA data from server
-  const refreshPwaData = async () => {
-    if (!user) return;
-    try {
-      const membership = await getMembership({ id: user.id } as any);
-      if (membership) {
-        const data = await loadPwaData(membership);
-        setPwaData(data);
-        console.log('[App] PWA data refreshed after push');
-      }
-    } catch (error) {
-      console.warn('[App] Failed to refresh PWA data:', error);
-    }
-  };
-
-  // Listen for push notification messages from Service Worker
-  useEffect(() => {
-    if (!navigator.serviceWorker) return;
-    
-    const handleSWMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'push' && event.data.payload) {
-        const payload = event.data.payload;
-        const type = payload.type || 'default';
-        const tab = TYPE_TO_TAB[type] || 'inicio';
-        
-        console.log('[App] Push received for type:', type, '-> tab:', tab);
-        setNotificationCounts(prev => ({
-          ...prev,
-          [tab]: (prev[tab] || 0) + 1
-        }));
-        // Update localStorage for persistence
-        const storageKey = TAB_TO_STORAGE_KEY[tab];
-        if (storageKey) {
-          const newCount = (notificationCounts[tab] || 0) + 1;
-          localStorage.setItem(storageKey, String(newCount));
-        }
-
-        // Auto-refresh data if app is visible (in foreground)
-        if (document.visibilityState === 'visible') {
-          console.log('[App] App visible, refreshing data...');
-          refreshPwaData();
-        }
-      }
-    };
-    
-    navigator.serviceWorker.addEventListener('message', handleSWMessage);
-    return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
-  }, []);
-
-  // Refresh data when app becomes visible (user returns to app)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        console.log('[App] App became visible, refreshing data...');
-        refreshPwaData();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user]);
 
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;
@@ -315,106 +160,10 @@ export default function UsuariosApp() {
         return (
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Mis Visitas</h2>
+              <h2 className="text-xl font-bold text-gray-900">Autorizar Visitas</h2>
               <VisitAuthorizationForm user={user} onCreated={() => void getSession().then(async session => { if (session) { const membership = await getMembership(session.user); if (membership) setPwaData(await loadPwaData(membership)); } })} />
             </div>
-
-            {/* Visitas registradas por portería */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Icon name="user-check" className="w-5 h-5 text-blue-600" />
-                Visitas de Portería
-              </h3>
-              {(pwaData?.visitors || []).length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No hay visitas registradas por portería</p>
-              ) : (
-                <div className="space-y-3">
-                  {pwaData!.visitors.map((v) => (
-                    <div key={v.id} className="border rounded-xl p-3 bg-white">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{v.visitor_name}</p>
-                          <p className="text-xs text-gray-500">
-                            {v.date} {v.entry_time && `· Ingreso: ${v.entry_time}`}
-                          </p>
-                          <Badge variant={v.status === 'Aprobado' ? 'success' : v.status === 'Rechazado' ? 'error' : 'warning'} className="mt-1">
-                            {v.status}
-                          </Badge>
-                        </div>
-                        {v.status === 'Autorizado' && (
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Button
-                              className="bg-green-600 hover:bg-green-700"
-                              size="sm"
-                              onClick={async () => {
-                                const updates = await updateVisitorLogStatus({
-                                  conjuntoId: user.conjuntoId,
-                                  logId: v.id,
-                                  status: 'Aprobado',
-                                  userId: user.id,
-                                });
-                                // Optimistic update: immediately show "Ingresó" with entry_time
-                                setPwaData(prev => prev ? {
-                                  ...prev,
-                                  visitors: prev.visitors.map(vv => vv.id === v.id ? { ...vv, ...updates } : vv)
-                                } : prev);
-                                // Full refresh to sync
-                                const session = await getSession();
-                                if (session) {
-                                  const membership = await getMembership(session.user);
-                                  if (membership) setPwaData(await loadPwaData(membership));
-                                }
-                              }}
-                            >
-                              Aprobar
-                            </Button>
-                            <Button
-                              className="bg-red-600 hover:bg-red-700"
-                              size="sm"
-                              onClick={async () => {
-                                await updateVisitorLogStatus({
-                                  conjuntoId: user.conjuntoId,
-                                  logId: v.id,
-                                  status: 'Rechazado',
-                                  userId: user.id,
-                                });
-                                const session = await getSession();
-                                if (session) {
-                                  const membership = await getMembership(session.user);
-                                  if (membership) setPwaData(await loadPwaData(membership));
-                                }
-                              }}
-                            >
-                              Rechazar
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Autorizaciones propias enviadas */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Autorizaciones enviadas</h3>
-              {(pwaData?.authorizations || []).length === 0 ? (
-                <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p>
-              ) : (
-                <div className="space-y-3">
-                  {pwaData!.authorizations.map((v) => (
-                    <div key={v.id} className="flex justify-between">
-                      <div>
-                        <span>{v.visitor_name}</span>
-                        <p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p>
-                      </div>
-                      <Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
+            <Card className="p-4"><h3 className="font-semibold">Autorizaciones enviadas</h3>{(pwaData?.authorizations || []).length === 0 ? <p className="text-gray-600 text-center py-8">No hay autorizaciones registradas</p> : <div className="space-y-3">{pwaData!.authorizations.map((v) => <div key={v.id} className="flex justify-between"><div><span>{v.visitor_name}</span><p className="text-xs text-gray-500">{v.visit_date} {v.visitor_phone || ''}</p></div><Badge variant={v.status === 'aprobada' ? 'success' : 'warning'}>{v.status}</Badge></div>)}</div>}</Card>
           </div>
         );
       case 'comunicados':
@@ -442,17 +191,28 @@ export default function UsuariosApp() {
                 </div>
               </div>
             </Card>
-        <NotificationSettings userId={user.id} onToast={addToast} />
-        {user.role === 'residente_principal' && <InvitationForm membershipId={user.membershipId} />}
-        <Button variant="danger" onClick={() => void signOut().then(() => setUser(null))}>
-          <Icon name="log-in" className="w-4 h-4" /> Cerrar Sesión
-        </Button>
-      </div>
-    );
-  default:
-    return null;
-  }
-};
+            <Card className="p-4">
+              <h3 className="font-semibold text-gray-900 mb-4">Notificaciones</h3>
+              <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones', 'error'))}>Activar notificaciones Push</Button>
+              <div className="space-y-3">
+                {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
+                  <label key={i} className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded border-gray-300" />
+                    <span className="text-gray-700">{n}</span>
+                  </label>
+                ))}
+              </div>
+            </Card>
+            {user.role === 'residente_principal' && <InvitationForm membershipId={user.membershipId} />}
+            <Button variant="danger" onClick={() => void signOut().then(() => setUser(null))}>
+              <Icon name="log-in" className="w-4 h-4" /> Cerrar Sesión
+            </Button>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -474,113 +234,28 @@ export default function UsuariosApp() {
         {renderTab()}
       </main>
 
-      <BottomNav
-        activeTab={activeTab}
-        onTabSelect={handleTabSelect}
-        primaryItems={primaryItems}
-        secondaryItems={secondaryItems}
-        actions={bottomActions}
-        badges={notificationCounts}
-      />
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 md:hidden" role="navigation" aria-label="Navegación principal">
+        <div className="flex items-center justify-around h-14">
+          {NavTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex flex-col items-center gap-1 flex-1 min-h-[48px] transition-colors ${
+                activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'
+              }`}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+            >
+              <Icon name={tab.icon} className={`w-6 h-6 ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'}`} />
+              <span className="text-[11px] font-medium">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
 
 function InvitationForm({ membershipId }: { membershipId: string }) { const [email, setEmail] = useState(''); const [message, setMessage] = useState(''); const submit = async (e: React.FormEvent) => { e.preventDefault(); try { await inviteAdditionalUser(membershipId, email); setMessage('Invitación registrada.'); setEmail(''); } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo enviar la invitación.'); } }; return <Card className="p-4"><h3 className="font-semibold">Invitar usuario adicional</h3><p className="mt-1 text-sm text-gray-600">Puedes tener hasta cuatro invitaciones pendientes.</p><form onSubmit={submit} className="mt-3 flex gap-2"><Input type="email" placeholder="correo Gmail" value={email} onChange={e => setEmail(e.target.value)} required/><Button type="submit">Invitar</Button></form>{message && <p className="mt-2 text-sm text-gray-600">{message}</p>}</Card>; }
-
-function NotificationSettings({ userId, onToast }: { userId: string; onToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error', duration?: number) => void }) {
-  const [state, setState] = useState<PushSubscriptionState>('unsupported');
-  const [loading, setLoading] = useState(true);
-  const supported = isPushSupported();
-  const installed = isRunningAsInstalledPwa();
-  const ios = isLikelyIos();
-
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      setState(await getPushSubscriptionState());
-    } catch {
-      setState('unsupported');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { void refresh(); }, []);
-
-  const activate = async () => {
-    try {
-      setLoading(true);
-      await subscribeToPush(userId);
-      setState(await getPushSubscriptionState());
-      onToast('Notificaciones activadas en este teléfono.', 'success');
-    } catch (error) {
-      onToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones.', 'error');
-      void refresh();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deactivate = async () => {
-    try {
-      setLoading(true);
-      await unsubscribeFromPush(userId);
-      setState(await getPushSubscriptionState());
-      onToast('Notificaciones desactivadas en este teléfono.', 'success');
-    } catch (error) {
-      onToast(error instanceof Error ? error.message : 'No se pudieron desactivar las notificaciones.', 'error');
-      void refresh();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const labelByState: Record<PushSubscriptionState, string> = {
-    unsupported: 'No compatible',
-    'missing-vapid-key': 'Configuración pendiente',
-    'permission-default': 'Sin activar',
-    'permission-denied': 'Bloqueadas',
-    subscribed: 'Activas',
-    'not-subscribed': 'Sin suscripción',
-  };
-
-  const details = (() => {
-    if (!supported) return 'Este navegador no permite notificaciones web push.';
-    if (ios && !installed) return 'En iPhone, instala PAIC en la pantalla de inicio y ábrela desde el ícono antes de activar las notificaciones.';
-    if (state === 'permission-denied') return 'El permiso quedó bloqueado. Actívalo desde los ajustes del navegador o del teléfono.';
-    if (state === 'missing-vapid-key') return 'Falta configurar la clave pública VAPID del sitio.';
-    if (state === 'subscribed') return 'Este teléfono está suscrito para recibir comunicados, reservas, PQRs y avisos de administración.';
-    return 'Actívalas desde este botón para registrar este teléfono en PAIC.';
-  })();
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-gray-900">Notificaciones</h3>
-          <p className="mt-1 text-sm text-gray-600">{details}</p>
-        </div>
-        <Badge variant={state === 'subscribed' ? 'success' : state === 'permission-denied' || state === 'unsupported' ? 'error' : 'warning'}>{loading ? 'Revisando' : labelByState[state]}</Badge>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="outline" disabled={loading || !supported || state === 'permission-denied' || state === 'missing-vapid-key' || (ios && !installed)} onClick={() => void activate()}>
-          Activar en este teléfono
-        </Button>
-        {state === 'subscribed' && <Button variant="outline" disabled={loading} onClick={() => void deactivate()}>Desactivar</Button>}
-        <Button variant="outline" disabled={loading} onClick={() => void refresh()}>Revisar estado</Button>
-      </div>
-      <div className="mt-4 space-y-3">
-        {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
-          <label key={i} className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" defaultChecked disabled={state !== 'subscribed'} className="w-5 h-5 text-blue-600 rounded border-gray-300" />
-            <span className={state === 'subscribed' ? 'text-gray-700' : 'text-gray-400'}>{n}</span>
-          </label>
-        ))}
-      </div>
-    </Card>
-  );
-}
 
 function VisitAuthorizationForm({ user, onCreated }: { user: { id: string; conjuntoId: string; apt: string }; onCreated: () => void }) { const [form,setForm]=useState({visitorName:'',visitorPhone:'',visitDate:'',notes:''}); const [message,setMessage]=useState(''); const [open,setOpen]=useState(false); const submit=async(e:React.FormEvent)=>{e.preventDefault();try{await createVisitAuthorization({conjuntoId:user.conjuntoId,apartment:user.apt,userId:user.id,...form});setMessage('Autorización enviada a portería.');setForm({visitorName:'',visitorPhone:'',visitDate:'',notes:''});setOpen(false);onCreated()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo registrar la visita.')}};return <details className="rounded-xl border bg-white p-4" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary className="cursor-pointer font-semibold">Autorizar nueva visita</summary><form onSubmit={submit} className="mt-3 grid gap-3"><Input placeholder="Nombre del visitante" value={form.visitorName} onChange={e=>setForm({...form,visitorName:e.target.value})} required/><Input type="tel" placeholder="Teléfono (opcional)" value={form.visitorPhone} onChange={e=>setForm({...form,visitorPhone:e.target.value})}/><input className="rounded border p-2" type="date" min={new Date().toISOString().slice(0,10)} value={form.visitDate} onChange={e=>setForm({...form,visitDate:e.target.value})} required/><textarea className="min-h-20 rounded border p-2" placeholder="Observaciones (opcional)" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/><Button type="submit">Enviar autorización</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</form></details>; }
 

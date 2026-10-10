@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Icon } from './ui/Icon';
 import type { SettingsTab } from '../App';
-import BottomSheet from './BottomSheet';
 
 interface BottomNavProps {
   activeTab: string;
@@ -56,22 +55,25 @@ const BottomNav: React.FC<BottomNavProps> = ({
   onStartTour,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const swipeStartY = React.useRef<number | null>(null);
+  const swipeStartY = useRef<number | null>(null);
 
-  const handleBarTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     swipeStartY.current = e.touches[0].clientY;
   };
 
-  const handleBarTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     if (swipeStartY.current === null) return;
     const deltaY = e.touches[0].clientY - swipeStartY.current;
     if (deltaY < -20) {
       setExpanded(true);
       swipeStartY.current = null;
+    } else if (deltaY > 20) {
+      setExpanded(false);
+      swipeStartY.current = null;
     }
   };
 
-  const handleBarTouchEnd = () => {
+  const handleTouchEnd = () => {
     swipeStartY.current = null;
   };
 
@@ -97,62 +99,75 @@ const BottomNav: React.FC<BottomNavProps> = ({
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40">
-      <BottomSheet
-        isOpen={expanded}
-        onClose={() => setExpanded(false)}
-        title="Más opciones de gestión"
-      >
-        <div className="pb-4">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-3">
-            Módulos adicionales
-          </p>
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {secondaryTabs.map((item) => {
-              const isActive = isActiveTab(item.id);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleTabPress(item.id)}
-                  className={`flex flex-col items-center justify-center gap-1.5 min-w-0 min-h-[68px] rounded-2xl py-2.5 transition-all ${
-                    isActive ? 'text-blue-600 bg-blue-50 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Icon
-                    name={item.icon}
-                    className={`w-6 h-6 ${isActive ? 'text-blue-600' : 'text-slate-500'}`}
-                  />
-                  <span className="text-[11px] text-center leading-tight">
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-3">
-            Acciones rápidas
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {secondaryActions.map((item) => (
+      {expanded && (
+        <div className="fixed inset-0 z-40">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setExpanded(false)}
+            data-testid="bottom-nav-backdrop"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute left-0 right-0 bg-white rounded-t-2xl shadow-2xl border-t border-gray-200"
+            style={{ bottom: BAR_HEIGHT }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div className="flex justify-center pt-2.5 pb-1">
               <button
-                key={item.id}
-                onClick={() => handleActionPress(item.handler)}
-                className="flex flex-col items-center justify-center gap-1.5 min-w-0 min-h-[68px] rounded-2xl py-2.5 text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                <Icon name={item.icon} className="w-6 h-6 text-slate-500" />
-                <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
-              </button>
-            ))}
+                onClick={() => setExpanded(false)}
+                aria-label="Contraer menú"
+                className="w-12 h-1.5 bg-gray-300 rounded-full min-h-[6px]"
+              />
+            </div>
+            <div className="px-4 pb-5 max-h-[45vh] overflow-y-auto">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
+                Más opciones
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {secondaryTabs.map((item) => {
+                  const isActive = isActiveTab(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleTabPress(item.id)}
+                      className={`flex flex-col items-center justify-center gap-1 min-w-0 min-h-[64px] rounded-xl py-2 transition-colors ${
+                        isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon
+                        name={item.icon}
+                        className={`w-6 h-6 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
+                      />
+                      <span className={`text-[11px] font-medium text-center leading-tight ${isActive ? 'font-semibold' : ''}`}>
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+                {secondaryActions.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleActionPress(item.handler)}
+                    className="flex flex-col items-center justify-center gap-1 min-w-0 min-h-[64px] rounded-xl py-2 text-gray-500 hover:bg-gray-100 transition-colors"
+                  >
+                    <Icon name={item.icon} className="w-6 h-6 text-gray-500" />
+                    <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </BottomSheet>
+      )}
 
       <div className="bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom,0px)]">
-        <div 
+        <div
           className="flex items-center justify-around h-[64px] px-1"
-          onTouchStart={handleBarTouchStart}
-          onTouchMove={handleBarTouchMove}
-          onTouchEnd={handleBarTouchEnd}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {primaryItems.map((item) => {
             const isActive = isActiveTab(item.id);

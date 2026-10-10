@@ -106,28 +106,27 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
                 <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
         </div>
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <h3 className="text-base font-bold text-slate-800 mb-4 tracking-tight">Agregar Nueva Tarea</h3>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Agregar Nueva Tarea</h3>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
                 <input 
                     type="text" 
                     placeholder="Describe la tarea..." 
-                    className="flex-1 w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    className="flex-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
                 />
                 <input 
                     type="date" 
-                    className="w-full sm:w-auto px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    className="w-full sm:w-auto p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     value={newTaskDate}
                     onChange={(e) => setNewTaskDate(e.target.value)}
                 />
                 <button 
                     onClick={handleAddTask}
-                    className="px-5 py-2.5 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all text-xs flex items-center justify-center gap-1.5 shrink-0"
+                    className="px-4 py-2 w-full sm:w-auto bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
-                    <Icon name="plus" className="w-3.5 h-3.5" />
                     Agregar
                 </button>
             </div>
@@ -138,7 +137,7 @@ const PendingTasksView: React.FC<PendingTasksViewProps> = ({ userProfile }) => {
             <div className="text-center py-10 text-gray-500 bg-white rounded-lg shadow-sm">Cargando tareas...</div>
         ) : sortedTasks.length > 0 ? (
             sortedTasks.map(task => (
-                <div key={task.id} className={`p-4 sm:p-5 rounded-2xl border transition-all flex items-start gap-4 ${task.completed ? 'bg-slate-50/70 border-slate-100 opacity-60' : 'bg-white border-slate-200/80 shadow-xs hover:shadow-sm'}`}>
+                <div key={task.id} className={`p-4 rounded-lg flex items-start gap-4 transition-colors ${task.completed ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
                     <input 
                         type="checkbox" 
                         checked={task.completed} 

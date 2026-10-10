@@ -369,7 +369,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         const canManageData = [DbTab.Residents, DbTab.AccountStatus, DbTab.Providers, DbTab.Internal].includes(activeDbTab);
         
         return (
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 border-b border-slate-100 bg-slate-50/50">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 border-b">
                 <div className="flex flex-wrap items-center gap-3">
                     {canManageData && (
                         <>
@@ -401,7 +401,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
                                     case DbTab.Internal: handleStaffModalOpen(null); break;
                                 }
                             }}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs hover:shadow-sm transition-all text-xs flex items-center gap-1.5">
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors text-xs flex items-center gap-1">
                           <Icon name="user-plus" className="w-4 h-4" />
                           Agregar Registro
                         </button>
@@ -729,8 +729,8 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 flex items-center gap-2 p-1 bg-slate-100/80 rounded-2xl w-fit overflow-x-auto">
-        <nav className="flex space-x-1 min-w-max" aria-label="Tabs">
+      <div className="mb-4 border-b border-gray-200 overflow-x-auto">
+        <nav className="-mb-px flex space-x-6 min-w-max" aria-label="Tabs">
           {Object.values(DbTab).map(tab => {
             const subtabId = 'subtab-' + tab.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
             return (
@@ -740,9 +740,9 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
               onClick={() => setActiveDbTab(tab)}
               className={`${
                 activeDbTab === tab
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-              } px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap`}
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
             >
               {tab}
             </button>
@@ -751,7 +751,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ userProfile }) => {
         </nav>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {renderTableActions()}
         <div className="overflow-x-auto">
             {renderContent()}

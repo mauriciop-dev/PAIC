@@ -3,12 +3,7 @@ import { supabase as typedSupabase } from '@paic/supabase/client';
 export const TRIAL_WRITE_BLOCKED_EVENT = 'paic:trial-write-blocked';
 export const TRIAL_WRITE_BLOCKED_MESSAGE =
   'Tu periodo de prueba venció. Puedes seguir consultando PAIC; elige un plan para volver a editar.';
-const BILLING_FUNCTIONS = new Set([
-  'activate-mp-subscription',
-  'create-mp-subscription',
-  'send-push-notification',
-  'send-pwa-push',
-]);
+const BILLING_FUNCTIONS = new Set(['activate-mp-subscription', 'create-mp-subscription']);
 
 type WriteAccessProvider = () => boolean;
 

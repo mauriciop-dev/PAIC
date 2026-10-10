@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@paic/ui";
 import { apiService } from "../../services/apiService";
-import { supabase } from "../../services/supabaseClient";
 import {
   EstacionSession,
   VigilanteSession,
@@ -129,66 +128,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
     }
   }, [stationSession]);
 
-  // Realtime subscription for visitor_logs and package_logs
-  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-
-  useEffect(() => {
-    if (!stationSession || !activeShift) return;
-
-    const channel = supabase
-      .channel(`kiosk-${stationSession.conjunto_id}-${stationSession.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'visitor_logs',
-          filter: `conjunto_id=eq.${stationSession.conjunto_id}`,
-        },
-        (payload) => {
-          console.log('[Kiosk] Realtime visitor_logs change:', payload);
-          // Refresh data when visitor_logs changes
-          fetchOperationalData();
-          
-          // Show notification if resident approved a visit (status changed to Ingresó)
-          if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
-            const newLog = payload.new as VisitorLog;
-            const oldLog = payload.old as VisitorLog;
-            if (oldLog.status === 'Autorizado' && newLog.status === 'Ingresó') {
-              setNotification({
-                type: 'success',
-                text: `🏠 Residente aprobó visita: ${newLog.visitorName} (Apto ${newLog.apartment}) - Ingreso automático registrado`,
-              });
-              setTimeout(() => setNotification(null), 6000);
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'package_logs',
-          filter: `conjunto_id=eq.${stationSession.conjunto_id}`,
-        },
-        () => {
-          console.log('[Kiosk] Realtime package_logs change');
-          fetchOperationalData();
-        }
-      )
-      .subscribe();
-
-    realtimeChannelRef.current = channel;
-
-    return () => {
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-        realtimeChannelRef.current = null;
-      }
-    };
-  }, [stationSession, activeShift, fetchOperationalData]);
-
   useEffect(() => {
     if (activeShift && stationSession) {
       fetchOperationalData();
@@ -268,17 +207,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         await apiService.addVisitorLog(stationSession.conjunto_id, payload);
       }
 
-      // Push notification to resident
-      await apiService.sendPushNotification({
-        conjuntoId: stationSession.conjunto_id,
-        apartment: visitorApartment.trim(),
-        title: "Visita Autorizada",
-        body: `Se ha autorizado el ingreso de ${visitorName.trim()} para el ${visitorDate}`,
-        type: "porteria",
-        resourceId: `visitor-${Date.now()}`,
-        url: "/visitantes",
-      });
-
       setVisitorName("");
       setVisitorFeedback("✅ Visitante registrado y autorizado en bitácora.");
       setTimeout(() => setVisitorFeedback(null), 3000);
@@ -303,19 +231,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
           entryTime: now,
         });
       }
-      // Push notification
-      const log = visitorLogs.find(l => l.id === logId);
-      if (log) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: log.apartment,
-          title: "Visitante Ingresó",
-          body: `${log.visitorName} ha ingresado al conjunto a las ${now}`,
-          type: "porteria",
-          resourceId: `visitor-entry-${logId}`,
-          url: "/visitantes",
-        });
-      }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Ingresó", entryTime: now } : log))
       );
@@ -335,19 +250,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         await apiService.updateVisitorLog(stationSession.conjunto_id, logId, {
           status: "Salió",
           exitTime: now,
-        });
-      }
-      // Push notification
-      const log = visitorLogs.find(l => l.id === logId);
-      if (log) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: log.apartment,
-          title: "Visitante Salió",
-          body: `${log.visitorName} ha salido del conjunto a las ${now}`,
-          type: "porteria",
-          resourceId: `visitor-exit-${logId}`,
-          url: "/visitantes",
         });
       }
       setVisitorLogs((prev) =>
@@ -376,17 +278,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         await apiService.addPackageLog(stationSession.conjunto_id, payload);
       }
 
-      // Push notification to resident
-      await apiService.sendPushNotification({
-        conjuntoId: stationSession.conjunto_id,
-        apartment: pkgApartment.trim(),
-        title: "Nuevo Paquete en Portería",
-        body: `Llegó un paquete de ${pkgCourier.trim()}${pkgTracking.trim() ? ` (Guía: ${pkgTracking.trim()})` : ""}`,
-        type: "porteria",
-        resourceId: `package-${Date.now()}`,
-        url: "/paquetes",
-      });
-
       setPkgCourier("");
       setPkgTracking("");
       setPackageFeedback("✅ Paquete recibido y registrado en bitácora.");
@@ -407,19 +298,6 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
       } catch (rpcErr) {
         console.warn("Fallback to standard updatePackageLogStatus:", rpcErr);
         await apiService.updatePackageLogStatus(stationSession.conjunto_id, packageId, "Entregado");
-      }
-      // Push notification
-      const pkg = packageLogs.find(p => p.id === packageId);
-      if (pkg) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: pkg.apartment,
-          title: "Paquete Entregado",
-          body: `Tu paquete de ${pkg.courier} ha sido marcado como entregado`,
-          type: "porteria",
-          resourceId: `package-delivered-${packageId}`,
-          url: "/paquetes",
-        });
       }
       setPackageLogs((prev) =>
         prev.map((p) => (p.id === packageId ? { ...p, status: "Entregado" } : p))

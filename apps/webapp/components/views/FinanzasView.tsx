@@ -67,34 +67,20 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ isOpen, onClose, onSave, inco
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg border border-slate-100 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                    <Icon name="x" className="w-5 h-5"/>
-                </button>
-                <h2 className="text-xl font-bold text-slate-900 mb-6 tracking-tight">{incomeToEdit ? 'Editar Ingreso' : 'Agregar Ingreso'}</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">{incomeToEdit ? 'Editar Ingreso' : 'Agregar Ingreso'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Descripción</label>
-                        <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Ej. Cuota administración Apto 101" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Monto ($)</label>
-                        <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="0" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Categoría</label>
-                        <select name="category" value={formData.category} onChange={handleChange} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm">
-                            {Object.values(IncomeCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Fecha</label>
-                        <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div className="mt-8 pt-2 flex justify-end gap-3 border-t border-slate-100">
-                        <button type="button" onClick={onClose} className="px-4 py-2.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                        <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors">Guardar</button>
+                    <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border rounded" required />
+                    <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border rounded" required />
+                    <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border rounded bg-white">
+                        {Object.values(IncomeCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2 border rounded" required />
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
                     </div>
                 </form>
             </div>
@@ -148,34 +134,20 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSave, ex
     };
 
     return (
-       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg border border-slate-100 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                    <Icon name="x" className="w-5 h-5"/>
-                </button>
-                <h2 className="text-xl font-bold text-slate-900 mb-6 tracking-tight">{expenseToEdit ? 'Editar Gasto' : 'Agregar Gasto'}</h2>
+       <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"><Icon name="x" className="w-6 h-6"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">{expenseToEdit ? 'Editar Gasto' : 'Agregar Gasto'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Descripción</label>
-                        <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Ej. Pago servicios públicos" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Monto ($)</label>
-                        <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="0" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Categoría</label>
-                        <select name="category" value={formData.category} onChange={handleChange} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm">
-                            {Object.values(ExpenseCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Fecha</label>
-                        <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" required />
-                    </div>
-                    <div className="mt-8 pt-2 flex justify-end gap-3 border-t border-slate-100">
-                        <button type="button" onClick={onClose} className="px-4 py-2.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                        <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors">Guardar</button>
+                    <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Descripción" className="w-full p-2 border rounded" required />
+                    <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="Monto" className="w-full p-2 border rounded" required />
+                    <select name="category" value={formData.category} onChange={handleChange} className="w-full p-2 border rounded bg-white">
+                        {Object.values(ExpenseCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2 border rounded" required />
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Guardar</button>
                     </div>
                 </form>
             </div>
@@ -440,66 +412,45 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     const renderResumen = () => (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                        <Icon name="arrow-up-right" className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Ingresos Totales</h3>
-                        <p className="text-2xl font-extrabold text-emerald-600 tracking-tight mt-0.5">{formatCurrency(totalIncomes)}</p>
-                    </div>
+                <div className="bg-white p-5 rounded-lg shadow-md text-center border border-green-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Ingresos Totales</h3>
+                    <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncomes)}</p>
                 </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                        <Icon name="arrow-down-right" className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Egresos Totales</h3>
-                        <p className="text-2xl font-extrabold text-rose-600 tracking-tight mt-0.5">{formatCurrency(totalExpenses)}</p>
-                    </div>
+                <div className="bg-white p-5 rounded-lg shadow-md text-center border border-red-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Egresos Totales</h3>
+                    <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
                 </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl ${balance >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0`}>
-                        <Icon name="dollar-sign" className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Saldo Disponible</h3>
-                        <p className={`text-2xl font-extrabold tracking-tight mt-0.5 ${balance >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
-                            {formatCurrency(balance)}
-                        </p>
-                    </div>
+                 <div className="bg-white p-5 rounded-lg shadow-md text-center border border-blue-200">
+                    <h3 className="text-sm font-semibold text-gray-500">Saldo Actual</h3>
+                    <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{formatCurrency(balance)}</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm h-88 flex flex-col">
-                    <h3 className="text-base font-bold text-slate-800 tracking-tight mb-4 pb-2 border-b border-slate-100">Distribución de Egresos por Categoría</h3>
-                    <div className="flex-1 min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={chartData.expenseByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} label>
-                                    {chartData.expenseByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                                </Pie>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                <Legend wrapperStyle={{fontSize: "12px"}}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Distribución de Egresos por Categoría</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie data={chartData.expenseByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                {chartData.expenseByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend wrapperStyle={{fontSize: "12px"}}/>
+                        </PieChart>
+                    </ResponsiveContainer>
                 </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm h-88 flex flex-col">
-                    <h3 className="text-base font-bold text-slate-800 tracking-tight mb-4 pb-2 border-b border-slate-100">Comparativa Ingresos vs. Gastos (6 Meses)</h3>
-                    <div className="flex-1 min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData.monthlyData.slice(-6)} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="name" fontSize={12} stroke="#94a3b8" />
-                                <YAxis fontSize={12} stroke="#94a3b8" tickFormatter={(value) => new Intl.NumberFormat('es-CO', { notation: 'compact', compactDisplay: 'short' }).format(value as number)}/>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                <Legend wrapperStyle={{fontSize: "12px"}}/>
-                                <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                 <div className="bg-white p-6 rounded-lg shadow-md h-80 flex flex-col">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos vs. Gastos</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData.monthlyData.slice(-6)} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" fontSize={12} />
+                            <YAxis fontSize={12} tickFormatter={(value) => new Intl.NumberFormat('es-CO', { notation: 'compact', compactDisplay: 'short' }).format(value as number)}/>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend wrapperStyle={{fontSize: "12px"}}/>
+                            <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
+                            <Bar dataKey="gastos" name="Gastos" fill="#ef4444" />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
         </div>
@@ -512,78 +463,69 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
         const columns = ['Descripción', 'Categoría', 'Fecha', 'Monto'];
         
         return (
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-100 bg-slate-50/50">
-                     <div className="flex items-center gap-3">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b">
+                     <div className="flex items-center gap-4">
                         <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept=".xlsx, .xls" />
-                        <button onClick={handleDownloadTemplate} className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
-                            Plantilla Excel
-                        </button>
-                        <button onClick={handleUploadClick} disabled={isUploading} className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs hover:bg-slate-50 transition-colors disabled:opacity-50">
+                        <button onClick={handleDownloadTemplate} className="text-sm font-medium text-blue-600 hover:underline">Descargar Plantilla</button>
+                        <button onClick={handleUploadClick} disabled={isUploading} className="text-sm font-medium text-blue-600 hover:underline disabled:text-gray-400">
                             {isUploading ? 'Cargando...' : 'Cargar Archivo'}
                         </button>
-                        {feedbackMessage && <p className={`text-xs font-medium ${feedbackMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>{feedbackMessage.text}</p>}
+                        {feedbackMessage && <p className={`text-sm ${feedbackMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{feedbackMessage.text}</p>}
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar registros..." />
-                        <button onClick={handleRefresh} className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors" aria-label="Refrescar datos">
+                    <div className="flex items-center gap-2">
+                        <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Buscar..." />
+                        <button onClick={handleRefresh} className="p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100" aria-label="Refrescar datos">
                             <Icon name="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Todos los Ingresos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de ingresos de forma permanente.', onConfirm: handleDeleteAllIncomes } : { title: 'Eliminar Todos los Gastos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de gastos de forma permanente.', onConfirm: handleDeleteAllExpenses })} className="px-3 py-2 bg-rose-50 text-rose-700 rounded-xl font-semibold text-xs hover:bg-rose-100 transition-colors">
-                            Vaciar
-                        </button>
-                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(null) : handleOpenExpenseModal(null)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all">
-                            <Icon name="plus" className="w-3.5 h-3.5" />
+                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Todos los Ingresos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de ingresos de forma permanente.', onConfirm: handleDeleteAllIncomes } : { title: 'Eliminar Todos los Gastos', message: '¿ESTÁS SEGURO? Esta acción eliminará TODOS los registros de gastos de forma permanente.', onConfirm: handleDeleteAllExpenses })} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md font-semibold text-xs hover:bg-red-200">Eliminar Todos</button>
+                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(null) : handleOpenExpenseModal(null)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold text-xs flex items-center gap-1">
                             Agregar {type === 'income' ? 'Ingreso' : 'Egreso'}
                         </button>
                     </div>
                 </div>
                  <div className="md:hidden space-y-3 p-4">
                     {data.map((item: any) => (
-                      <div key={item.id} className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <p className="font-semibold text-slate-900 text-sm truncate flex-1">{item.description}</p>
-                          <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-700 flex-shrink-0">{item.category}</span>
+                      <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-gray-900 text-sm truncate flex-1">{item.description}</p>
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 flex-shrink-0">{item.category}</span>
                         </div>
-                        <p className="text-xs text-slate-400 mb-3">{item.date}</p>
-                        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                          <p className={`text-base font-extrabold tracking-tight ${type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(item.amount)}</p>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl py-1.5 px-3 transition-colors">Editar</button>
-                            <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl py-1.5 px-3 transition-colors">Eliminar</button>
+                        <p className="text-xs text-gray-500 mb-3">{item.date}</p>
+                        <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                          <p className={`text-base font-bold ${type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(item.amount)}</p>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 px-3 transition-colors">Editar</button>
+                            <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg py-2 px-3 transition-colors">Eliminar</button>
                           </div>
                         </div>
                       </div>
                     ))}
                     {data.length === 0 && (
-                      <div className="text-center py-12 text-slate-400">
-                        <Icon name="dollarSign" className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                        <p className="text-sm font-medium">No se encontraron {type === 'income' ? 'ingresos' : 'gastos'}</p>
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon name="dollarSign" className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-sm">No se encontraron {type === 'income' ? 'ingresos' : 'gastos'}</p>
                       </div>
                     )}
                  </div>
                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-sm text-left text-slate-600">
-                        <thead className="text-xs text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
-                                {columns.map(col => <th key={col} scope="col" className="px-6 py-3.5 font-semibold">{col}</th>)}
-                                <th scope="col" className="px-6 py-3.5 text-right font-semibold">Acciones</th>
+                                {columns.map(col => <th key={col} scope="col" className="px-6 py-3">{col}</th>)}
+                                <th scope="col" className="px-6 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody>
                             {data.map((item: any) => (
-                                <tr key={item.id} className="bg-white hover:bg-slate-50/70 transition-colors">
-                                    <td className="px-6 py-4 font-semibold text-slate-800">{item.description}</td>
-                                    <td className="px-6 py-4">
-                                        <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-700">
-                                            {item.category}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-500">{item.date}</td>
-                                    <td className={`px-6 py-4 font-bold ${type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(item.amount)}</td>
+                                <tr key={item.id} className="bg-white border-b hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-medium text-gray-900">{item.description}</td>
+                                    <td className="px-6 py-4">{item.category}</td>
+                                    <td className="px-6 py-4">{item.date}</td>
+                                    <td className="px-6 py-4 font-semibold">{formatCurrency(item.amount)}</td>
                                     <td className="px-6 py-4 text-right space-x-2">
-                                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="font-semibold text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">Editar</button>
-                                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="font-semibold text-xs text-rose-600 hover:text-rose-800 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors">Eliminar</button>
+                                        <button onClick={() => type === 'income' ? handleOpenIncomeModal(item) : handleOpenExpenseModal(item)} className="font-medium text-blue-600 hover:underline">Editar</button>
+                                        <button onClick={() => setConfirmAction(type === 'income' ? { title: 'Eliminar Ingreso', message: '¿Seguro que quieres eliminar este ingreso?', onConfirm: () => handleDeleteIncome(item.id) } : { title: 'Eliminar Gasto', message: '¿Seguro que quieres eliminar este gasto?', onConfirm: () => handleDeleteExpense(item.id) })} className="font-medium text-red-600 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
                             ))}
@@ -596,25 +538,22 @@ const FinanzasView: React.FC<FinanzasViewProps> = ({ userProfile }) => {
     
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-2xl w-fit">
-                {Object.values(FinanzasTab).map(tab => {
-                    const isSelected = activeTab === tab;
+            <div className="mb-4 border-b border-gray-200">
+                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                  {Object.values(FinanzasTab).map(tab => {
                     const subtabId = 'subtab-finanzas-' + tab.toLowerCase().replace(/[áéíóú]/g, c => ({'á':'a','é':'e','í':'i','ó':'o','ú':'u'})[c] || c);
                     return (
-                        <button
-                          key={tab}
-                          id={subtabId}
-                          onClick={() => setActiveTab(tab)}
-                          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                            isSelected 
-                              ? 'bg-white text-blue-600 shadow-xs' 
-                              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                          }`}
-                        >
-                          {tab}
-                        </button>
+                    <button
+                      key={tab}
+                      id={subtabId}
+                      onClick={() => setActiveTab(tab)}
+                      className={`${ activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
+                    >
+                      {tab}
+                    </button>
                     );
-                })}
+                  })}
+                </nav>
             </div>
             
             {isLoading ? (

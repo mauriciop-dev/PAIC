@@ -2,23 +2,14 @@
   "name": "paic-monorepo",
   "private": true,
   "version": "0.0.0",
-  "dependencies": {
-    "lucide-react": "^1.49.0",
-    "vite": "^6.2.0"
-  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:webapp": "pnpm --filter webapp dev",
-    "dev:marketing": "pnpm --filter marketing dev",
-    "dev:usuarios": "pnpm --filter usuarios dev",
-    "dev:docs": "pnpm --filter docs dev",
-    "build:all": "pnpm -r build",
-    "build:webapp": "pnpm --filter webapp build",
-    "build:marketing": "pnpm --filter marketing build",
-    "build:usuarios": "pnpm --filter usuarios build",
-    "build:docs": "pnpm --filter docs build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "types": "pnpm -r types"
+    "dev": "npm run dev --workspace=apps/webapp",
+    "build": "npm run build --workspace=apps/webapp",
+    "test": "npm run test --workspace=apps/webapp"
   },
   "devDependencies": {
     "supabase": "^2.115.0",
@@ -26,6 +17,5 @@
   },
   "engines": {
     "node": "22.x"
-  },
-  "packageManager": "pnpm@9.12.0"
+  }
 }

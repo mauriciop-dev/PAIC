@@ -26,7 +26,6 @@ export default defineConfig(({ mode }) => {
           '@paic/supabase': path.resolve(currentDir, '../../packages/supabase'),
           '@paic/config': path.resolve(currentDir, '../../packages/config'),
           '@paic/analytics': path.resolve(currentDir, '../../packages/analytics'),
-          '@paic/design-tokens': path.resolve(currentDir, '../../packages/design-tokens'),
         }
       },
       test: {

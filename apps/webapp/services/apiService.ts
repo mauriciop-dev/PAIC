@@ -497,13 +497,13 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addVisitorLog(conjuntoId: string, log: Omit<T.VisitorLog, 'id'>) {
-    const { data, error } = await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId }).select().single();
+    const { error } = await supabase.from('visitor_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId });
     if (error) {
       console.error('Error adding visitor log:', error);
       throw error;
     }
     
-    // Notificación de autorización de visitante (email)
+    // Notificación de autorización de visitante
     const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment);
     const info = await this.fetchConjuntoInfo(conjuntoId);
     if (resident && info) {
@@ -517,7 +517,6 @@ export const apiService = {
         `;
         this.sendCommunicationEmail([resident.email], 'Autorización de Visitante', content, [], info.adminName, info.adminEmail);
     }
-    return data;
   },
   async updateVisitorLog(conjuntoId: string, id: number, updates: Partial<Omit<T.VisitorLog, 'id'>>) {
     const { error } = await supabase.from('visitor_logs').update(toSupabase(updates)).eq('conjunto_id', conjuntoId).eq('id', id);
@@ -552,10 +551,10 @@ export const apiService = {
     return data ? fromSupabase(data) : [];
   },
   async addPackageLog(conjuntoId: string, log: Partial<T.PackageLog>) {
-    const { data, error } = await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' }).select().single();
+    const { error } = await supabase.from('package_logs').insert({ ...toSupabase(log), conjunto_id: conjuntoId, status: 'En recepción' });
     if (error) throw error;
 
-    // Notificación de recepción de paquete (email)
+    // Notificación de recepción de paquete
     const resident = await this.fetchResidentByApartment(conjuntoId, log.apartment!);
     const info = await this.fetchConjuntoInfo(conjuntoId);
     if (resident && info) {
@@ -570,7 +569,6 @@ export const apiService = {
         `;
         this.sendCommunicationEmail([resident.email], 'Nuevo Paquete en Recepción', content, [], info.adminName, info.adminEmail);
     }
-    return data;
   },
   async updatePackageLogStatus(conjuntoId: string, id: number, status: T.PackageLog['status']) {
     const { error } = await supabase.from('package_logs').update({ status }).eq('conjunto_id', conjuntoId).eq('id', id);
@@ -795,36 +793,6 @@ export const apiService = {
     return data as { role: 'user' | 'model'; content: string }[];
   },
   
-  // --- Push Notifications ---
-  async sendPushNotification(input: {
-    conjuntoId: string;
-    apartment: string;
-    title: string;
-    body: string;
-    type: 'porteria' | 'comunicado' | 'documento' | 'reglamento' | 'evento';
-    resourceId: string;
-    url: string;
-  }): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data, error } = await supabase.functions.invoke('send-push-notification', {
-        body: {
-          conjunto_id: input.conjuntoId,
-          apartment: input.apartment,
-          title: input.title,
-          body: input.body,
-          type: input.type,
-          resource_id: input.resourceId,
-          url: input.url,
-        },
-      });
-      if (error) throw error;
-      return { success: true, error: data?.error };
-    } catch (err: any) {
-      console.error('Error sending push notification:', err);
-      return { success: false, error: err.message };
-    }
-  },
-
   // --- Communications ---
   async sendMassEmail(conjuntoId: string, group: string, subject: string, body: string): Promise<{message: string}> {
       const info = await this.fetchConjuntoInfo(conjuntoId);

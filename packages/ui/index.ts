@@ -26,14 +26,5 @@ export type { AvatarProps, AvatarSize, AvatarGroupProps } from './Avatar';
 export { ProgressRing } from './ProgressRing';
 export type { ProgressRingProps } from './ProgressRing';
 
-export { Switch } from './Switch';
-export type { SwitchProps } from './Switch';
-
 export { SearchBar } from './SearchBar';
 export type { SearchBarProps } from './SearchBar';
-
-export { BottomSheet } from './BottomSheet';
-export type { BottomSheetProps } from './BottomSheet';
-
-export { BottomNav } from './BottomNav';
-export type { BottomNavProps, NavItem } from './BottomNav';
