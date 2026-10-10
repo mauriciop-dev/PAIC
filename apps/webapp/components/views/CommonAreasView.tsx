@@ -3,6 +3,7 @@ import { apiService } from '../../services/apiService';
 import { CommonArea, UserProfile, Reservation } from '../../types';
 import BookingModal from '../BookingModal';
 import { Icon } from '@paic/ui';
+import { notifyPwaResidents } from '../../utils/notifications';
 
 const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -143,6 +144,16 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
     try {
         await apiService.addReservation(userProfile.conjuntoId, reservation);
         setIsBookingModalOpen(false);
+        
+        // Send push notification to residents about new reservation
+        await notifyPwaResidents({
+            conjuntoId: userProfile.conjuntoId,
+            tipo: 'reserva',
+            titulo: `Nueva reserva: ${reservation.residentName || reservation.apartment}`,
+            cuerpo: `Reserva para ${reservation.commonAreaId ? commonAreas.find(area => area.id === reservation.commonAreaId)?.name || 'un área común'} el ${reservation.date} de ${reservation.startTime} a ${reservation.endTime}`,
+            userId: null // Send to all residents in the conjunto
+        });
+        
         fetchData();
     } catch (error) {
         console.error("Failed to save reservation:", error);

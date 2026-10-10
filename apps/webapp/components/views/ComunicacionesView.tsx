@@ -5,6 +5,7 @@ import { Icon } from '@paic/ui';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
 import CommunicationRecipientModal, { RecipientSelection } from '../CommunicationRecipientModal';
+import { notifyPwaResidents } from '../../utils/notifications';
 import {
     getGoogleDrivePreviewUrl,
     isGoogleDriveFileUrl,
@@ -186,6 +187,15 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                 setAttachments([]);
                 setScheduledAt('');
                 setScheduleMode('now');
+                
+                // Send push notification for scheduled communication
+                await notifyPwaResidents({
+                    conjuntoId: conjuntoInfo.id,
+                    tipo: 'comunicado',
+                    titulo: subject,
+                    cuerpo: body,
+                    userId: null // Send to all residents in the conjunto
+                });
                 return;
             }
 
@@ -199,6 +209,15 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
                 setSelectedApartments([]);
                 setRecipientSelection({ audience: 'manual', apartments: [], emails: [], emailsByApartment: {} });
                 setAttachments([]);
+                
+                // Send push notification to residents
+                await notifyPwaResidents({
+                    conjuntoId: conjuntoInfo.id,
+                    tipo: 'comunicado',
+                    titulo: subject,
+                    cuerpo: body,
+                    userId: null // Send to all residents in the conjunto
+                });
             } else {
                 throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
             }

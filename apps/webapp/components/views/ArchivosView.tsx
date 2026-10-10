@@ -3,6 +3,7 @@ import { ConjuntoInfo, UserProfile, StoredFile } from '../../types';
 import { apiService } from '../../services/apiService';
 import ConfirmModal from '../ConfirmModal';
 import { Icon } from '@paic/ui';
+import { notifyPwaResidents } from '../../utils/notifications';
 
 interface ArchivosViewProps {
   userProfile: UserProfile;
