@@ -35,7 +35,7 @@ export async function subscribeToPush(userId: string) {
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    throw new Error('El permiso de notificaciones fue denegado.');
+    throw new Error('El permiso de notificaciones fue denegado en el navegador.');
   }
 
   const registration = await navigator.serviceWorker.ready;
@@ -45,13 +45,21 @@ export async function subscribeToPush(userId: string) {
   });
 
   const json = subscription.toJSON();
-  const { error } = await supabase.from('pwa_push_subscriptions').upsert({
+  const pushData = {
     user_id: userId,
     endpoint: json.endpoint,
+    p256dh: json.keys?.p256dh || '',
+    auth: json.keys?.auth || '',
     subscription: json,
     updated_at: new Date().toISOString()
-  }, { onConflict: 'endpoint' });
+  };
 
+  // Upsert into push_subscriptions (user's Supabase table) with fallback to pwa_push_subscriptions
+  let { error } = await supabase.from('push_subscriptions').upsert(pushData, { onConflict: 'endpoint' });
+  if (error) {
+    const res = await supabase.from('pwa_push_subscriptions').upsert(pushData, { onConflict: 'endpoint' });
+    error = res.error;
+  }
   if (error) throw error;
 }
 
@@ -60,6 +68,7 @@ export async function unsubscribeFromPush(userId: string) {
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return;
+  await supabase.from('push_subscriptions').delete().eq('user_id', userId).eq('endpoint', subscription.endpoint);
   await supabase.from('pwa_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', subscription.endpoint);
   await subscription.unsubscribe();
 }
