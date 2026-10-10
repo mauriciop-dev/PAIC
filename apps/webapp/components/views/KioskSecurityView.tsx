@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@paic/ui";
 import { apiService } from "../../services/apiService";
+import { notifyNewPackage, notifyNewVisitor } from "../../services/pwaPushService";
 import {
   EstacionSession,
   VigilanteSession,
@@ -206,6 +207,7 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         console.warn("Fallback to standard addVisitorLog:", rpcErr);
         await apiService.addVisitorLog(stationSession.conjunto_id, payload);
       }
+      await notifyNewVisitor(stationSession.conjunto_id, visitorApartment.trim(), visitorName.trim());
 
       setVisitorName("");
       setVisitorFeedback("✅ Visitante registrado y autorizado en bitácora.");
@@ -277,6 +279,7 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         console.warn("Fallback to standard addPackageLog:", rpcErr);
         await apiService.addPackageLog(stationSession.conjunto_id, payload);
       }
+      await notifyNewPackage(stationSession.conjunto_id, pkgApartment.trim(), pkgCourier.trim());
 
       setPkgCourier("");
       setPkgTracking("");

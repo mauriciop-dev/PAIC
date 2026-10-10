@@ -4,6 +4,7 @@ import { ConjuntoInfo, UserProfile } from '../../types';
 import { Icon } from '@paic/ui';
 import { geminiService } from '../../services/geminiService';
 import { apiService } from '../../services/apiService';
+import { notifyNewCommunication } from '../../services/pwaPushService';
 import CommunicationRecipientModal, { RecipientSelection } from '../CommunicationRecipientModal';
 import {
     getGoogleDrivePreviewUrl,
@@ -192,6 +193,7 @@ const handleRemoveRecipient = (recipientToRemove: string) => {
             const result = await apiService.sendCommunicationEmail(recipients, subject, body, attachmentLinks, conjuntoInfo.adminName, conjuntoInfo.adminEmail);
             
             if (result.success) {
+                await notifyNewCommunication(conjuntoInfo.id, subject);
                 setFeedback({type: 'success', text: `¡Correo enviado exitosamente a ${recipients.length} destinatario(s)!`});
                 setSubject('');
                 setBody('');
