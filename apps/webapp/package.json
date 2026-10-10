@@ -17,6 +17,7 @@
     "marked": "13.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-is": "^18.3.1",
     "recharts": "^3.3.0",
     "@paic/ui": "*",
     "@paic/types": "*",
