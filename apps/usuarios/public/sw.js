@@ -1,4 +1,4 @@
-const CACHE = 'paic-usuarios-v3';
+const CACHE = 'paic-usuarios-v4';
 self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/','/manifest.json','/logo-paic.png']))); self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (event) => {
@@ -12,7 +12,20 @@ self.addEventListener('fetch', (event) => {
   }).catch(() => caches.match(event.request)));
 });
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : { title: 'PAIC Residentes', body: 'Tienes una nueva actualización.' };
+  let data = { title: 'PAIC Residentes', body: 'Tienes una nueva actualización.', url: '/' };
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (e) {
+    try {
+      const text = event.data ? event.data.text() : '';
+      if (text) data = { title: 'PAIC Residentes', body: text, url: '/' };
+    } catch (err) {
+      // ignore
+    }
+  }
+
   const payload = {
     title: data.title || 'PAIC Residentes',
     body: data.body || '',

@@ -8,14 +8,14 @@ import './App.css';
 
 const NavTabs = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
-  { id: 'reservas', label: 'Reservas', icon: 'calendar' },
+  { id: 'reservas', label: 'Reservas', icon: 'calendar', badgeKey: 'reservas' },
   { id: 'comunicados', label: 'Noticias', icon: 'mail' },
   { id: 'cuenta', label: 'Cuenta', icon: 'dollarSign' },
-  { id: 'pqrs', label: 'PQRs', icon: 'message-square' },
+  { id: 'pqrs', label: 'PQRs', icon: 'message-square', badgeKey: 'pqrs' },
   { id: 'documentos', label: 'Docs', icon: 'file-text' },
   { id: 'directorio', label: 'Contactos', icon: 'phone' },
   { id: 'votaciones', label: 'Votos', icon: 'checkSquare' },
-  { id: 'paquetes', label: 'Paquetes', icon: 'package' },
+  { id: 'paquetes', label: 'Paquetes', icon: 'package', badgeKey: 'paquetes' },
   { id: 'visitantes', label: 'Visitas', icon: 'user-plus' },
   { id: 'perfil', label: 'Perfil', icon: 'user' },
 ];
@@ -70,6 +70,12 @@ export default function UsuariosApp() {
   if (authLoading) return <div className="min-h-screen grid place-items-center bg-gray-50 text-gray-600">Validando tu acceso…</div>;
   if (!user) return registrationMode ? <RegistrationScreen conjuntoId={registrationConjunto} userEmail={authError?.startsWith('AUTH:') ? authError.slice(5) : ''} onSubmitted={() => setAuthError('Tu solicitud fue enviada y está pendiente de aprobación.')} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} error={authError} /> : <LoginScreen error={authError} onLogin={() => void signInWithGoogle().catch((error) => setAuthError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.'))} />;
 
+  const counts: Record<string, number> = {
+    reservas: pwaData?.reservations.filter(r => r.status === 'pendiente').length || 0,
+    pqrs: pwaData?.pqrs.filter(p => p.status === 'respondido').length || 0,
+    paquetes: pwaData?.packages.filter(p => p.status !== 'Entregado').length || 0,
+  };
+
   const renderTab = () => {
     switch (activeTab) {
       case 'inicio':
@@ -84,12 +90,22 @@ export default function UsuariosApp() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-6 text-center" hover onClick={() => setActiveTab('reservas')}>
+              <Card className="p-6 text-center relative" hover onClick={() => setActiveTab('reservas')}>
+                {counts.reservas > 0 && (
+                  <span className="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white font-bold">
+                    {counts.reservas}
+                  </span>
+                )}
                 <Icon name="calendar" className="w-12 h-12 text-blue-600 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold text-gray-900">Mis Reservas</h3>
                 <p className="text-gray-500 text-sm mt-1">Ver y gestionar tus reservas</p>
               </Card>
-              <Card className="p-6 text-center" hover onClick={() => setActiveTab('paquetes')}>
+              <Card className="p-6 text-center relative" hover onClick={() => setActiveTab('paquetes')}>
+                {counts.paquetes > 0 && (
+                  <span className="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white font-bold">
+                    {counts.paquetes}
+                  </span>
+                )}
                 <Icon name="package" className="w-12 h-12 text-amber-600 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold text-gray-900">Paquetes</h3>
                 <p className="text-gray-500 text-sm mt-1">Revisar paquetes recibidos</p>
@@ -240,12 +256,19 @@ export default function UsuariosApp() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center gap-1 flex-1 min-h-[48px] transition-colors ${
+              className={`flex flex-col items-center gap-1 flex-1 min-h-[48px] transition-colors relative ${
                 activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'
               }`}
               aria-current={activeTab === tab.id ? 'page' : undefined}
             >
-              <Icon name={tab.icon} className={`w-6 h-6 ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'}`} />
+              <div className="relative">
+                <Icon name={tab.icon} className={`w-6 h-6 ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500'}`} />
+                {tab.badgeKey && counts[tab.badgeKey] > 0 && (
+                  <span className="absolute -top-1 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold">
+                    {counts[tab.badgeKey]}
+                  </span>
+                )}
+              </div>
               <span className="text-[11px] font-medium">{tab.label}</span>
             </button>
           ))}

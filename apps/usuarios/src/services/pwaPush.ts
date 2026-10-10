@@ -23,15 +23,35 @@ function decodeKey(value: string) {
 }
 
 export async function subscribeToPush(userId: string) {
-  if (!supabase || !vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    throw new Error('Las notificaciones Push no están configuradas en este entorno.');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Este dispositivo no soporta notificaciones Push.');
   }
+  if (!vapidPublicKey) {
+    throw new Error('Falta configurar la variable VITE_VAPID_PUBLIC_KEY en Vercel.');
+  }
+  if (!supabase) {
+    throw new Error('Supabase no está configurado.');
+  }
+
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') throw new Error('El permiso de notificaciones fue rechazado.');
+  if (permission !== 'granted') {
+    throw new Error('El permiso de notificaciones fue denegado.');
+  }
+
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey) });
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: decodeKey(vapidPublicKey)
+  });
+
   const json = subscription.toJSON();
-  const { error } = await supabase.from('pwa_push_subscriptions').upsert({ user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() }, { onConflict: 'endpoint' });
+  const { error } = await supabase.from('pwa_push_subscriptions').upsert({
+    user_id: userId,
+    endpoint: json.endpoint,
+    subscription: json,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'endpoint' });
+
   if (error) throw error;
 }
 
