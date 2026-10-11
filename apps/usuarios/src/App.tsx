@@ -209,7 +209,7 @@ export default function UsuariosApp() {
             </Card>
             <Card className="p-4">
               <h3 className="font-semibold text-gray-900 mb-4">Notificaciones</h3>
-              <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(error instanceof Error ? error.message : 'No se pudieron activar las notificaciones', 'error'))}>Activar notificaciones Push</Button>
+              <Button variant="outline" onClick={() => void subscribeToPush(user.id).then(() => addToast('Notificaciones activadas', 'success')).catch(error => addToast(`Error: ${error instanceof Error ? error.message : String(error)}`, 'error'))}>Activar notificaciones Push</Button>
               <div className="space-y-3">
                 {['Nuevos paquetes', 'Recordatorio de reservas', 'Alertas de seguridad', 'Comunicaciones de la administración'].map((n, i) => (
                   <label key={i} className="flex items-center gap-3 cursor-pointer">
