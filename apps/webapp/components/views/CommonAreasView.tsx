@@ -150,7 +150,7 @@ const CommonAreasView: React.FC<CommonAreasViewProps> = ({ userProfile }) => {
             conjuntoId: userProfile.conjuntoId,
             tipo: 'reserva',
             titulo: `Nueva reserva: ${reservation.residentName || reservation.apartment}`,
-            cuerpo: `Reserva para ${reservation.commonAreaId ? commonAreas.find(area => area.id === reservation.commonAreaId)?.name || 'un área común'} el ${reservation.date} de ${reservation.startTime} a ${reservation.endTime}`,
+            cuerpo: `Reserva para ${reservation.commonAreaId ? 'área conocida' : 'un área común'} el ${reservation.date} de ${reservation.startTime} a ${reservation.endTime}`,
             userId: null // Send to all residents in the conjunto
         });
         

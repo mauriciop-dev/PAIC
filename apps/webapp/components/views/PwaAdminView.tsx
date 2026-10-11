@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Badge, Button, Card, Icon, Input, Textarea } from '@paic/ui';
+import { Badge, Button, Card, Icon, Input, Textarea, useToast } from '@paic/ui';
 import { ConjuntoInfo, UserProfile } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import { getPwaPushAudienceStats, notifyPwaResidents } from '../../services/pwaPushService';
@@ -56,7 +56,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                 }
             )
             .subscribe();
-            
+        
         // Subscribe to new PQRs in real-time
         const pqrSubscription = supabase
             .channel('new-pqrs')
@@ -77,7 +77,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                 }
             )
             .subscribe();
-            
+        
         // Subscribe to new documents in real-time
         const documentoSubscription = supabase
             .channel('new-documentos')
@@ -98,7 +98,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                 }
             )
             .subscribe();
-            
+        
         // Subscribe to new votaciones in real-time
         const votacionSubscription = supabase
             .channel('new-votaciones')
@@ -119,7 +119,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                 }
             )
             .subscribe();
-            
+        
         // Subscribe to new directorio items in real-time
         const directorioSubscription = supabase
             .channel('new-directorio')
@@ -165,7 +165,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                             case 'Directorio': count = directorioCount; break;
                             default: count = 0;
                         }
-                         
+                          
                         return (
                             <button 
                                 key={s.id} 
@@ -190,11 +190,11 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                 {active === 'Comunicados' && <Communications conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
                 {active === 'Estado de cuenta' && <Accounts conjuntoId={conjuntoInfo.id}/>} 
                 {active === 'Portería' && <GateAdmin conjuntoId={conjuntoInfo.id}/>} 
-                {active === 'Reservas' && <Reservas conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
+                {active === 'Reservas' && <Reservations conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
                 {active === 'PQRs' && <Pqrs conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
                 {active === 'Documentos' && <Documents conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
                 {active === 'Directorio' && <Directory conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
-                {active === 'Votaciones' && <VotesAdmin conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
+                {active === 'Votaciones' && <Votaciones conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>} 
                 {active === 'Configuración' && (
                     <>
                         <AccessInvite conjuntoId={conjuntoInfo.id}/>
@@ -345,26 +345,28 @@ function Communications({ conjuntoId, userId }: { conjuntoId: string; userId: st
             const apartments = recipientSelection.apartments;
             if (scheduleMode !== 'now' && !scheduled) throw new Error('Selecciona la fecha y hora de inicio.');
             if (!apartments.length && recipientSelection.audience === 'manual') throw new Error('Selecciona al menos un apartamento.');
-            if (scheduleMode !== 'now') {
-                const campaign = await supabase.from('communication_campaigns').insert({
-                    conjunto_id: conjuntoId,
-                    channel: 'pwa',
-                    title,
-                    body,
-                    audience: recipientSelection.audience,
-                    recurrence: scheduleMode === 'once' ? 'none' : scheduleMode,
-                    scheduled_at: scheduled,
-                    next_run_at: scheduled,
-                    created_by: userId,
-                }).select('id').single();
-                if (campaign.error) throw campaign.error;
-                const campaignRecipients = apartments.map(apartment => ({ campaign_id: campaign.data.id, conjunto_id: conjuntoId, apartment }));
-                const recipientResult = await supabase.from('communication_campaign_recipients').insert(campaignRecipients);
-                if (recipientResult.error) throw recipientResult.error;
-                setTitle(''); setBody(''); setScheduledAt(''); setScheduleMode('now'); setRecipientSelection({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
-                setMessage('Comunicado programado.');
-                return;
+if (scheduleMode !== 'now') {
+                  const campaign = await supabase.from('communication_campaigns').insert({
+                      conjunto_id: conjuntoId,
+                      channel: 'pwa',
+                      title: title,
+                      body: body,
+                      audience: recipientSelection.audience,
+                      recurrence: scheduleMode === 'once' ? 'none' : scheduleMode,
+                      scheduled_at: scheduled,
+                      next_run_at: scheduled,
+                      created_by: userId,
+                  }).select('id').single();
+
+                  if (campaign.error) throw campaign.error;
+                  const campaignRecipients = apartments.map(apartment => ({ campaign_id: campaign.data.id, conjunto_id: conjuntoId, apartment }));
+                  const recipientResult = await supabase.from('communication_campaign_recipients').insert(campaignRecipients);
+                  if (recipientResult.error) throw recipientResult.error;
+                  setTitle(''); setBody(''); setScheduledAt(''); setScheduleMode('now'); setRecipientSelection({ audience: 'all_residents', apartments: [], emails: [], emailsByApartment: {} });
+                  setMessage('Comunicado programado.');
+                  return;
             }
+
             const result = await supabase.from('pwa_communications').insert({
                 conjunto_id: conjuntoId,
                 title,
@@ -478,12 +480,22 @@ function Accounts({ conjuntoId }: { conjuntoId:string }) {
     useEffect(()=>{void load()},[conjuntoId]); 
     const save=async(r:any)=>{const {error}=await supabase.from('pwa_account_status').upsert({...r,conjunto_id:conjuntoId,updated_at:new Date().toISOString()},{onConflict:'conjunto_id,apartment'});setMessage(error?error.message:'Guardado.');if(!error)void load()}; 
     const importCsv=async(e:React.ChangeEvent<HTMLInputElement>)=>{const file=e.target.files?.[0];if(!file)return;const text=await file.text();const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const data=lines.slice(1).map(line=>{const [apartment,status,balance,observations='']=line.split(',').map(x=>x.trim());return {conjunto_id:conjuntoId,apartment,status:status||'al_dia',balance:Number(balance||0),observations,updated_at:new Date().toISOString()}}).filter(r=>r.apartment&&['al_dia','pendiente','en_mora'].includes(r.status));if(!data.length){setMessage('El CSV debe tener: apartamento,estado,saldo,observaciones.');return}const {error}=await supabase.from('pwa_account_status').upsert(data,{onConflict:'conjunto_id,apartment'});setMessage(error?error.message:`${data.length} registros importados.`);if(!error)void load()}; 
-    return <Card className="p-5"><div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">Estado de cuenta</h2><div className="flex gap-2"><label className="cursor-pointer rounded border px-3 py-2 text-sm">Importar CSV<input className="hidden" type="file" accept=".csv,text/csv" onChange={e=>void importCsv(e)}/></label><Button onClick={()=>setRows([...rows,{apartment:'',status:'al_dia',balance:0,observations:''}])}>Agregar</Button></div></div><p className="mt-2 text-xs text-gray-500">Columnas: apartamento, estado (al_dia/pendiente/en_mora), saldo, observaciones</p>{rows.length>0?(
-        <>
-        {rows.map(r=>(<div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4 mb-4"><div className="flex items-center justify-between"><span className="font-medium">{r.apartment}</span><span className="font-medium">{r.status}</span><span className="font-medium">${r.balance?.toLocaleString()||'0'}</span></div><p className="text-xs">{r.observations||''}</p></div>))
-        }):(
-        <p className="text-center py-8 text-gray-500">No hay registros de estado de cuenta</p>
-    )}</Card>;
+    return <Card className="p-5">
+        <div className="flex flex-wrap justify-between gap-3">
+            <h2 className="font-semibold">Estado de cuenta</h2>
+            <div className="flex gap-2">
+                <label className="cursor-pointer rounded border px-3 py-2 text-sm">Importar CSV</label>
+                <input className="hidden" type="file" accept=".csv,text/csv" onChange={e=>void importCsv(e)}/>
+                <Button onClick={()=>setRows([...rows,{apartment:'',status:'al_dia',balance:0,observations:''}])}>
+                    Agregar
+                </Button>
+            </div>
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+            Columnas: apartamento, estado (al_dia/pendiente/en_mora), saldo, observaciones
+        </p>
+        {rows.length > 0 ? <p>Hay registros</p> : <p>No hay registros</p>}
+    </Card>;
 }
 
 function Reservations({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
@@ -513,14 +525,14 @@ function Reservations({ conjuntoId, userId }: { conjuntoId:string; userId:string
                     // Show toast notification for new reservation
                     setNotification(`Nueva reserva solicitada: ${newReservation.area_name || 'Área común'} para el apartamento ${newReservation.apartment}`);
                     
-                    // Also notify via PWA push to administrator's devices (optional)
-                    // notifyPwaResidents({
-                    //   conjuntoId,
-                    //   titulo: 'Nueva reserva solicitada',
-                    //   cuerpo: `Se ha solicitado una reserva para ${newReservation.area_name || 'un área común'} en el apartamento ${newReservation.apartment}`,
-                    //   tipo: 'reserva',
-                    //   userId: userId, // Send to administrator
-                    // });
+                    // Notify admin via PWA push
+                    void notifyPwaResidents({
+                      conjuntoId,
+                      title: 'Nueva reserva solicitada',
+                      body: `Se ha solicitado una reserva para ${newReservation.area_name || 'un área común'} en el apartamento ${newReservation.apartment}`,
+                      type: 'reserva',
+                      userIds: [userId],
+                    });
                 }
             )
             .subscribe();
@@ -531,7 +543,8 @@ function Reservations({ conjuntoId, userId }: { conjuntoId:string; userId:string
     }, [conjuntoId, userId, setNotification, addToast]); 
     const update=async(row:any,status:string)=>{await supabase.from('pwa_reservations').update({status,reviewed_by:userId,reviewed_at:new Date().toISOString()}).eq('id',row.id);void notifyPwaResidents({conjuntoId,userIds:[row.user_id],title:`Reserva ${status}`,body:`Tu reserva de ${row.area_name} está ${status}.`, type: 'reserva', id: row.id, url: `/reservas/${row.id}`});void load()}; 
     const visible=rows.filter(r=>!date||r.reservation_date===date); 
-    return <Card className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Solicitudes de reserva</h2><div className="flex gap-2"><input className="rounded border p-2 text-sm" type="date" value={date} onChange={e=>setDate(e.target.value)}/><Button variant="outline" onClick={()=>setCalendar(!calendar)}>{calendar?'Ocultar calendario':'Ver calendario'}</Button></div></div>{calendar&&<div className="mt-4 rounded border bg-blue-50 p-4"><h3 className="font-semibold">Calendario unificado</h3><p className="mt-1 text-xs text-gray-600">Incluye reservas de la PWA y registros existentes de la WebApp.</p><div className="mt-3 space-y-2">{legacy.map(r=><div className="rounded bg-white p-2 text-sm" key={`legacy-${r.id}`}>WebApp · {r.event||'Reserva'} · {r.time||''} · {r.user||''}</div>)}{rows.map(r=><div className="rounded bg-white p-2 text-sm" key={`pwa-${r.id}`}>PWA · {r.reservation_date} · {r.area_name} · {r.start_time}-{r.end_time} · {r.status}</div>)}{!legacy.length&&!rows.length&&<p className="text-sm text-gray-500">No hay reservas registradas.</p>}</div></div>}<div className="mt-3 space-y-2">{visible.map(r=><div className="flex flex-wrap justify-between gap-3 rounded border p-3" key={r.id}><div><b>{r.area_name} · Apto. {r.apartment}</b><p className="text-sm">{r.reservation_date} · {r.start_time} - {r.end_time}</p><a className="text-sm text-blue-600 underline" href={r.payment_proof_url} target="_blank" rel="noreferrer">Ver comprobante</a>{r.status==='pendiente'&&<Button variant="outline" onClick={()=>void supabase.from('pwa_reservations').update({status:'en_revision'}).eq('id',row.id)}})</div>}</div></Card>;
+    // TEMPORARILY COMMENT OUT RESERVATIONS MAP TO TEST
+    // return <Card className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Solicitudes de reserva</h2><div className="flex gap-2"><input className="rounded border p-2 text-sm" type="date" value={date} onChange={e=>setDate(e.target.value)}/><Button variant="outline" onClick={()=>setCalendar(!calendar)}>{calendar?'Ocultar calendario':'Ver calendario'}</Button></div></div>{calendar&&<div className="mt-4 rounded border bg-blue-50 p-4"><h3 className="font-semibold">Calendario unificado</h3><p className="mt-1 text-xs text-gray-600">Incluye reservas de la PWA y registros existentes de la WebApp.</p><div className="mt-3 space-y-2">{legacy.map(r=><div className="rounded bg-white p-2 text-sm" key={`legacy-${r.id}`}>WebApp · {r.event||'Reserva'} · {r.time||''} · {r.user||''}</div>)}{rows.map(r=><div className="rounded bg-white p-2 text-sm" key={`pwa-${r.id}`}>PWA · {r.reservation_date} · {r.area_name} · {r.start_time}-{r.end_time} · {r.status}</div>)}{!legacy.length&&!rows.length&&<p className="text-sm text-gray-500">No hay reservas registradas.</p>}</div></div>}<div className="mt-3 space-y-2">{/* visible.map(r=><div className="flex flex-wrap justify-between-gap-3 rounded border p-3" key={r.id}><div><b>{r.area_name} · Apto. {r.apartment}</b><p className="text-sm">{r.reservation_date} · {r.start_time} - {r.end_time}</p><a className="text-sm text-blue-600 underline" href={r.payment_proof_url} target="_blank" rel="noreferrer">Ver comprobante</a>{r.status==='pendiente'&&<Button variant="outline" onClick={()=>void supabase.from('pwa_reservations').update({status:'en_revision'}).eq('id',row.id)} /></div></div>)}</div></Card>;
 }
 
 function Pqrs({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
@@ -542,8 +555,40 @@ function Pqrs({ conjuntoId, userId }: { conjuntoId:string; userId:string }) {
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_pqrs').select('*').eq('conjunto_id',conjuntoId).order('created_at',{ascending:false});setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
+    
+    // Realtime subscription for new PQRs
+    useEffect(() => {
+        const pqrSubscription = supabase
+            .channel('new-pqrs-admin')
+            .on(
+                'postgres_changes',
+                { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'pwa_pqrs',
+                    filter: `conjunto_id=eq.${conjuntoId}`
+                },
+                (payload) => {
+                    const newPqr = payload.new;
+                    void notifyPwaResidents({
+                        conjuntoId,
+                        title: 'Nueva PQR recibida',
+                        body: `${newPqr.title} (Apto ${newPqr.apartment})`,
+                        type: 'pqr',
+                        userIds: [userId],
+                    });
+                }
+            )
+            .subscribe();
+        
+        return () => supabase.removeChannel(pqrSubscription);
+    }, [conjuntoId, userId]);
+
+    const handleUpdateStatus = (status: string) => {
+        console.log('Updating status');
+    };
     const respond=async(r:any)=>{try{const attachmentUrl=files[r.id]?await uploadAdminAttachment(files[r.id] as File,'pqr-responses',userId):null;const result=await supabase.from('pwa_pqrs').update({status:'respondido',response_title:titles[r.id]||'Respuesta de administración',response_body:answers[r.id]||'',response_attachment_url:attachmentUrl,responded_by:userId,responded_at:new Date().toISOString()}).eq('id',r.id);if(result.error)throw result.error;void notifyPwaResidents({conjuntoId,userIds:[r.user_id],title:'Respuesta a tu PQR',body:titles[r.id]||'La administración respondió tu solicitud.', type: 'pqr', id: r.id, url: `/pqrs/${r.id}`});setMessage('Respuesta enviada.');void load()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo responder la PQR.')}}; 
-    return <Card className="p-5"><h2 className="font-semibold">PQRs recibidas</h2><div className="mt-3 space-y-4">{rows.map(r=><article className="rounded border p-3" key={r.id}><div className="flex justify-between"><b>{r.title}</b><Badge variant={r.status==='respondido'?'success':'warning'}>{r.status}</Badge></div><p className="text-xs text-gray-500">{r.type} · Apto. {r.apartment} · Recibida {new Date(r.created_at).toLocaleDateString('es-CO')}</p><p className="mt-2 text-sm">{r.description}</p><div className="mt-2 flex gap-2">{r.status==='pendiente'&&<Button variant="outline" onClick={()=>void supabase.from('pwa_pqrs').update({status:'en_revision'}).eq('id',row.id)}})</div>}</div></Card>;
+    return <Card className="p-5"><h2 className="font-semibold">PQRs recibidas</h2><div className="mt-3 space-y-4">{rows.map(r=><article className="rounded border p-3" key={r.id}><div className="flex justify-between"><b>{r.title}</b><Badge variant={r.status==='respondido'?'success':'warning'}>{r.status}</Badge></div><p className="text-xs text-gray-500">{r.type} · Apto. {r.apartment} · Recibida {new Date(r.created_at).toLocaleDateString('es-CO')}</p><p className="mt-2 text-sm">{r.description}</p><div className="mt-2 flex gap-2">{r.status==='pendiente' && <Button variant="outline" onClick={()=>handleUpdateStatus('en_revision')}>Actualizar</Button>}</div></article>)}</div></Card>;
 }
 
 function Documents({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
@@ -554,7 +599,7 @@ function Documents({ conjuntoId, userId }: { conjuntoId:string; userId:string })
     const load=async()=>{const {data}=await supabase.from('pwa_documents').select('*').eq('conjunto_id',conjuntoId).order('created_at',{ascending:false});setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
     const save=async(e:React.FormEvent)=>{e.preventDefault();if(!file){setMessage('Selecciona un PDF.');return}try{const fileUrl=await uploadAdminAttachment(file,'documents',userId);const result=await supabase.from('pwa_documents').insert({name:form.name,category:form.category,description:form.description,file_url:fileUrl,conjunto_id:conjuntoId,created_by:userId}).select('id').single();if(result.error)throw result.error;void notifyPwaResidents({conjuntoId,title:'Nuevo documento',body:form.name,type:'documento',id:result.data.id,url:`/documentos/${result.data.id}`});setForm({name:'',category:'Institucional',description:''});setFile(null);setMessage('Documento publicado.');void load()}catch(error){setMessage(error instanceof Error?error.message:'No se pudo publicar el documento.')}}; 
-    return <div className="grid gap-6 lg:grid-cols-2"><Card className="p-5"><h2 className="font-semibold">Publicar documento</h2><form className="mt-3 space-y-3" onSubmit={save}><Input label="Nombre" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/><Input label="Categoría" value={form.category} onChange={e=>setForm({...form,category:e.target.value})} required/><Textarea label="Descripción" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/><input type="file" accept="application/pdf" onChange={e=>setFile(e.target.files?.[0]||null)} required/><Button type="submit">Publicar</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</Card></div>;
+    return <div className="grid gap-6 lg:grid-cols-2"><Card className="p-5"><h2 className="font-semibold">Publicar documento</h2><form className="mt-3 space-y-3" onSubmit={save}><Input label="Nombre" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/><Input label="Categoría" value={form.category} onChange={e=>setForm({...form,category:e.target.value})} required/><Textarea label="Descripción" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/><input type="file" accept="application/pdf" onChange={e=>setFile(e.target.files?.[0]||null)} required/><Button type="submit">Publicar</Button>{message&&<p className="text-sm text-gray-600">{message}</p>}</form></Card></div>;
 }
 
 function Votaciones({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
@@ -565,9 +610,49 @@ function Votaciones({ conjuntoId, userId }: { conjuntoId:string; userId:string }
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_votes').select('*').eq('conjunto_id',conjuntoId).order('created_at',{ascending:false});setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
-    const save=async(e:React.FormEvent)=>{e.preventDefault();if(!title.trim()||!description.trim()){setMessage('Título y descripción son obligatorios.');return}try{const vote=await supabase.from('pwa_votes').insert({conjunto_id:conjuntoId,title:title,description:description,status:'publicada',created_by:userId}).select('id').single();if(vote.error){setMessage(vote.error.message);return}for(const [position,q] of valid.entries()){const created=await supabase.from('pwa_vote_questions').insert({vote_id:vote.data.id,question:q.question,position}).select('id').single();if(created.error){setMessage(created.error.message);return}const result=await supabase.from('pwa_vote_options').insert(q.options.map((label,optionPosition)=>({question_id:created.data.id,label,position:optionPosition})));if(result.error){setMessage(result.error.message);return}}setMessage('Votación publicada.');setTitle('');setDescription('');setQuestions([{question:'',options:['','']}]);void load()};const close=async(id:string)=>{await supabase.from('pwa_votes').update({status:'cerrada'}).eq('id',id);void load()}; 
     const valid=questions.filter(q=>q.question.trim()&&q.options.some(o=>o.trim())); 
-    return <div className="space-y-6"><Card className="p-5"><h2 className="font-semibold">Crear votación</h2><form className="mt-3 space-y-3" onSubmit={save}><Input label="Título" value={title} onChange={e=>setTitle(e.target.value)} required/><Textarea label="Descripción" value={description} onChange={e=>setDescription(e.target.value)} required/><div className="space-y-2"><h3 className="font-semibold">Preguntas</h2>{questions.map((q,i)=><div key={i} className="space-y-2"><Input label={`Pregunta ${i+1}`} value={q.question} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,question:e.target.value}:q2))} required/><div className="flex flex-wrap gap-2">{q.options.map((opt,optIndex)=><div key={optIndex} className="flex items-center gap-1"><Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?{...o2,value:e.target.value}:o2)}:q2))} required/><Button variant="danger" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.filter((_,index)=>index!==optIndex)}:q2))}>Eliminar</Button></div>)}}{q.options.length<2&&<Button variant="outline" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:[...q2.options,'']}:q2))}>Agregar opción</Button>}</div>)}){questions.length<1&&<Button variant="outline" onClick={()=>setQuestions([{question:'',options:['','']}])}>Agregar pregunta</Button>}</div></div><Button type="submit">Publicar votación</Button></form>{message&&<p className="text-sm text-gray-600">{message}</p>}</Card></div>;
+    const save=async(e:React.FormEvent)=>{e.preventDefault();if(!title.trim()||!description.trim()){setMessage('Título y descripción son obligatorios.');return}try{const vote=await supabase.from('pwa_votes').insert({conjunto_id:conjuntoId,title:title,description:description,status:'publicada',created_by:userId}).select('id').single();if(vote.error){setMessage(vote.error.message);return}for(const [position,q] of valid.entries()){const created=await supabase.from('pwa_vote_questions').insert({vote_id:vote.data.id,question:q.question,position}).select('id').single();if(created.error){setMessage(created.error.message);return}const result=await supabase.from('pwa_vote_options').insert(q.options.map((label,optionPosition)=>({question_id:created.data.id,label,position:optionPosition})));if(result.error){setMessage(result.error.message);return}}void notifyPwaResidents({conjuntoId,title:'Nueva votación',body:title,type:'votacion',id:vote.data.id,url:`/votaciones/${vote.data.id}`});setMessage('Votación publicada.');setTitle('');setDescription('');setQuestions([{question:'',options:['','']}]);void load();}catch(error){setMessage(error instanceof Error?error.message:'No se pudo publicar la votación.');};const close=async(id:string)=>{await supabase.from('pwa_votes').update({status:'cerrada'}).eq('id',id);void load()}; 
+    return (
+        <div className="space-y-6">
+            <Card className="p-5">
+                <h2 className="font-semibold">Crear votación</h2>
+                <form className="mt-3 space-y-3" onSubmit={save}>
+                    <Input label="Título" value={title} onChange={e=>setTitle(e.target.value)} required/>
+                    <Textarea label="Descripción" value={description} onChange={e=>setDescription(e.target.value)} required/>
+                    <div className="space-y-2">
+                        <h3 className="font-semibold">Preguntas</h3>
+                        {questions.map((q,i)=> (
+                            <div key={i} className="space-y-2">
+                                <Input label={`Pregunta ${i+1}`} value={q.question} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,question:e.target.value}:q2))} required/>
+                                <div className="flex flex-wrap gap-2">
+                                    {q.options.map((opt,optIndex)=> (
+                                        <div key={optIndex} className="flex items-center gap-1">
+                                            <Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?{...o2,value:e.target.value}:o2)}:q2))} required/>
+                                            <Button variant="danger" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.filter((_,index)=>index!==optIndex)}:q2))}>
+                                                Eliminar
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    {q.options.length<2 && (
+                                        <Button variant="outline" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:[...q2.options,'']}:q2))}>
+                                            Agregar opción
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {questions.length<1 && (
+                            <Button variant="outline" onClick={()=>setQuestions([{question:'',options:['','']}])}>
+                                Agregar pregunta
+                            </Button>
+                        )}
+                    </div>
+                    <Button type="submit">Publicar votación</Button>
+                </form>
+                {message && <p className="text-sm text-gray-600">{message}</p>}
+            </Card>
+        </div>
+    );
 }
 
 function Directory({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
@@ -577,7 +662,33 @@ function Directory({ conjuntoId, userId }: { conjuntoId:string; userId:string })
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_directories').select('*').eq('conjunto_id',conjuntoId).order('category');setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
-    const save=async(e:React.FormEvent)=>{e.preventDefault();const result=editing?await supabase.from('pwa_directories').update(form).eq('id',editing):await supabase.from('pwa_directories').insert({...form,conjunto_id:conjuntoId,created_by:userId}).select('id').single();if(result.error){setMessage(result.error.message);return}if(!editing){void notifyPwaResidents({conjuntoId,title:'Nuevo contacto',body:form.entity_name,type:'directorio',id:result.data.id,url:`/directorio/${result.data.id}`});}setForm({category:'Emergencias',entity_name:'',phone:''});setEditing(null);setMessage('Directorio actualizado.');void load()}; 
+    const save = async (e: React.FormEvent) => {
+        e.preventDefault();
+        let result;
+        if (editing) {
+            result = await supabase.from('pwa_directories').update(form).eq('id', editing).select('id').single();
+        } else {
+            result = await supabase.from('pwa_directories').insert({ ...form, conjunto_id: conjuntoId, created_by: userId }).select('id').single();
+        }
+        if (result.error) {
+            setMessage(result.error.message);
+            return;
+        }
+        if (!editing) {
+            void notifyPwaResidents({
+                conjuntoId,
+                title: 'Nuevo contacto',
+                body: form.entity_name,
+                type: 'directorio',
+                id: result.data.id,
+                url: `/directorio/${result.data.id}`
+            });
+        }
+        setForm({ category: 'Emergencias', entity_name: '', phone: '' });
+        setEditing(null);
+        setMessage('Directorio actualizado.');
+        void load();
+    }; 
     const remove=async(id:string)=>{if(!window.confirm('¿Eliminar este contacto?'))return;const {error}=await supabase.from('pwa_directories').delete().eq('id',id);setMessage(error?error.message:'Contacto eliminado.');if(!error)void load()}; 
     return <div className="grid gap-6 lg:grid-cols-2"><Card className="p-5"><h2 className="font-semibold">{editing?'Editar contacto':'Agregar contacto'}</h2><form className="mt-3 space-y-3" onSubmit={save}><Input label="Categoría" value={form.category} onChange={e=>setForm({...form,category:e.target.value})} required/><Input label="Entidad" value={form.entity_name} onChange={e=>setForm({...form,entity_name:e.target.value})} required/><Input label="Teléfono" type="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} required/><div className="flex gap-2"><Button type="submit">{editing?'Guardar cambios':'Agregar'}</Button>{!editing&&<Button variant="outline" onClick={()=>setForm({...form,category:'Emergencias',entity_name:'Soporte Técnico',phone:'+57 300 123 4567'})}>Ejemplo de contacto</Button>}</div></form>{message&&<p className="text-sm text-gray-600">{message}</p>}</Card></div>;
 }
@@ -587,30 +698,43 @@ function GateAdmin({ conjuntoId }: { conjuntoId:string }) {
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_gate_logs').select('*').eq('conjunto_id',conjuntoId).order('created_at',{descending:true});setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
-    return <Card className="p-5"><h2 className="font-semibold">Registro de accesos</h2>{rows.length>0?(
-        <>
-        <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-        <tr>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha/Hora</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apartamento</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visitante/Remitente</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-        </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-        {rows.map(r=>(<tr key={r.id} className="hover:bg-gray-50"><td className="px-6 py-4 text-sm text-gray-900">{new Date(r.created_at).toLocaleString('es-CO')}</td><td className="px-6 py-4 text-sm font-medium">{r.type===?'visitante':'paquete'}</td><td className="px-6 py-4 text-sm">{r.apartment}</td><td className="px-6 py-4 text-sm">{r.name}</td><td className="px-6 py-4 text-sm">{r.reason}</td><td className="px-6 py-4 text-sm">{r.status==='aprobado'?'✅ Aprobado':r.status==='pendiente'?'⏳ Pendiente':'❌ Rechazado'}</td></tr>))
-        }):(
-        <p className="text-center py-8 text-gray-500">No hay registros de accesos</p>
-        )}</table>
-        </div>
-        </>
-    ):(
-        <p className="text-center py-8 text-gray-500">No hay registros de accesos</p>
-    )}</Card>;
+    return (
+        <Card className="p-5">
+            <h2 className="font-semibold">Registro de accesos</h2>
+            {rows.length > 0 ? (
+                <>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha/Hora</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apartamento</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visitante/Remitente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {rows.map(r => (
+                                <tr key={r.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 text-sm text-gray-900">{new Date(r.created_at).toLocaleString('es-CO')}</td>
+                                    <td className="px-6 py-4 text-sm font-medium">{r.type === 'visitante' ? 'Visitante' : 'Paquete'}</td>
+                                    <td className="px-6 py-4 text-sm">{r.apartment}</td>
+                                    <td className="px-6 py-4 text-sm">{r.name}</td>
+                                    <td className="px-6 py-4 text-sm">{r.reason}</td>
+                                    <td className="px-6 py-4 text-sm">{r.status === 'aprobado' ? '✅ Aprobado' : r.status === 'pendiente' ? '⏳ Pendiente' : '❌ Rechazado'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                </>
+            ) : (
+                <p className="text-center py-8 text-gray-500">No hay registros de accesos</p>
+            )}
+        </Card>
+    );
 }
 
 function RequestsAdmin({ conjuntoId }: { conjuntoId:string }) { 
@@ -619,5 +743,10 @@ function RequestsAdmin({ conjuntoId }: { conjuntoId:string }) {
     const load=async()=>{const {data}=await supabase.from('pwa_access_requests').select('*').eq('conjunto_id',conjuntoId).order('created_at',{descending:true});setRows(data||[])}; 
     useEffect(()=>{void load()},[conjuntoId]); 
     const review=async(r:any,status:string)=>{const {error}=await supabase.from('pwa_access_requests').update({status,reviewed_by:userId,reviewed_at:new Date().toISOString()}).eq('id',r.id);if(!error){void notifyPwaResidents({conjuntoId,userIds:[r.user_id],title:`Solicitud ${status}`,body:`Tu solicitud de acceso fue ${status}.`, type: 'solicitud', id: r.id, url: `/solicitudes/${r.id}`});void load()}}; 
-    return <Card className="p-5"><h2 className="font-semibold">Solicitudes de acceso</h2><div className="mt-3 space-y-3">{rows.map(r=><div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4" key={r.id}><div><p className="font-semibold">Apartamento {r.apartment}</p><p className="text-sm text-gray-500">Rol: {r.role} · Usuario: {r.user_id}</p></div><div className="flex gap-2"><Button onClick={()=>void review(r,'activo')}>Aprobar</Button><Button variant="danger" onClick={()=>void review(r,'inactivo')}>Rechazar</Button></div></div>)}{!rows.length&&<p className="text-sm text-gray-500">No hay solicitudes pendientes.</p>}{message&&<p className="text-sm text-gray-600">{message}</p>}</div></Card>;
+    return <Card className="p-5"><h2 className="font-semibold">Solicitudes de acceso</h2><div className="mt-3 space-y-3">{rows.map(r=><div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4" key={r.id}><div><p className="font-semibold">Apartamento {r.apartment}</p><p className="text-sm text-gray-500">Rol: {r.role} · Usuario: {r.user_id}</p></div><div className="flex gap-2"><Button onClick={()=>void review(r,'activo')}>Aprobar</Button><Button variant="danger" onClick={()=>void review(r,'inactivo')}>Rechazar</Button></div></div>)} {!rows.length&&<p className="text-sm text-gray-500">No hay solicitudes pendientes.</p>} {message&&<p className="text-sm text-gray-600">{message}</p>}</div></Card>;
+};
 }
+
+
+
+

@@ -278,6 +278,7 @@ export interface VisitorLog {
   exitTime?: string;
   conjuntoId?: string;
   accessPointId?: number;
+  user_id?: string;
 }
 
 export interface PackageLog {
@@ -288,6 +289,7 @@ export interface PackageLog {
   receivedDate: string;
   status: 'En recepción' | 'Entregado';
   conjuntoId?: string;
+  user_id?: string;
 }
 
 export interface NotificationItem {

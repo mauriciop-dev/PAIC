@@ -353,6 +353,17 @@ export default function UsuariosApp() {
                                   status: 'Aprobado',
                                   userId: user.id,
                                 });
+                                // Notificar a portería/admin que el residente aprobó
+                                await supabase.functions.invoke('send-pwa-push', {
+                                  body: {
+                                    conjuntoId: user.conjuntoId,
+                                    title: 'Visita aprobada por residente',
+                                    body: `${user.name} (Apto ${user.apt}) aprobó el ingreso de ${v.visitor_name}`,
+                                    type: 'porteria',
+                                    id: `visitor-approved-${v.id}`,
+                                    url: '/visitantes'
+                                  }
+                                });
                                 // Optimistic update: immediately show "Ingresó" with entry_time
                                 setPwaData(prev => prev ? {
                                   ...prev,
@@ -377,6 +388,17 @@ export default function UsuariosApp() {
                                   logId: v.id,
                                   status: 'Rechazado',
                                   userId: user.id,
+                                });
+                                // Notificar a portería/admin que el residente rechazó
+                                await supabase.functions.invoke('send-pwa-push', {
+                                  body: {
+                                    conjuntoId: user.conjuntoId,
+                                    title: 'Visita rechazada por residente',
+                                    body: `${user.name} (Apto ${user.apt}) rechazó el ingreso de ${v.visitor_name}`,
+                                    type: 'porteria',
+                                    id: `visitor-rejected-${v.id}`,
+                                    url: '/visitantes'
+                                  }
                                 });
                                 const session = await getSession();
                                 if (session) {

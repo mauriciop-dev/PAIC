@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Icon } from "@paic/ui";
 import { apiService } from "../../services/apiService";
 import { supabase } from "../../services/supabaseClient";
+import { notifyPwaResidents } from "../../utils/notifications";
 import {
   EstacionSession,
   VigilanteSession,
@@ -268,16 +269,25 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         await apiService.addVisitorLog(stationSession.conjunto_id, payload);
       }
 
-      // Push notification to resident
-      await apiService.sendPushNotification({
-        conjuntoId: stationSession.conjunto_id,
-        apartment: visitorApartment.trim(),
-        title: "Visita Autorizada",
-        body: `Se ha autorizado el ingreso de ${visitorName.trim()} para el ${visitorDate}`,
-        type: "porteria",
-        resourceId: `visitor-${Date.now()}`,
-        url: "/visitantes",
-      });
+      // Push notification + notification table for badge
+      await Promise.all([
+        apiService.sendPushNotification({
+          conjuntoId: stationSession.conjunto_id,
+          apartment: visitorApartment.trim(),
+          title: "Visita Autorizada",
+          body: `Se ha autorizado el ingreso de ${visitorName.trim()} para el ${visitorDate}`,
+          type: "porteria",
+          resourceId: `visitor-${Date.now()}`,
+          url: "/visitantes",
+        }),
+        notifyPwaResidents({
+          conjuntoId: stationSession.conjunto_id,
+          tipo: 'porteria',
+          titulo: 'Visita Autorizada',
+          cuerpo: `Se ha autorizado el ingreso de ${visitorName.trim()} para el ${visitorDate}`,
+          userId: undefined, // null = all residents in conjunto
+        })
+      ]);
 
       setVisitorName("");
       setVisitorFeedback("✅ Visitante registrado y autorizado en bitácora.");
@@ -303,18 +313,27 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
           entryTime: now,
         });
       }
-      // Push notification
+      // Push notification + notification table for badge
       const log = visitorLogs.find(l => l.id === logId);
       if (log) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: log.apartment,
-          title: "Visitante Ingresó",
-          body: `${log.visitorName} ha ingresado al conjunto a las ${now}`,
-          type: "porteria",
-          resourceId: `visitor-entry-${logId}`,
-          url: "/visitantes",
-        });
+        await Promise.all([
+          apiService.sendPushNotification({
+            conjuntoId: stationSession.conjunto_id,
+            apartment: log.apartment,
+            title: "Visitante Ingresó",
+            body: `${log.visitorName} ha ingresado al conjunto a las ${now}`,
+            type: "porteria",
+            resourceId: `visitor-entry-${logId}`,
+            url: "/visitantes",
+          }),
+          notifyPwaResidents({
+            conjuntoId: stationSession.conjunto_id,
+            tipo: 'porteria',
+            titulo: 'Visitante Ingresó',
+            cuerpo: `${log.visitorName} ha ingresado al conjunto a las ${now}`,
+            userId: log.user_id,
+          })
+        ]);
       }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Ingresó", entryTime: now } : log))
@@ -337,18 +356,27 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
           exitTime: now,
         });
       }
-      // Push notification
+      // Push notification + notification table for badge
       const log = visitorLogs.find(l => l.id === logId);
       if (log) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: log.apartment,
-          title: "Visitante Salió",
-          body: `${log.visitorName} ha salido del conjunto a las ${now}`,
-          type: "porteria",
-          resourceId: `visitor-exit-${logId}`,
-          url: "/visitantes",
-        });
+        await Promise.all([
+          apiService.sendPushNotification({
+            conjuntoId: stationSession.conjunto_id,
+            apartment: log.apartment,
+            title: "Visitante Salió",
+            body: `${log.visitorName} ha salido del conjunto a las ${now}`,
+            type: "porteria",
+            resourceId: `visitor-exit-${logId}`,
+            url: "/visitantes",
+          }),
+          notifyPwaResidents({
+            conjuntoId: stationSession.conjunto_id,
+            tipo: 'porteria',
+            titulo: 'Visitante Salió',
+            cuerpo: `${log.visitorName} ha salido del conjunto a las ${now}`,
+            userId: log.user_id,
+          })
+        ]);
       }
       setVisitorLogs((prev) =>
         prev.map((log) => (log.id === logId ? { ...log, status: "Salió", exitTime: now } : log))
@@ -376,16 +404,25 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         await apiService.addPackageLog(stationSession.conjunto_id, payload);
       }
 
-      // Push notification to resident
-      await apiService.sendPushNotification({
-        conjuntoId: stationSession.conjunto_id,
-        apartment: pkgApartment.trim(),
-        title: "Nuevo Paquete en Portería",
-        body: `Llegó un paquete de ${pkgCourier.trim()}${pkgTracking.trim() ? ` (Guía: ${pkgTracking.trim()})` : ""}`,
-        type: "porteria",
-        resourceId: `package-${Date.now()}`,
-        url: "/paquetes",
-      });
+      // Push notification + notification table for badge
+      await Promise.all([
+        apiService.sendPushNotification({
+          conjuntoId: stationSession.conjunto_id,
+          apartment: pkgApartment.trim(),
+          title: "Nuevo Paquete en Portería",
+          body: `Llegó un paquete de ${pkgCourier.trim()}${pkgTracking.trim() ? ` (Guía: ${pkgTracking.trim()})` : ""}`,
+          type: "porteria",
+          resourceId: `package-${Date.now()}`,
+          url: "/paquetes",
+        }),
+        notifyPwaResidents({
+          conjuntoId: stationSession.conjunto_id,
+          tipo: 'porteria',
+          titulo: 'Nuevo Paquete en Portería',
+          cuerpo: `Llegó un paquete de ${pkgCourier.trim()}${pkgTracking.trim() ? ` (Guía: ${pkgTracking.trim()})` : ""}`,
+          userId: undefined, // null = all residents in conjunto
+        })
+      ]);
 
       setPkgCourier("");
       setPkgTracking("");
@@ -408,18 +445,27 @@ const KioskSecurityView: React.FC<KioskSecurityViewProps> = ({ onStationDisconne
         console.warn("Fallback to standard updatePackageLogStatus:", rpcErr);
         await apiService.updatePackageLogStatus(stationSession.conjunto_id, packageId, "Entregado");
       }
-      // Push notification
+      // Push notification + notification table for badge
       const pkg = packageLogs.find(p => p.id === packageId);
       if (pkg) {
-        await apiService.sendPushNotification({
-          conjuntoId: stationSession.conjunto_id,
-          apartment: pkg.apartment,
-          title: "Paquete Entregado",
-          body: `Tu paquete de ${pkg.courier} ha sido marcado como entregado`,
-          type: "porteria",
-          resourceId: `package-delivered-${packageId}`,
-          url: "/paquetes",
-        });
+        await Promise.all([
+          apiService.sendPushNotification({
+            conjuntoId: stationSession.conjunto_id,
+            apartment: pkg.apartment,
+            title: "Paquete Entregado",
+            body: `Tu paquete de ${pkg.courier} ha sido marcado como entregado`,
+            type: "porteria",
+            resourceId: `package-delivered-${packageId}`,
+            url: "/paquetes",
+          }),
+          notifyPwaResidents({
+            conjuntoId: stationSession.conjunto_id,
+            tipo: 'porteria',
+            titulo: 'Paquete Entregado',
+            cuerpo: `Tu paquete de ${pkg.courier} ha sido marcado como entregado`,
+            userId: pkg.user_id,
+          })
+        ]);
       }
       setPackageLogs((prev) =>
         prev.map((p) => (p.id === packageId ? { ...p, status: "Entregado" } : p))

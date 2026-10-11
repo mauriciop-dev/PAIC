@@ -20,7 +20,7 @@ import {
   TRIAL_WRITE_BLOCKED_EVENT,
   TRIAL_WRITE_BLOCKED_MESSAGE,
 } from './services/supabaseClient';
-import usePWAServiceWorker from './hooks/usePWAServiceWorker';
+import { usePWAServiceWorker } from './hooks/usePWAServiceWorker';
 
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';

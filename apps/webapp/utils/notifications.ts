@@ -55,3 +55,15 @@ export async function getUnreadCount(conjuntoId: string, tipo: NotifTipo) {
   if (error) return 0;
   return count ?? 0;
 }
+
+export interface DueDateStatus {
+  overdue: boolean;
+  dueSoon: boolean;
+}
+
+export function humanizeDueDateLabel(item: string, status: DueDateStatus): string {
+  const base = item || 'Pendiente';
+  if (status.overdue) return `Vencido: ${base}`;
+  if (status.dueSoon) return `Recordatorio: ${base}`;
+  return `${base} Pendiente`;
+}
