@@ -1,4 +1,4 @@
-const CACHE = 'paic-usuarios-v4';
+const CACHE = 'paic-usuarios-v5';
 self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/','/manifest.json','/logo-paic.png']))); self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (event) => {
@@ -11,28 +11,30 @@ self.addEventListener('fetch', (event) => {
     return response;
   }).catch(() => caches.match(event.request)));
 });
+
 self.addEventListener('push', (event) => {
   let data = { title: 'PAIC Residentes', body: 'Tienes una nueva actualización.', url: '/' };
   try {
     if (event.data) {
-      data = event.data.json();
+      const rawText = event.data.text();
+      try {
+        data = JSON.parse(rawText);
+      } catch (err) {
+        data = { title: 'PAIC Residentes', body: rawText, url: '/' };
+      }
     }
   } catch (e) {
-    try {
-      const text = event.data ? event.data.text() : '';
-      if (text) data = { title: 'PAIC Residentes', body: text, url: '/' };
-    } catch (err) {
-      // ignore
-    }
+    console.error('Error parsing push data:', e);
   }
 
   const payload = {
     title: data.title || 'PAIC Residentes',
-    body: data.body || '',
+    body: data.body || 'Nueva notificación de PAIC',
     icon: data.icon || '/logo-paic.png',
     badge: data.badge || '/logo-paic.png',
     data: { url: data.url || '/' }
   };
+
   event.waitUntil(self.registration.showNotification(payload.title, payload));
 });
 

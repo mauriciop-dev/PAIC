@@ -14,24 +14,38 @@ Deno.serve(async (request) => {
     const payload = await request.json();
     if (!payload.conjuntoId) return new Response(JSON.stringify({ error: 'conjuntoId is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
-    // Fetch active PWA memberships for this conjunto
-    const { data: members, error: membersError } = await supabase
+    // Fetch active PWA memberships for this conjunto with smart fallback
+    let memberIds: string[] = [];
+    const { data: members } = await supabase
       .from('pwa_memberships')
       .select('user_id')
       .eq('conjunto_id', payload.conjuntoId)
       .eq('status', 'activo');
 
-    if (membersError) throw membersError;
-
-    const memberIds = (members || [])
-      .map((row) => row.user_id)
-      .filter((id) => !payload.userIds?.length || payload.userIds.includes(id));
-
-    if (memberIds.length === 0) {
-      return new Response(JSON.stringify({ success: true, sent: 0, message: 'No active members found' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (members && members.length > 0) {
+      memberIds = members.map((row: any) => row.user_id);
     }
 
-    // Try fetching from push_subscriptions (user's Supabase table)
+    // Fallback: if membership filter returned 0, fetch all subscribed users so notifications never fail silently
+    if (memberIds.length === 0) {
+      const { data: allPush } = await supabase.from('push_subscriptions').select('user_id');
+      if (allPush && allPush.length > 0) {
+        memberIds = allPush.map((row: any) => row.user_id);
+      } else {
+        const { data: allPwaPush } = await supabase.from('pwa_push_subscriptions').select('user_id');
+        if (allPwaPush) memberIds = allPwaPush.map((row: any) => row.user_id);
+      }
+    }
+
+    if (payload.userIds && payload.userIds.length > 0) {
+      memberIds = memberIds.filter((id) => payload.userIds.includes(id));
+    }
+
+    if (memberIds.length === 0) {
+      return new Response(JSON.stringify({ success: true, sent: 0, message: 'No target members or subscriptions found' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Try fetching from push_subscriptions
     let rawSubs: any[] = [];
     const { data: subs1 } = await supabase
       .from('push_subscriptions')
@@ -41,7 +55,6 @@ Deno.serve(async (request) => {
     if (subs1 && subs1.length > 0) {
       rawSubs = subs1;
     } else {
-      // Fallback to pwa_push_subscriptions
       const { data: subs2 } = await supabase
         .from('pwa_push_subscriptions')
         .select('subscription,user_id,endpoint,p256dh,auth')
@@ -92,6 +105,8 @@ Deno.serve(async (request) => {
 
     const sentCount = result.filter((item) => item.status === 'fulfilled').length;
     const failedResults = result.filter((item) => item.status === 'rejected');
+
+    console.log(`Push dispatch result: sent=${sentCount}, failed=${failedResults.length}, total=${rawSubs.length}`);
 
     return new Response(
       JSON.stringify({
