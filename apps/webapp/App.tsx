@@ -226,8 +226,8 @@ if (profile) {
                     analytics.trackPageView(activeTab);
                     setUserProfile(profile);
                     
-                    // Inicializar push notifications
-                    initializePushService(profile.id);
+                    // Inicializar push notifications con conjuntoId
+                    initializePushService(profile.id, profile.conjuntoId);
                     
                     if (profile.conjuntoId) {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
@@ -459,8 +459,8 @@ if (profile) {
       analytics.setUserId(profile.id);
       setUserProfile(profile);
       
-      // Inicializar push notifications
-      initializePushService(profile.id);
+      // Inicializar push notifications con conjuntoId
+      initializePushService(profile.id, profile.conjuntoId);
       
       if (profile.conjuntoId) {
           const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);

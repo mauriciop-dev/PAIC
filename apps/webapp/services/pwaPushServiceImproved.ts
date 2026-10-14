@@ -64,7 +64,7 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null
 /**
  * Suscribe el navegador a notificaciones push
  */
-export async function subscribeToPushNotifications(userId: string): Promise<boolean> {
+export async function subscribeToPushNotifications(userId: string, conjuntoId?: string): Promise<boolean> {
   if (!isPushSupported()) {
     console.warn('Push notifications not supported');
     return false;
@@ -103,6 +103,7 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
           user_id: userId,
           endpoint: subscription.endpoint,
           subscription: subscription.toJSON(),
+          conjunto_id: conjuntoId || null,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'endpoint'
@@ -177,7 +178,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 /**
  * Inicializa el servicio de push al cargar la app - VERSIÓN ROBUSTA
  */
-export async function initializePushService(userId: string): Promise<boolean> {
+export async function initializePushService(userId: string, conjuntoId?: string): Promise<boolean> {
   console.log('🚀 Inicializando push service para:', userId);
   
   const permission = await requestNotificationPermission();
@@ -189,7 +190,7 @@ export async function initializePushService(userId: string): Promise<boolean> {
 
   console.log('✅ Permisos concedidos');
 
-  const subscribed = await subscribeToPushNotifications(userId);
+  const subscribed = await subscribeToPushNotifications(userId, conjuntoId);
   
   if (subscribed) {
     console.log('✅ Push notifications inicializadas correctamente');

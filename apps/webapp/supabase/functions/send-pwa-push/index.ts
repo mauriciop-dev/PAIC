@@ -22,33 +22,29 @@ serve(async (req) => {
   }
 
   try {
-    const { conjugatedId, title, body, userIds, type, url, datos, vapidPublicKey, vapidPrivateKey } = await req.json();
-    console.log('🔔 send-pwa-push invoked:', { conjugatedId, title, userIds, type });
+    const { conjuntoId, title, body, userIds, type, url, datos, vapidPublicKey, vapidPrivateKey } = await req.json();
+    console.log('🔔 send-pwa-push invoked:', { conjuntoId, title, userIds, type });
+
+    if (!conjuntoId) {
+      return new Response(
+        JSON.stringify({ error: 'conjuntoId is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Crear cliente de Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Obtener suscripciones push
+    // Obtener suscripciones push - AHORA POR CONJUNTO_ID DIRECTO
     let query = supabase
       .from('pwa_push_subscriptions')
-      .select('*');
+      .select('*')
+      .eq('conjunto_id', conjuntoId);
 
-    if (conjugatedIds && conjugatedIds.length > 0) {
-      query = query.in('user_id', conjugatedIds);
-    } else {
-      // Todos los usuarios del conjunto - usar tabla users sin filtro 'activo'
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('conjunto_id', conjugatedId);
-      
-      console.log('👥 Users found:', users?.length, 'error:', usersError?.message);
-      
-      if (users && users.length > 0) {
-        query = query.in('user_id', users.map(u => u.id));
-      }
+    if (userIds && userIds.length > 0) {
+      query = query.in('user_id', userIds);
     }
 
     const { data: subscriptions, error } = await query;
@@ -64,7 +60,7 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('⚠️ No subscriptions found for conjunto:', conjugatedId);
+      console.log('⚠️ No subscriptions found for conjunto:', conjuntoId);
       return new Response(
         JSON.stringify({ sent: 0, failed: 0, total: 0, message: 'No subscriptions found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -100,7 +96,7 @@ serve(async (req) => {
       data: {
         url: url || '/',
         type,
-        conjugatedId,
+        conjuntoId,
         datos
       }
     });
