@@ -1,6 +1,10 @@
 /**
  * Supabase Edge Function para enviar notificaciones PWA
  * Uso: supabase.functions.invoke('send-pwa-push', { body: {...} })
+ * 
+ * Las VAPID keys pueden venir de:
+ * 1. Deno.env (secrets de Supabase project)
+ * 2. request body (pasadas desde el frontend)
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -18,8 +22,8 @@ serve(async (req) => {
   }
 
   try {
-    const { conjuntoId, title, body, userIds, type, url, datos } = await req.json();
-    console.log('🔔 send-pwa-push invoked:', { conjuntoId, title, userIds, type });
+    const { conjugatedId, title, body, userIds, type, url, datos, vapidPublicKey, vapidPrivateKey } = await req.json();
+    console.log('🔔 send-pwa-push invoked:', { conjugatedId, title, userIds, type });
 
     // Crear cliente de Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -31,14 +35,14 @@ serve(async (req) => {
       .from('pwa_push_subscriptions')
       .select('*');
 
-    if (userIds && userIds.length > 0) {
-      query = query.in('user_id', userIds);
+    if (conjugatedIds && conjugatedIds.length > 0) {
+      query = query.in('user_id', conjugatedIds);
     } else {
       // Todos los usuarios del conjunto - usar tabla users sin filtro 'activo'
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id')
-        .eq('conjunto_id', conjuntoId);
+        .eq('conjunto_id', conjugatedId);
       
       console.log('👥 Users found:', users?.length, 'error:', usersError?.message);
       
@@ -60,20 +64,21 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('⚠️ No subscriptions found for conjunto:', conjuntoId);
+      console.log('⚠️ No subscriptions found for conjunto:', conjugatedId);
       return new Response(
         JSON.stringify({ sent: 0, failed: 0, total: 0, message: 'No subscriptions found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+    // Usar keys del request o del entorno
+    const publicKey = vapidPublicKey || Deno.env.get('VAPID_PUBLIC_KEY');
+    const privateKey = vapidPrivateKey || Deno.env.get('VAPID_PRIVATE_KEY');
 
-    if (!vapidPublicKey || !vapidPrivateKey) {
+    if (!publicKey || !privateKey) {
       console.error('❌ VAPID keys not configured');
       return new Response(
-        JSON.stringify({ error: 'VAPID keys not configured in Edge Function secrets' }),
+        JSON.stringify({ error: 'VAPID keys not configured. Provide in request body as vapidPublicKey/vapidPrivateKey, or add to Supabase project secrets.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -83,8 +88,8 @@ serve(async (req) => {
     
     webPush.setVapidDetails(
       'mailto:admin@paicai.com.co',
-      vapidPublicKey,
-      vapidPrivateKey
+      publicKey,
+      privateKey
     );
 
     const payload = JSON.stringify({
@@ -95,7 +100,7 @@ serve(async (req) => {
       data: {
         url: url || '/',
         type,
-        conjuntoId,
+        conjugatedId,
         datos
       }
     });
