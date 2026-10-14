@@ -19,6 +19,7 @@ serve(async (req) => {
 
   try {
     const { conjuntoId, title, body, userIds, type, url, datos } = await req.json();
+    console.log('🔔 send-pwa-push invoked:', { conjuntoId, title, userIds, type });
 
     // Crear cliente de Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -33,12 +34,13 @@ serve(async (req) => {
     if (userIds && userIds.length > 0) {
       query = query.in('user_id', userIds);
     } else {
-      // Todos los usuarios del conjunto
-      const { data: users } = await supabase
+      // Todos los usuarios del conjunto - usar tabla users sin filtro 'activo'
+      const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id')
-        .eq('conjunto_id', conjuntoId)
-        .eq('activo', true);
+        .eq('conjunto_id', conjuntoId);
+      
+      console.log('👥 Users found:', users?.length, 'error:', usersError?.message);
       
       if (users && users.length > 0) {
         query = query.in('user_id', users.map(u => u.id));
@@ -47,11 +49,21 @@ serve(async (req) => {
 
     const { data: subscriptions, error } = await query;
     
+    console.log('📱 Subscriptions found:', subscriptions?.length, 'error:', error?.message);
+    
     if (error) {
       console.error('Error obteniendo suscripciones:', error);
       return new Response(
-        JSON.stringify({ error: 'Error obteniendo suscripciones' }),
+        JSON.stringify({ error: 'Error obteniendo suscripciones', details: error.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('⚠️ No subscriptions found for conjunto:', conjuntoId);
+      return new Response(
+        JSON.stringify({ sent: 0, failed: 0, total: 0, message: 'No subscriptions found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -59,9 +71,9 @@ serve(async (req) => {
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
 
     if (!vapidPublicKey || !vapidPrivateKey) {
-      console.error('VAPID keys not configured');
+      console.error('❌ VAPID keys not configured');
       return new Response(
-        JSON.stringify({ error: 'VAPID keys not configured' }),
+        JSON.stringify({ error: 'VAPID keys not configured in Edge Function secrets' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -104,8 +116,9 @@ serve(async (req) => {
 
         await webPush.sendNotification(subscription, payload);
         sent++;
+        console.log('✅ Sent to:', sub.endpoint.substring(0, 50) + '...');
       } catch (error) {
-        console.error('Error enviando a', sub.endpoint, error);
+        console.error('❌ Error enviando a', sub.endpoint, error);
         failed++;
         
         // Si la suscripción expiró, eliminarla
@@ -118,7 +131,6 @@ serve(async (req) => {
       }
     }
 
-    // Actualizar estadísticas
     const result = {
       sent,
       failed,
@@ -126,15 +138,17 @@ serve(async (req) => {
       activeMembers: subscriptions?.length || 0
     };
 
+    console.log('📊 Result:', result);
+    
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error en send-pwa-push:', error);
+    console.error('💥 Error en send-pwa-push:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, stack: error.stack }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

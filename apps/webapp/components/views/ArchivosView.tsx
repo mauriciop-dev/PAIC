@@ -67,6 +67,15 @@ const ArchivosView: React.FC<ArchivosViewProps> = ({ userProfile, conjuntoInfo }
       await apiService.uploadFileForConjunto(userProfile.conjuntoId, file);
       setFeedback({ type: 'success', text: `Archivo "${file.name}" subido exitosamente.` });
       fetchFiles(); // Refresh the list
+      
+      // Send push notification to residents
+      await notifyPwaResidents({
+        conjuntoId: conjuntoInfo.id,
+        tipo: 'documento',
+        titulo: 'Nuevo documento disponible',
+        cuerpo: `Se ha publicado: ${file.name}`,
+        userId: null // Send to all residents
+      });
     } catch (error: any) {
       let errorMessage = `Error al subir: ${error.message}`;
       if (error.message.includes('JSON.parse')) {
