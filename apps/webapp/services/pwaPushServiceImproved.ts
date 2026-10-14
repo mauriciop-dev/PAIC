@@ -96,18 +96,20 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
     }
 
     if (subscription) {
-      // Save to Supabase
-      const response = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          subscription: subscription.toJSON()
-        })
-      });
+      // Save to Supabase directly
+      const { error } = await supabase
+        .from('pwa_push_subscriptions')
+        .upsert({
+          user_id: userId,
+          endpoint: subscription.endpoint,
+          subscription: subscription.toJSON(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'endpoint'
+        });
 
-      if (!response.ok) {
-        console.error('❌ Error guardando suscripción:', await response.text());
+      if (error) {
+        console.error('❌ Error guardando suscripción:', error);
         return false;
       }
 
