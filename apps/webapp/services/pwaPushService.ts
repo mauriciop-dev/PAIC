@@ -22,7 +22,14 @@ export type NotifyPwaInput = {
 };
 
 export async function notifyPwaResidents(input: NotifyPwaInput): Promise<PwaPushResult | null> {
-  const { data, error } = await supabase.functions.invoke('send-pwa-push', { body: input });
+  // Pasar VAPID keys desde Vite env
+  const body = {
+    ...input,
+    vapidPublicKey: import.meta.env.VITE_VAPID_PUBLIC_KEY || '',
+    vapidPrivateKey: import.meta.env.VITE_VAPID_PRIVATE_KEY || '',
+  };
+
+  const { data, error } = await supabase.functions.invoke('send-pwa-push', { body });
   if (error) {
     console.warn('No se pudo enviar la notificación PWA', error);
     return null;
