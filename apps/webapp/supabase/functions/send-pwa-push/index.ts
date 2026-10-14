@@ -1,72 +1,141 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import webpush from 'npm:web-push';
+/**
+ * Supabase Edge Function para enviar notificaciones PWA
+ * Uso: supabase.functions.invoke('send-pwa-push', { body: {...} })
+ */
 
-const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-Deno.serve(async (request) => {
-  // Handle CORS preflight
-  if (request.method === 'OPTIONS') {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
-    const token = authHeader.replace('Bearer ', '');
-    const { data: caller } = await supabase.auth.getUser(token);
-    if (!caller.user) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
-    const { data: profile } = await supabase.from('user_profiles').select('role,conjunto_id').eq('id', caller.user.id).maybeSingle();
-    if (!profile || !['trial', 'subscriber'].includes(profile.role)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
-    const payload = await request.json();
-    if (!payload.conjuntoId) return new Response('conjuntoId is required', { status: 400, headers: corsHeaders });
-    if (profile.conjunto_id !== payload.conjuntoId) return new Response('Forbidden', { status: 403, headers: corsHeaders });
-    const { data: members, error: membersError } = await supabase.from('pwa_memberships').select('user_id').eq('conjunto_id', payload.conjuntoId).eq('status', 'activo');
-    if (membersError) throw membersError;
-    const memberIds = (members || []).map((row) => row.user_id).filter((id) => !payload.userIds?.length || payload.userIds.includes(id));
-    const { data: subscriptions, error } = memberIds.length ? await supabase.from('pwa_push_subscriptions').select('subscription,user_id').in('user_id', memberIds) : { data: [], error: null };
-    if (error) throw error;
-    if (payload.dryRun) {
-      return Response.json({
-        total: subscriptions?.length || 0,
-        activeMembers: memberIds.length,
-        sent: 0,
-        failed: 0,
-        removed: 0,
-      }, { headers: corsHeaders });
+    const { conjuntoId, title, body, userIds, type, url, datos } = await req.json();
+
+    // Crear cliente de Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Obtener suscripciones push
+    let query = supabase
+      .from('pwa_push_subscriptions')
+      .select('*');
+
+    if (userIds && userIds.length > 0) {
+      query = query.in('user_id', userIds);
+    } else {
+      // Todos los usuarios del conjunto
+      const { data: users } = await supabase
+        .from('users')
+        .select('id')
+        .eq('conjunto_id', conjuntoId)
+        .eq('activo', true);
+      
+      if (users && users.length > 0) {
+        query = query.in('user_id', users.map(u => u.id));
+      }
     }
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT');
+
+    const { data: subscriptions, error } = await query;
+    
+    if (error) {
+      console.error('Error obteniendo suscripciones:', error);
+      return new Response(
+        JSON.stringify({ error: 'Error obteniendo suscripciones' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-    if (!vapidSubject || !vapidPublicKey || !vapidPrivateKey) throw new Error('VAPID no está configurado.');
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-    const result = await Promise.allSettled((subscriptions || []).map((row) => webpush.sendNotification(row.subscription, JSON.stringify({
-      title: payload.title || 'PAIC Residentes',
-      body: payload.body || '',
-      type: payload.type || 'default',
-      id: payload.id || 'default',
-      url: payload.url || '/',
-      icon: payload.icon || '/logo-paic.png',
-      badge: payload.badge || '/logo-paic.png',
-    }))));
-    const expired = (subscriptions || []).filter((_, index) => {
-      if (result[index].status !== 'rejected') return false;
-      const statusCode = (result[index] as PromiseRejectedResult).reason?.statusCode;
-      return statusCode === 404 || statusCode === 410;
-    }).map((row) => row.user_id);
-    if (expired.length) await supabase.from('pwa_push_subscriptions').delete().in('user_id', expired);
-    return Response.json({
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      console.error('VAPID keys not configured');
+      return new Response(
+        JSON.stringify({ error: 'VAPID keys not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Importar web-push
+    const webPush = await import('https://esm.sh/web-push@3.6.4');
+    
+    webPush.setVapidDetails(
+      'mailto:admin@paicai.com.co',
+      vapidPublicKey,
+      vapidPrivateKey
+    );
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: '/icon-192x192.png',
+      badge: '/badge-72x72.png',
+      data: {
+        url: url || '/',
+        type,
+        conjuntoId,
+        datos
+      }
+    });
+
+    let sent = 0;
+    let failed = 0;
+
+    // Enviar a cada suscripción
+    for (const sub of subscriptions || []) {
+      try {
+        const subscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.subscription?.keys?.p256dh,
+            auth: sub.subscription?.keys?.auth
+          }
+        };
+
+        await webPush.sendNotification(subscription, payload);
+        sent++;
+      } catch (error) {
+        console.error('Error enviando a', sub.endpoint, error);
+        failed++;
+        
+        // Si la suscripción expiró, eliminarla
+        if (error.statusCode === 410) {
+          await supabase
+            .from('pwa_push_subscriptions')
+            .delete()
+            .eq('endpoint', sub.endpoint);
+        }
+      }
+    }
+
+    // Actualizar estadísticas
+    const result = {
+      sent,
+      failed,
       total: subscriptions?.length || 0,
-      sent: result.filter((item) => item.status === 'fulfilled').length,
-      failed: result.filter((item) => item.status === 'rejected').length,
-      removed: expired.length,
-    }, { headers: corsHeaders });
+      activeMembers: subscriptions?.length || 0
+    };
+
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Push failed' }, { status: 500, headers: corsHeaders });
+    console.error('Error en send-pwa-push:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });

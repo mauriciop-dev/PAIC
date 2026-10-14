@@ -21,6 +21,7 @@ import {
   TRIAL_WRITE_BLOCKED_MESSAGE,
 } from './services/supabaseClient';
 import { usePWAServiceWorker } from './hooks/usePWAServiceWorker';
+import { initializePushService } from './services/pwaPushServiceImproved';
 
 import { fromSupabase } from './utils/dbMappers';
 import { Session } from '@supabase/supabase-js';
@@ -125,6 +126,12 @@ const AppContent: React.FC = () => {
   const handleLogout = useCallback(async () => {
     setWriteAccessProvider(() => true);
     supabase.removeAllChannels();
+    
+    // Limpiar badge de notificaciones al salir
+    if ('setAppBadge' in navigator) {
+      navigator.setAppBadge(0);
+    }
+    
     await supabase.auth.signOut();
     setUserProfile(null);
     setConjuntoInfo(null);
@@ -208,17 +215,21 @@ const AppContent: React.FC = () => {
 
             if (cancelled) return;
 
-            if (profile) {
-                if (!loginTrackedRef.current) {
-                  loginTrackedRef.current = true;
-                  if (profile.email !== 'demo@paicai.com.co') {
-                    analytics.trackLogin('google', profile.role);
-                  }
-                }
-                analytics.setUserId(profile.id);
-                analytics.trackPageView(activeTab);
-                setUserProfile(profile);
-                if (profile.conjuntoId) {
+if (profile) {
+                    if (!loginTrackedRef.current) {
+                      loginTrackedRef.current = true;
+                      if (profile.email !== 'demo@paicai.com.co') {
+                        analytics.trackLogin('google', profile.role);
+                      }
+                    }
+                    analytics.setUserId(profile.id);
+                    analytics.trackPageView(activeTab);
+                    setUserProfile(profile);
+                    
+                    // Inicializar push notifications
+                    initializePushService(profile.id);
+                    
+                    if (profile.conjuntoId) {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
                     if (cancelled) return;
                     if (info) {
@@ -447,7 +458,10 @@ const AppContent: React.FC = () => {
       analytics.trackLogin('internal', 'internal');
       analytics.setUserId(profile.id);
       setUserProfile(profile);
-
+      
+      // Inicializar push notifications
+      initializePushService(profile.id);
+      
       if (profile.conjuntoId) {
           const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
           if (info) setConjuntoInfo(info);
