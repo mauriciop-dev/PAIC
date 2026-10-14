@@ -1,9 +1,8 @@
 /**
- * Service Worker mejorado para PAIC PWA
- * Maneja caché, push notifications y badges
+ * PAIC PWA Service Worker - Versión limpia y robusta
  */
 
-const CACHE_NAME = 'paic-pwa-v2';
+const CACHE_NAME = 'paic-pwa-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -22,7 +21,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activar
+// Activar - limpiar caches viejos
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -37,39 +36,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch
+// Fetch - cache first, then network
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
+        if (response) return response;
         return fetch(event.request).then(response => {
-          // No almacenamos respuestas que no sean exitosas ni opcionales
           if (!response || response.status !== 200 || response.type !== 'basic') {
             return response;
           }
-
-          // Clone the response for cache
           const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
           return response;
         });
-      }).catch(() => {
-        // Fallback básico
-        return caches.match(event.request);
-      })
+      }).catch(() => caches.match(event.request))
   );
 });
 
-// Recibir notificaciones push
+// Push notifications
 self.addEventListener('push', (event) => {
   let data = {
     title: 'PAIC',
@@ -98,16 +85,8 @@ self.addEventListener('push', (event) => {
       ...data.data
     },
     actions: [
-      {
-        action: 'view',
-        title: 'Ver',
-        icon: '/icon-192x192.png'
-      },
-      {
-        action: 'close',
-        title: 'Cerrar',
-        icon: '/icon-192x192.png'
-      }
+      { action: 'view', title: 'Ver', icon: '/icon-192x192.png' },
+      { action: 'close', title: 'Cerrar', icon: '/icon-192x192.png' }
     ],
     requireInteraction: false,
     silent: false
@@ -125,62 +104,54 @@ self.addEventListener('notificationclick', (event) => {
   const action = event.action;
   const data = event.notification.data || {};
 
-  // Actualizar badge a 0 cuando se abre la notificación
+  // Clear badge
   if ('setAppBadge' in self.navigator) {
-    self.navigator.setAppBadge(0);
+    self.navigator.setAppBadge(0).catch(() => {});
   }
 
-  // Manejar acciones
-  if (action === 'close') {
-    return;
-  }
+  if (action === 'close') return;
 
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then((clientList) => {
-      // Si ya hay una ventana abierta, enfocarla
-      for (const client of clientList) {
-        if (client.url.includes(self.origin) && 'focus' in client) {
-          client.focus();
-          // Enviar mensaje para navegar a la URL específica
-          client.postMessage({
-            type: 'NAVIGATE',
-            url: data.url || '/'
-          });
-          return;
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.origin) && 'focus' in client) {
+            client.focus();
+            client.postMessage({ type: 'NAVIGATE', url: data.url || '/' });
+            return;
+          }
         }
-      }
-      
-      // Si no hay ventanas abiertas, abrir una nueva
-      if (clients.openWindow) {
-        return clients.openWindow(data.url || '/');
-      }
-    })
+        if (clients.openWindow) {
+          return clients.openWindow(data.url || '/');
+        }
+      })
   );
 });
 
-// Cerrar notificación
+// Notification close
 self.addEventListener('notificationclose', (event) => {
   console.log('Notification closed:', event.notification.data);
 });
 
-// Mensajes del cliente
+// Messages from client
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+  
+  if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 
-  if (event.data && event.data.type === 'UPDATE_BADGE') {
+  if (event.data.type === 'UPDATE_BADGE') {
     if ('setAppBadge' in self.navigator) {
-      self.navigator.setAppBadge(event.data.count || 0);
+      self.navigator.setAppBadge(event.data.count || 0).catch(() => {});
     }
   }
 
-  if (event.data && event.data.type === 'CLEAR_BADGE') {
+  if (event.data.type === 'CLEAR_BADGE') {
     if ('setAppBadge' in self.navigator) {
-      self.navigator.setAppBadge(0);
+      self.navigator.setAppBadge(0).catch(() => {});
     }
   }
 });
+
+console.log('[SW] Service Worker v3 iniciado correctamente');
