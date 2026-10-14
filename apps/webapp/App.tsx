@@ -226,8 +226,26 @@ if (profile) {
                     analytics.trackPageView(activeTab);
                     setUserProfile(profile);
                     
+                    // Obtener conjunto_id desde tabla users por email (para Google OAuth)
+                    let userConjuntoId = profile.conjuntoId;
+                    if (!userConjuntoId && profile.email) {
+                      try {
+                        const { data: userData } = await supabase
+                          .from('users')
+                          .select('conjunto_id')
+                          .eq('email', profile.email)
+                          .maybeSingle();
+                        if (userData?.conjunto_id) {
+                          userConjuntoId = userData.conjunto_id;
+                          console.log('📍 conjunto_id encontrado en users:', userConjuntoId);
+                        }
+                      } catch (e) {
+                        console.warn('Error buscando conjunto_id en users:', e);
+                      }
+                    }
+                    
                     // Inicializar push notifications con conjuntoId
-                    initializePushService(profile.id, profile.conjuntoId);
+                    initializePushService(profile.id, userConjuntoId);
                     
                     if (profile.conjuntoId) {
                     const info = await apiService.fetchConjuntoInfo(profile.conjuntoId);
