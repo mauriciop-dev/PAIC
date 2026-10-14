@@ -213,9 +213,38 @@ const AppContent: React.FC = () => {
                 await new Promise(res => setTimeout(res, 2000));
             }
 
-            if (cancelled) return;
+if (cancelled) return;
 
-if (profile) {
+            // Si no hay perfil en user_profiles, buscar en users y crearlo
+            if (!profile && session.user.email) {
+              try {
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('email', session.user.email)
+                  .maybeSingle();
+                
+                if (userData) {
+                  // Crear perfil en user_profiles
+                  const newProfile = {
+                    id: session.user.id,
+                    email: userData.email,
+                    fullName: userData.name || session.user.user_metadata?.full_name || '',
+                    role: userData.role || 'Subscriber',
+                    conjuntoId: userData.conjunto_id,
+                    permissions: [],
+                  };
+                  
+                  await supabase.from('user_profiles').upsert(newProfile);
+                  profile = newProfile;
+                  console.log('✅ Perfil creado en user_profiles desde users:', profile);
+                }
+              } catch (e) {
+                console.warn('Error creando perfil desde users:', e);
+              }
+            }
+
+            if (profile) {
                     if (!loginTrackedRef.current) {
                       loginTrackedRef.current = true;
                       if (profile.email !== 'demo@paicai.com.co') {
