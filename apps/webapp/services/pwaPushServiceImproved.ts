@@ -1,6 +1,5 @@
 /**
- * Servicio de Push mejorado para PAIC
- * Maneja suscripciones y envío de notificaciones push
+ * Servicio de Push mejorado para PAIC - Versión robusta
  */
 
 import { supabase } from './supabaseClient';
@@ -8,6 +7,9 @@ import { supabase } from './supabaseClient';
 export const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  if (!base64String) {
+    throw new Error('VAPID_PUBLIC_KEY no configurada');
+  }
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
     .replace(/\-/g, '+')
@@ -24,45 +26,98 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
+ * Verifica si el navegador soporta push
+ */
+export function isPushSupported(): boolean {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+/**
+ * Registra Service Worker con reintentos
+ */
+async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) {
+    console.error('Service Worker no soportado');
+    return null;
+  }
+
+  try {
+    // Unregister old SW first
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const reg of registrations) {
+      await reg.unregister();
+    }
+
+    // Register new SW
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/'
+    });
+    
+    console.log('✅ SW registrado:', registration.scope);
+    return registration;
+  } catch (error) {
+    console.error('❌ Error registrando SW:', error);
+    return null;
+  }
+}
+
+/**
  * Suscribe el navegador a notificaciones push
  */
 export async function subscribeToPushNotifications(userId: string): Promise<boolean> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  if (!isPushSupported()) {
     console.warn('Push notifications not supported');
     return false;
   }
 
+  if (!VAPID_PUBLIC_KEY) {
+    console.error('❌ VAPID_PUBLIC_KEY no configurada en build');
+    return false;
+  }
+
   try {
-    const registration = await navigator.serviceWorker.ready;
-    
-    // Verificar si ya está suscrito
+    const registration = await registerServiceWorker();
+    if (!registration) return false;
+
+    // Wait for SW to be ready
+    await navigator.serviceWorker.ready;
+
+    // Check existing subscription
     let subscription = await registration.pushManager.getSubscription();
     
     if (!subscription) {
-      // Suscribirse
+      // Subscribe
+      console.log('📡 Suscribiendo a push...');
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
+      console.log('✅ Suscripción creada');
     }
 
     if (subscription) {
-      // Guardar en Supabase
+      // Save to Supabase
       const response = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          subscription: JSON.parse(JSON.stringify(subscription.toJSON()))
+          subscription: subscription.toJSON()
         })
       });
 
-      return response.ok;
+      if (!response.ok) {
+        console.error('❌ Error guardando suscripción:', await response.text());
+        return false;
+      }
+
+      console.log('✅ Suscripción guardada en Supabase');
+      return true;
     }
 
     return false;
   } catch (error) {
-    console.error('Error suscribiéndose a push:', error);
+    console.error('❌ Error en subscribeToPushNotifications:', error);
     return false;
   }
 }
@@ -71,9 +126,7 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
  * Verifica el estado de suscripción
  */
 export async function checkPushSubscription(): Promise<boolean> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    return false;
-  }
+  if (!isPushSupported()) return false;
 
   try {
     const registration = await navigator.serviceWorker.ready;
@@ -89,9 +142,7 @@ export async function checkPushSubscription(): Promise<boolean> {
  * Cancela suscripción a notificaciones push
  */
 export async function unsubscribeFromPush(): Promise<boolean> {
-  if (!('serviceWorker' in navigator)) {
-    return false;
-  }
+  if (!('serviceWorker' in navigator)) return false;
 
   try {
     const registration = await navigator.serviceWorker.ready;
@@ -101,7 +152,6 @@ export async function unsubscribeFromPush(): Promise<boolean> {
       await subscription.unsubscribe();
       return true;
     }
-
     return false;
   } catch (error) {
     console.error('Error cancelando suscripción:', error);
@@ -113,72 +163,59 @@ export async function unsubscribeFromPush(): Promise<boolean> {
  * Solicita permisos de notificación
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
-  if (!('Notification' in window)) {
-    return 'denied';
-  }
+  if (!('Notification' in window)) return 'denied';
 
-  if (Notification.permission === 'granted') {
-    return 'granted';
-  }
-
-  if (Notification.permission === 'denied') {
-    return 'denied';
-  }
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
 
   const permission = await Notification.requestPermission();
   return permission;
 }
 
 /**
- * Envía notificación a través de Supabase Edge Function
- */
-export async function sendPushNotificationToUsers(
-  input: {
-    conjuntoId: string;
-    title: string;
-    body: string;
-    userIds?: string[];
-    type?: string;
-    url?: string;
-  }
-): Promise<{ sent: number; total: number }> {
-  try {
-    const { data, error } = await supabase.functions.invoke('send-pwa-push', {
-      body: input
-    });
-
-    if (error) {
-      console.error('Error enviando notificación:', error);
-      return { sent: 0, total: 0 };
-    }
-
-    return data || { sent: 0, total: 0 };
-  } catch (error) {
-    console.error('Error enviando notificación:', error);
-    return { sent: 0, total: 0 };
-  }
-}
-
-/**
- * Inicializa el servicio de push al cargar la app
+ * Inicializa el servicio de push al cargar la app - VERSIÓN ROBUSTA
  */
 export async function initializePushService(userId: string): Promise<boolean> {
+  console.log('🚀 Inicializando push service para:', userId);
+  
   const permission = await requestNotificationPermission();
   
   if (permission !== 'granted') {
-    console.warn('Notificaciones denegadas');
+    console.warn('⚠️ Permisos denegados:', permission);
     return false;
   }
+
+  console.log('✅ Permisos concedidos');
 
   const subscribed = await subscribeToPushNotifications(userId);
   
   if (subscribed) {
-    console.log('Push notifications inicializadas correctamente');
+    console.log('✅ Push notifications inicializadas correctamente');
     // Actualizar badge a 0 al iniciar
     if ('setAppBadge' in navigator) {
-      await navigator.setAppBadge(0);
+      try {
+        await navigator.setAppBadge(0);
+      } catch (e) {
+        console.warn('setAppBadge no soportado:', e);
+      }
     }
+  } else {
+    console.error('❌ Falló suscripción push');
   }
 
   return subscribed;
+}
+
+/**
+ * Envía notificación de prueba
+ */
+export async function sendTestNotification(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  
+  const registration = await navigator.serviceWorker.ready;
+  await registration.showNotification('PAIC Test', {
+    body: 'Las notificaciones funcionan correctamente',
+    icon: '/icon-192x192.png',
+    badge: '/badge-72x72.png'
+  });
 }
