@@ -8,6 +8,7 @@ import { useNotifications } from '../hooks/useNotifications';
 interface ModuleBadgeProps {
   tipo: 'comunicado' | 'reserva' | 'pqr' | 'documento' | 'votacion' | 'directorio' | 'porteria' | 'visitante' | 'paquete';
   conjuntoId: string;
+  userId?: string | null;
   label?: string;
   showBadge?: boolean;
   className?: string;
@@ -16,16 +17,17 @@ interface ModuleBadgeProps {
 export function ModuleBadgeEnhanced({
   tipo,
   conjuntoId,
+  userId,
   label,
   showBadge = true,
   className = ''
 }: ModuleBadgeProps) {
-  const { getCountForType } = useNotifications(conjuntoId);
+  const { getCountForType } = useNotifications(conjuntoId, userId);
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     setCount(getCountForType(tipo));
-  }, [tipo, conjuntoId, getCountForType]);
+  }, [tipo, conjuntoId, userId, getCountForType]);
 
   // Actualizar badge de la app cuando cambie el contador
   useEffect(() => {
@@ -53,13 +55,13 @@ export function ModuleBadgeEnhanced({
 /**
  * Hook para usar badges en módulos sin necesidad de mostrar el componente
  */
-export function useModuleBadge(tipo: ModuleBadgeProps['tipo'], conjuntoId: string) {
-  const { getCountForType, markAllAsRead } = useNotifications(conjuntoId);
+export function useModuleBadge(tipo: ModuleBadgeProps['tipo'], conjuntoId: string, userId?: string | null) {
+  const { getCountForType, markAllAsRead } = useNotifications(conjuntoId, userId);
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     setCount(getCountForType(tipo));
-  }, [tipo, conjuntoId, getCountForType]);
+  }, [tipo, conjuntoId, userId, getCountForType]);
 
   const markAsRead = () => markAllAsRead(tipo);
 

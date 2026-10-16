@@ -20,9 +20,11 @@ interface NotificationItem {
   tipo: NotificationType;
   titulo: string;
   cuerpo: string;
-  datos: any;
+  referenciaRecurso: string | null;
+  tipoRecurso: NotificationType | null;
   leido: boolean;
   creado_at: string;
+  url?: string;
 }
 
 export function useNotifications(conjuntoId: string, userId?: string) {
@@ -57,7 +59,13 @@ export function useNotifications(conjuntoId: string, userId?: string) {
 
       if (fetchError) throw fetchError;
 
-      setNotifications(data || []);
+      // Filtrar por destinatario: usuario específico o masiva (user_id null)
+      const filtered = (data || []).filter((notif) => {
+        if (!userId) return true;
+        return notif.user_id === null || notif.user_id === userId;
+      });
+
+      setNotifications(filtered);
 
       // Contar por tipo
       const counts: Record<NotificationType, number> = {
@@ -84,7 +92,7 @@ export function useNotifications(conjuntoId: string, userId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [conjuntoId]);
+  }, [conjuntoId, userId]);
 
   // Suscribirse a cambios en tiempo real
   useEffect(() => {
@@ -106,7 +114,12 @@ export function useNotifications(conjuntoId: string, userId?: string) {
         
         if (payload.eventType === 'INSERT') {
           const newNotif = payload.new as NotificationItem;
-          
+
+          // Filtrar por destinatario: solo contar si es para este usuario o masiva
+          if (userId && newNotif.user_id !== null && newNotif.user_id !== userId) {
+            return;
+          }
+
           // Agregar a la lista
           setNotifications(prev => [newNotif, ...prev]);
           
@@ -115,7 +128,7 @@ export function useNotifications(conjuntoId: string, userId?: string) {
             ...prev,
             [newNotif.tipo]: (prev[newNotif.tipo] || 0) + 1
           }));
-
+          
           // Mostrar notificación del navegador si está permitido
           if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
             navigator.serviceWorker.ready.then(registration => {
@@ -124,18 +137,34 @@ export function useNotifications(conjuntoId: string, userId?: string) {
                 icon: '/icon-192x192.png',
                 badge: '/badge-72x72.png',
                 data: {
-                  url: newNotif.datos?.url || '/'
+                  url: newNotif.url || '/'
                 }
               });
             });
           }
+          
+  // Limpiar canal cuando cambie userId para re-suscribirse con el nuevo filtro
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [conjuntoId, userId]);
 
-          // Actualizar badge de la app
+  // Actualizar badge de la app
           updateAppBadge();
         }
 
         if (payload.eventType === 'UPDATE') {
           const updatedNotif = payload.new as NotificationItem;
+
+          // Filtrar por destinatario
+          if (userId && updatedNotif.user_id !== null && updatedNotif.user_id !== userId) {
+            return;
+          }
+
           setNotifications(prev => 
             prev.map(n => n.id === updatedNotif.id ? updatedNotif : n)
           );
@@ -160,9 +189,10 @@ export function useNotifications(conjuntoId: string, userId?: string) {
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
     };
-  }, [conjuntoId, loadNotifications]);
+  }, [conjuntoId, userId, loadNotifications]);
 
   // Actualizar badge de la app
   const updateAppBadge = useCallback(async () => {
@@ -249,7 +279,8 @@ export function useNotifications(conjuntoId: string, userId?: string) {
     titulo: string;
     cuerpo?: string;
     userId?: string | null;
-    datos?: Record<string, any>;
+    referenciaRecurso?: string | null;
+    tipoRecurso?: NotificationType | null;
     url?: string;
   }) => {
     return await sendNotification({

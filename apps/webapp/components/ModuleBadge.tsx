@@ -7,10 +7,11 @@ import { getUnreadCount } from '../utils/notifications';
 interface ModuleBadgeProps {
   tipo: 'comunicado' | 'reserva' | 'pqr' | 'documento' | 'votacion' | 'directorio' | 'porteria' | 'visitante';
   conjuntoId: string;
+  userId?: string | null;
   label?: string;
 }
 
-export function ModuleBadge({ tipo, conjuntoId, label }: ModuleBadgeProps) {
+export function ModuleBadge({ tipo, conjuntoId, userId, label }: ModuleBadgeProps) {
   const [count, setCount] = React.useState<number>(0);
   const [mounted, setMounted] = React.useState(false);
 
@@ -18,11 +19,11 @@ export function ModuleBadge({ tipo, conjuntoId, label }: ModuleBadgeProps) {
     setMounted(true);
     // Actualizar cada 30 segundos para detectar nuevas notificaciones
     const interval = setInterval(async () => {
-      const unread = await getUnreadCount(conjuntoId, tipo);
+      const unread = await getUnreadCount(conjuntoId, tipo, userId);
       setCount(unread);
     }, 30000);
     return () => clearInterval(interval);
-  }, [conjuntoId, tipo]);
+  }, [conjuntoId, tipo, userId]);
 
   // Si no está montado, no mostrar badge
   if (!mounted) return <span>{label}</span>;

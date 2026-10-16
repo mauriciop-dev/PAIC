@@ -45,13 +45,19 @@ export async function notifyPwaResidents(p: NotifPayload) {
 }
 
 /** Leer badges de un tipo para un conjunto */
-export async function getUnreadCount(conjuntoId: string, tipo: NotifTipo) {
-  const { count, error } = await supabase
+export async function getUnreadCount(conjuntoId: string, tipo: NotifTipo, userId?: string | null) {
+  let query = supabase
     .from('notifications')
     .select('*', { count: 'exact', head: true })
     .eq('conjunto_id', conjuntoId)
     .eq('tipo', tipo)
     .eq('leido', false);
+
+  if (userId) {
+    query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+  }
+
+  const { count, error } = await query;
   if (error) return 0;
   return count ?? 0;
 }
