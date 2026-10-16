@@ -22,7 +22,8 @@ export interface NotificationData {
   titulo: string;
   cuerpo?: string;
   userId?: string | null;
-  datos?: Record<string, any>;
+  referenciaRecurso?: string | null; // UUID del recurso relacionado
+  tipoRecurso?: NotificationType | null; // Tipo de recurso relacionado
   url?: string;
 }
 
@@ -47,7 +48,8 @@ export async function sendNotification(data: NotificationData): Promise<{ succes
         tipo: data.tipo,
         titulo: data.titulo,
         cuerpo: data.cuerpo || '',
-        datos: data.datos || null,
+        referencia_recurso: data.referenciaRecurso || null,
+        tipo_recurso: data.tipoRecurso || null,
         leido: false,
         creado_at: new Date().toISOString()
       })
@@ -68,9 +70,11 @@ export async function sendNotification(data: NotificationData): Promise<{ succes
           tipo: data.tipo,
           titulo: data.titulo,
           cuerpo: data.cuerpo,
-          datos: data.datos,
+          referenciaRecurso: data.referenciaRecurso,
+          tipoRecurso: data.tipoRecurso,
           url: data.url,
-          conjuntoId: data.conjuntoId
+          conjuntoId: data.conjuntoId,
+          id: notif.id
         }
       });
 
@@ -102,6 +106,13 @@ async function sendPushNotifications(data: NotificationData, notificationId: str
     for (const sub of subscriptions) {
       await supabase.functions.invoke('send-pwa-push', {
         body: {
+          conjuntoId: data.conjuntoId,
+          title: data.titulo,
+          body: data.cuerpo || '',
+          type: data.tipo,
+          url: data.url || '/',
+          id: notificationId,
+          userIds: data.userId ? [data.userId] : undefined,
           subscription: sub.subscription,
           payload: {
             title: data.titulo,
@@ -109,6 +120,8 @@ async function sendPushNotifications(data: NotificationData, notificationId: str
             data: {
               notificationId,
               tipo: data.tipo,
+              referenciaRecurso: data.referenciaRecurso,
+              tipoRecurso: data.tipoRecurso,
               conjuntoId: data.conjuntoId,
               url: data.url || '/'
             }
@@ -124,13 +137,17 @@ async function sendPushNotifications(data: NotificationData, notificationId: str
 /**
  * Cuenta notificaciones no leídas por tipo
  */
-export async function getUnreadCount(conjuntoId: string, tipo?: NotificationType): Promise<number> {
+export async function getUnreadCount(conjuntoId: string, tipo?: NotificationType, userId?: string | null): Promise<number> {
   try {
     let query = supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('conjunto_id', conjuntoId)
       .eq('leido', false);
+
+    if (userId) {
+      query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+    }
 
     if (tipo) {
       query = query.eq('tipo', tipo);

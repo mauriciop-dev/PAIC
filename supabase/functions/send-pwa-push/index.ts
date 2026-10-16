@@ -24,6 +24,12 @@ Deno.serve(async (request) => {
     const { data: profile } = await supabase.from('user_profiles').select('role,conjunto_id').eq('id', caller.user.id).maybeSingle();
     if (!profile || !['trial', 'subscriber'].includes(profile.role)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
     const payload = await request.json();
+    // Soportar formato legacy { payload: { conjuntoId: ... } }
+    if (!payload.conjuntoId && payload.payload?.conjuntoId) {
+      payload.conjuntoId = payload.payload.conjuntoId;
+      payload.title = payload.title || payload.payload?.title;
+      payload.body = payload.body || payload.payload?.body;
+    }
     if (!payload.conjuntoId) return new Response('conjuntoId is required', { status: 400, headers: corsHeaders });
     if (profile.conjunto_id !== payload.conjuntoId) return new Response('Forbidden', { status: 403, headers: corsHeaders });
     const { data: members, error: membersError } = await supabase.from('pwa_memberships').select('user_id').eq('conjunto_id', payload.conjuntoId).eq('status', 'activo');
