@@ -44,18 +44,57 @@ export async function getPwaAttachmentUrl(path: string | null | undefined) {
   const { data, error } = await supabase.storage.from('pwa-attachments').createSignedUrl(path, 3600);
   return error ? path : data.signedUrl;
 }
-export async function createPqr(input: { conjuntoId: string; apartment: string; userId: string; type: string; title: string; description: string; attachmentUrl?: string | null }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { data, error } = await supabase.from('pwa_pqrs').insert({ conjunto_id: input.conjuntoId, apartment: input.apartment, user_id: input.userId, type: input.type, title: input.title, description: input.description, attachment_url: input.attachmentUrl || null }).select('id').single(); if (error) throw error; 
-  // Notificar a admin
+export async function createPqr(input: { conjuntoId: string; apartment: string; userId: string; type: string; title: string; description: string; attachmentUrl?: string | null }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { data, error } = await supabase.from('pwa_pqrs').insert({ conjunto_id: input.conjuntoId, apartment: input.apartment, user_id: input.userId, type: input.type, title: input.title, description: input.description, attachment_url: input.attachmentUrl || null }).select('id').single(); if (error) throw error;
+  // Notificar a admin (push)
   await supabase.functions.invoke('send-pwa-push', { body: { conjuntoId: input.conjuntoId, title: 'Nueva PQR recibida', body: `${input.title} (Apto ${input.apartment})`, type: 'pqr', id: data.id, url: `/pqrs/${data.id}` } });
+  // Registrar en tabla central de notificaciones (badge WebApp admin)
+  await supabase.from('notifications').insert({
+    conjunto_id: input.conjuntoId,
+    user_id: null,
+    tipo: 'pqr',
+    titulo: 'Nueva PQR recibida',
+    cuerpo: `${input.title} (Apto ${input.apartment})`,
+    referencia_recurso: data.id,
+    tipo_recurso: 'pqr',
+    url: `/pqrs/${data.id}`,
+    leido: false,
+    creado_at: new Date().toISOString()
+  });
   return data; }
 export async function answerVote(voteId: string, questionId: string, optionId: string, userId: string) { if (!supabase) throw new Error('Supabase no está configurado.'); const { error } = await supabase.from('pwa_vote_answers').insert({ vote_id: voteId, question_id: questionId, option_id: optionId, user_id: userId }); if (error) throw error; }
 export async function createReservation(input: { conjuntoId: string; apartment: string; userId: string; areaName: string; date: string; startTime: string; endTime: string; paymentProofPath: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { data, error } = await supabase.rpc('pwa_create_reservation', { target_conjunto: input.conjuntoId, target_apartment: input.apartment, target_area: input.areaName, target_date: input.date, target_start: input.startTime, target_end: input.endTime, target_payment_proof: input.paymentProofPath }); if (error) throw error;
   // Notificar a admin
   await supabase.functions.invoke('send-pwa-push', { body: { conjuntoId: input.conjuntoId, title: 'Nueva reserva solicitada', body: `Reserva para ${input.areaName} el ${input.date} (Apto ${input.apartment})`, type: 'reserva', id: data, url: `/reservas/${data}` } });
+  // Registrar en tabla central de notificaciones (badge WebApp admin)
+  await supabase.from('notifications').insert({
+    conjunto_id: input.conjuntoId,
+    user_id: null,
+    tipo: 'reserva',
+    titulo: 'Nueva reserva solicitada',
+    cuerpo: `Reserva para ${input.areaName} el ${input.date} (Apto ${input.apartment})`,
+    referencia_recurso: String(data),
+    tipo_recurso: 'reserva',
+    url: `/reservas/${data}`,
+    leido: false,
+    creado_at: new Date().toISOString()
+  });
   return data; }
 export async function createVisitAuthorization(input: { conjuntoId: string; apartment: string; userId: string; visitorName: string; visitorPhone: string; visitDate: string; notes: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const { data, error } = await supabase.from('pwa_visit_authorizations').insert({ conjunto_id: input.conjuntoId, apartment: input.apartment, user_id: input.userId, visitor_name: input.visitorName, visitor_phone: input.visitorPhone || null, visit_date: input.visitDate, notes: input.notes || null }).select('id').single(); if (error) throw error;
   // Notificar a portería/admin
   await supabase.functions.invoke('send-pwa-push', { body: { conjuntoId: input.conjuntoId, title: 'Nueva autorización de visita', body: `${input.visitorName} para Apto ${input.apartment} el ${input.visitDate}`, type: 'porteria', id: data.id, url: `/visitantes/${data.id}` } });
+  // Registrar en tabla central de notificaciones (badge WebApp admin/portería)
+  await supabase.from('notifications').insert({
+    conjunto_id: input.conjuntoId,
+    user_id: null,
+    tipo: 'porteria',
+    titulo: 'Nueva autorización de visita',
+    cuerpo: `${input.visitorName} para Apto ${input.apartment} el ${input.visitDate}`,
+    referencia_recurso: data.id,
+    tipo_recurso: 'porteria',
+    url: `/visitantes/${data.id}`,
+    leido: false,
+    creado_at: new Date().toISOString()
+  });
   return data; }
 
 export async function updateVisitorLogStatus(input: { conjuntoId: string; logId: number; status: 'Aprobado' | 'Rechazado'; userId: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const now = new Date().toTimeString().slice(0,5); const updates = input.status === 'Aprobado' ? { status: 'Ingresó', entry_time: now } : { status: 'Rechazado' }; const { error } = await supabase.from('visitor_logs').update(updates).eq('conjunto_id', input.conjuntoId).eq('id', input.logId); if (error) throw error; return updates; }
