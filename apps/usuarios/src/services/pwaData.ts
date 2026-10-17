@@ -97,5 +97,22 @@ export async function createVisitAuthorization(input: { conjuntoId: string; apar
   });
   return data; }
 
-export async function updateVisitorLogStatus(input: { conjuntoId: string; logId: number; status: 'Aprobado' | 'Rechazado'; userId: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const now = new Date().toTimeString().slice(0,5); const updates = input.status === 'Aprobado' ? { status: 'Ingresó', entry_time: now } : { status: 'Rechazado' }; const { error } = await supabase.from('visitor_logs').update(updates).eq('conjunto_id', input.conjuntoId).eq('id', input.logId); if (error) throw error; return updates; }
+export async function updateVisitorLogStatus(input: { conjuntoId: string; logId: number; status: 'Aprobado' | 'Rechazado'; userId: string }) { if (!supabase) throw new Error('Supabase no está configurado.'); const now = new Date().toTimeString().slice(0,5); const updates = input.status === 'Aprobado' ? { status: 'Ingresó', entry_time: now } : { status: 'Rechazado' }; const { error } = await supabase.from('visitor_logs').update(updates).eq('conjunto_id', input.conjuntoId).eq('id', input.logId); if (error) throw error;
+  // Notificar a portería (tabla central de notificaciones)
+  const { data: log } = await supabase.from('visitor_logs').select('apartment,visitor_name').eq('id', input.logId).single();
+  const title = input.status === 'Aprobado' ? 'Visita aprobada' : 'Visita rechazada';
+  const body = log ? `${log.visitor_name || 'Visitante'} - Apto ${log.apartment}` : `Visita ${input.status.toLowerCase()}`;
+  await supabase.from('notifications').insert({
+    conjunto_id: input.conjuntoId,
+    user_id: null,
+    tipo: 'porteria',
+    titulo: title,
+    cuerpo: body,
+    referencia_recurso: String(input.logId),
+    tipo_recurso: 'porteria',
+    url: `/visitantes/${input.logId}`,
+    leido: false,
+    creado_at: new Date().toISOString()
+  });
+  return updates; }
 export async function inviteAdditionalUser(membershipId: string, email: string) { if (!supabase) throw new Error('Supabase no está configurado.'); const { error } = await supabase.rpc('pwa_create_invitation', { target_membership: membershipId, target_email: email }); if (error) throw error; const appUrl = window.location.origin; const emailResult = await supabase.functions.invoke('send-email', { body: { to: [email], subject: 'Invitación a PAIC Residentes', html: `<h2>Has sido invitado a PAIC Residentes</h2><p>Usa tu cuenta de Google para ingresar a la aplicación.</p><p><a href="${appUrl}">Abrir PAIC Residentes</a></p>` } }); if (emailResult.error) throw emailResult.error; }
