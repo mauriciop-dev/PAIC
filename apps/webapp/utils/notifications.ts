@@ -12,7 +12,7 @@ export interface NotifPayload {
   tipo: NotifTipo;
   titulo: string;
   cuerpo?: string;
-  userId?: string; // destinatario específico; null = todos en conjunto
+  userIds?: string[]; // destinatarios específicos; vacío u omitido = masivo para todo el conjunto (user_id null)
 }
 
 /**
@@ -20,28 +20,43 @@ export interface NotifPayload {
  * Devuelve {sent, total} para usar en mensajes de confirmación.
  */
 export async function notifyPwaResidents(p: NotifPayload) {
-  // 1. Insertar fila
-  const { error } = await supabase.from('notifications').insert({
-    conjunto_id: p.conjuntoId,
-    user_id: p.userId ?? null,
-    tipo: p.tipo,
-    titulo: p.titulo,
-    cuerpo: p.cuerpo ?? '',
-    leido: false,
-    creado_at: new Date().toISOString(),
-  });
-  if (error) throw error;
+  const userIds = p.userIds || [];
 
-  // 2. Publicar realtime (todos los suscritos al canal reciben)
+  if (userIds.length > 0) {
+    // Una fila por destinatario específico (nada de masivo)
+    const rows = userIds.map((uid) => ({
+      conjunto_id: p.conjuntoId,
+      user_id: uid,
+      tipo: p.tipo,
+      titulo: p.titulo,
+      cuerpo: p.cuerpo ?? '',
+      leido: false,
+      creado_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase.from('notifications').insert(rows);
+    if (error) throw error;
+  } else {
+    // Masiva para todo el conjunto (comunicados, documentos, votaciones)
+    const { error } = await supabase.from('notifications').insert({
+      conjunto_id: p.conjuntoId,
+      user_id: null,
+      tipo: p.tipo,
+      titulo: p.titulo,
+      cuerpo: p.cuerpo ?? '',
+      leido: false,
+      creado_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  }
+
+  // Publicar en Realtime (los clientes filtran por user_id)
   await supabase.channel(`notifications:${p.conjuntoId}`).send({
     type: 'broadcast',
     event: 'new-notification',
     payload: { tipo: p.tipo, titulo: p.titulo, cuerpo: p.cuerpo },
   });
 
-  // 3. Contar cuántas se envían (estimación simple si no tienes tabla de suscriptores push)
-  // Si tienes tabla push_subscriptions, haz select count(*) de allí.
-  return { sent: 1, total: 1 };
+  return { sent: userIds.length || 1, total: userIds.length || 1 };
 }
 
 /** Leer badges de un tipo para un conjunto */
