@@ -13,16 +13,16 @@ FROM public.pwa_push_subscriptions;
 
 -- 2. Actualizar conjunto_id usando pwa_memberships (prioridad: membresía activa)
 UPDATE public.pwa_push_subscriptions p
-SET conjunto_id = m.conjunto_id,
+SET conjunto_id = m.conjunto_id::uuid,
     updated_at = now()
 FROM public.pwa_memberships m
 WHERE p.user_id = m.user_id
   AND m.status = 'activo'
-  AND (p.conjunto_id IS NULL OR p.conjunto_id <> m.conjunto_id);
+  AND p.conjunto_id IS NULL;
 
 -- 3. Para las que aún quedan NULL, intentar con user_profiles
 UPDATE public.pwa_push_subscriptions p
-SET conjunto_id = up.conjunto_id,
+SET conjunto_id = up.conjunto_id::uuid,
     updated_at = now()
 FROM public.user_profiles up
 WHERE p.user_id = up.id
