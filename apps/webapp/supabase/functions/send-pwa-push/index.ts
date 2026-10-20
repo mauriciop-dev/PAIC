@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { conjuntoId, title, body, userIds, type, url, datos, vapidPublicKey, vapidPrivateKey } = await req.json();
+    const { conjuntoId, title, body, userIds, type, url, datos } = await req.json();
     console.log('🔔 send-pwa-push invoked:', { conjuntoId, title, userIds, type });
 
     if (!conjuntoId) {
@@ -36,6 +36,18 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Obtener claves VAPID exclusivamente de secretos de servidor (nunca del body del request)
+    const publicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+    const privateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+
+    if (!publicKey || !privateKey) {
+      console.error('❌ VAPID keys not configured in server secrets');
+      return new Response(
+        JSON.stringify({ error: 'VAPID keys not configured. Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to Supabase project secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Obtener suscripciones push - AHORA POR CONJUNTO_ID DIRECTO
     let query = supabase
@@ -64,18 +76,6 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ sent: 0, failed: 0, total: 0, message: 'No subscriptions found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Usar keys del request o del entorno
-    const publicKey = vapidPublicKey || Deno.env.get('VAPID_PUBLIC_KEY');
-    const privateKey = vapidPrivateKey || Deno.env.get('VAPID_PRIVATE_KEY');
-
-    if (!publicKey || !privateKey) {
-      console.error('❌ VAPID keys not configured');
-      return new Response(
-        JSON.stringify({ error: 'VAPID keys not configured. Provide in request body as vapidPublicKey/vapidPrivateKey, or add to Supabase project secrets.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

@@ -7,10 +7,20 @@ import { toast } from 'react-toastify';
 function usePWAServiceWorker() {
   const [serviceWorker, setServiceWorker] = useState<ServiceWorker | null>(null);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Registrar service worker
     if ('serviceWorker' in navigator) {
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
+      if (!vapidPublicKey) {
+        const msg = 'VITE_VAPID_PUBLIC_KEY no está configurada en variables de entorno';
+        console.error(msg);
+        setError(msg);
+        return;
+      }
+
       navigator.serviceWorker.register('/sw.js')
         .then((sw) => {
           console.log('Service worker registrado:', sw);
@@ -20,25 +30,29 @@ function usePWAServiceWorker() {
             if (permission === 'granted') {
               sw.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(
-                  'BJqgBW6Wt9mXQJr3kD5G6H7I8J9K0L1M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5'
-                ),
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
               }).then((sub) => {
                 setSubscription(sub);
                 console.log('Push subscription establecido:', sub);
               }).catch((err) => {
                 console.error('Error al suscribirse a push:', err);
+                setError(err.message);
               });
+            } else {
+              console.warn('Permiso de notificaciones denegado');
             }
           });
 
           setServiceWorker(sw);
         })
-        .catch((err) => console.error('Error al registrar service worker:', err));
+        .catch((err) => {
+          console.error('Error al registrar service worker:', err);
+          setError(err.message);
+        });
     }
   }, []);
 
-  return { serviceWorker, subscription };
+  return { serviceWorker, subscription, error };
 }
 
 // Helper para convertir la clave pública a Uint8Array

@@ -31,11 +31,12 @@ export function ModuleBadge({ tipo, conjuntoId, userId, label }: ModuleBadgeProp
   return (
     <div className="inline-flex items-center">
       {label && <span className="mr-1">{label}</span>}
-      {count > 0 && (
-        <span className="text-xs bg-red-600 text-white rounded-full px-2 py-0.5 ml-1">
-          {count}
-        </span>
-      )}
+      <span
+        data-testid={`badge-${tipo}`}
+        className={`text-xs bg-red-600 text-white rounded-full px-2 py-0.5 ml-1 ${count === 0 ? 'hidden' : ''}`}
+      >
+        {count}
+      </span>
     </div>
   );
 }

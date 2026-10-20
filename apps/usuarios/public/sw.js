@@ -1,8 +1,8 @@
-// apps/usuarios/public/sw.js - VERSIÓN MEJORADA
+// apps/usuarios/public/sw.js - VERSIÓN CORREGIDA (sin localStorage)
 const CACHE = 'paic-usuarios-v12';
 
-// Mapping: backend notification type -> localStorage key
-// Also includes app tab IDs for clearBadge messages
+// No usamos localStorage en service workers - usamos comunicación con la app
+// Mantendremos el mapeo para referencia, pero no para almacenamiento persistente
 const TYPE_TO_STORAGE_KEY = {
   // Notification types (from backend)
   comunicado: 'paic_badge_comunicado',
@@ -84,7 +84,7 @@ self.addEventListener('push', (event) => {
 
   console.log('[ServiceWorker] Push data URL:', data.url);
 
-  // Use mapping for badge storage key
+  // Use mapping for badge storage key (solo para referencia)
   const pushType = data.type || 'default';
   const badgeKey = TYPE_TO_STORAGE_KEY[pushType] || TYPE_TO_STORAGE_KEY.default;
 
@@ -115,17 +115,18 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(payload.title, payload)
   );
 
-  // Update badge in localStorage for persistence using correct mapping
-  const currentBadge = parseInt(self.localStorage.getItem(badgeKey) || '0', 10);
-  self.localStorage.setItem(badgeKey, String(currentBadge + 1));
-  console.log('[ServiceWorker] Badge incremented for', pushType, '->', badgeKey, ':', currentBadge + 1);
-
-  // Notify app to update badge
+  // Notify app to update badge - enviamos un mensaje para que la app actualice su estado
+  // La aplicación será responsable de mantener el estado correcto de los badges
   self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
     clients.forEach(client => {
       client.postMessage({
-        type: 'push',
-        payload: { type: pushType, title: data.title, body: data.body }
+        type: 'PUSH_RECEIVED',
+        payload: { 
+          type: pushType, 
+          title: data.title, 
+          body: data.body,
+          badgeKey: badgeKey // Para que la app sepa qué tipo de badge actualizar
+        }
       });
     });
   });
@@ -147,9 +148,9 @@ self.addEventListener('notificationclick', (event) => {
     // For 'open' action, fall through to navigation
   }
 
-  // SIMPLE: Always open main app URL - avoids deep link issues
-  const targetUrl = self.location.origin + '/';
-  console.log('[ServiceWorker] Abriendo app principal:', targetUrl);
+  // NOTIFICACIÓN: En lugar de siempre abrir la principal, intentamos navegar a la URL específica
+  const targetUrl = data.data?.url || self.location.origin + '/';
+  console.log('[ServiceWorker] Abriendo URL:', targetUrl);
 
   event.waitUntil(
     self.clients
@@ -164,10 +165,16 @@ self.addEventListener('notificationclick', (event) => {
 
         if (existing) {
           console.log('[ServiceWorker] Enfocando ventana existente');
-          return existing.focus();
+          existing.focus();
+          // Enviar mensaje para navegar a la URL específica
+          existing.postMessage({
+            type: 'NAVIGATE_TO',
+            url: targetUrl
+          });
+          return existing;
         }
 
-        console.log('[ServiceWorker] Abriendo app principal');
+        console.log('[ServiceWorker] Abriendo nueva ventana');
         return self.clients.openWindow(targetUrl);
       })
   );
@@ -182,9 +189,9 @@ self.addEventListener('notificationaction', (event) => {
   }
 
   if (event.action === 'open') {
-    // SIMPLE: Always open main app URL
-    const targetUrl = self.location.origin + '/';
-    console.log('[ServiceWorker] Action open -> app principal:', targetUrl);
+    // NOTIFICACIÓN: Navegar a la URL específica en lugar de siempre al principal
+    const targetUrl = data.data?.url || self.location.origin + '/';
+    console.log('[ServiceWorker] Action open -> URL específica:', targetUrl);
 
     event.waitUntil(
       self.clients
@@ -215,12 +222,9 @@ self.addEventListener('message', (event) => {
     });
   }
 
-  // Clear badge for a type when user views that tab
-  if (event.data && event.data.type === 'clearBadge' && event.data.badgeType) {
-    const badgeKey = TYPE_TO_STORAGE_KEY[event.data.badgeType] || 'paic_badge_' + event.data.badgeType;
-    self.localStorage.removeItem(badgeKey);
-    console.log('[ServiceWorker] Badge cleared for:', event.data.badgeType, '->', badgeKey);
-  }
+  // NOTIFICACIÓN: Ya no procesamos clearBadge aquí porque no usamos localStorage
+  // El manejo de badges ahora lo hace la aplicación mediante comunicación con Supabase
+  // El service worker solo actúa como mensajero entre push notifications y la app
 });
 
-console.log('[ServiceWorker] ✅ Service Worker iniciado correctamente');
+console.log('[ServiceWorker] ✅ Service Worker iniciado correctamente (sin localStorage)');

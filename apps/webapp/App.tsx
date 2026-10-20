@@ -106,8 +106,8 @@ const AppContent: React.FC = () => {
     return () => window.clearInterval(timer);
   }, []);
 
-  // PWA Service Worker
-  const { serviceWorker, subscription: pushSubscription } = usePWAServiceWorker();
+    // PWA Service Worker
+    const { serviceWorker, error } = usePWAServiceWorker();
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);

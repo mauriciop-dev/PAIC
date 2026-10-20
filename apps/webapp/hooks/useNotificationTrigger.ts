@@ -20,7 +20,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'comunicados' }
+      tipoRecurso: 'comunicado',
+      referenciaRecurso: null
     });
   }, [conjuntoId]);
 
@@ -37,7 +38,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'reservas', ...datos }
+      tipoRecurso: 'reserva',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -54,7 +56,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'pqrs', ...datos }
+      tipoRecurso: 'pqr',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -71,7 +74,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'documentos', ...datos }
+      tipoRecurso: 'documento',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -88,7 +92,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'votaciones', ...datos }
+      tipoRecurso: 'votacion',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -105,7 +110,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'directorio', ...datos }
+      tipoRecurso: 'directorio',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -122,7 +128,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'porteria', ...datos }
+      tipoRecurso: 'porteria',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -139,7 +146,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'visitantes', ...datos }
+      tipoRecurso: 'visitante',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 
@@ -156,7 +164,8 @@ export function useNotificationTrigger(conjuntoId: string) {
       titulo,
       cuerpo,
       userId,
-      datos: { module: 'paquetes', ...datos }
+      tipoRecurso: 'paquete',
+      referenciaRecurso: datos?.id ?? null
     });
   }, [conjuntoId]);
 

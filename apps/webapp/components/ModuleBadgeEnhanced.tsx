@@ -38,14 +38,17 @@ export function ModuleBadgeEnhanced({
     }
   }, [count]);
 
-  if (!showBadge || count === 0) {
+  if (!showBadge) {
     return label ? <span className={className}>{label}</span> : null;
   }
 
   return (
     <div className={`inline-flex items-center ${className}`}>
       {label && <span>{label}</span>}
-      <span className="ml-2 text-[10px] bg-red-600 text-white rounded-full px-2 py-0.5 font-medium min-w-[20px] text-center">
+      <span
+        data-testid={`badge-${tipo}`}
+        className={`ml-2 text-[10px] bg-red-600 text-white rounded-full px-2 py-0.5 font-medium min-w-[20px] text-center ${count === 0 ? 'hidden' : ''}`}
+      >
         {count > 99 ? '99+' : count}
       </span>
     </div>
