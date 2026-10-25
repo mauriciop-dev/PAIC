@@ -38,7 +38,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
     useEffect(() => {
         // Subscribe to new reservations in real-time
         const reservationSubscription = supabase
-            .channel('new-reservations')
+            .channel(`new-reservations-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -59,7 +59,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new PQRs in real-time
         const pqrSubscription = supabase
-            .channel('new-pqrs')
+            .channel(`new-pqrs-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -80,7 +80,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new documents in real-time
         const documentoSubscription = supabase
-            .channel('new-documentos')
+            .channel(`new-documentos-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -101,7 +101,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new votaciones in real-time
         const votacionSubscription = supabase
-            .channel('new-votaciones')
+            .channel(`new-votaciones-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -122,7 +122,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new directorio items in real-time
         const directorioSubscription = supabase
-            .channel('new-directorio')
+            .channel(`new-directorio-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -511,7 +511,7 @@ function Reservations({ conjuntoId, userId }: { conjuntoId:string; userId:string
         
         // Subscribe to new reservations in real-time
         const reservationSubscription = supabase
-            .channel('new-reservations')
+            .channel(`reservations-realtime-${conjuntoId}`)
             .on(
                 'postgres_changes',
                 { 
