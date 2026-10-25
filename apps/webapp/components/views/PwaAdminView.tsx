@@ -199,7 +199,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                     <>
                         <AccessInvite conjuntoId={conjuntoInfo.id}/>
                         <PushDiagnostics conjuntoId={conjuntoInfo.id}/>
-                        <RequestsAdmin conjuntoId={conjuntoInfo.id}/>
+                        <RequestsAdmin conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>
                     </>
                 )}
             </div>
@@ -627,7 +627,7 @@ function Votaciones({ conjuntoId, userId }: { conjuntoId:string; userId:string }
                                 <div className="flex flex-wrap gap-2">
                                     {q.options.map((opt,optIndex)=> (
                                         <div key={optIndex} className="flex items-center gap-1">
-                                            <Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?{...o2,value:e.target.value}:o2)}:q2))} required/>
+                                            <Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?e.target.value:o2)}:q2))} required/>
                                             <Button variant="danger" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.filter((_,index)=>index!==optIndex)}:q2))}>
                                                 Eliminar
                                             </Button>
@@ -737,7 +737,7 @@ function GateAdmin({ conjuntoId }: { conjuntoId:string }) {
     );
 }
 
-function RequestsAdmin({ conjuntoId }: { conjuntoId:string }) { 
+function RequestsAdmin({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
     const [rows,setRows]=useState<any[]>([]); 
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_access_requests').select('*').eq('conjunto_id',conjuntoId).order('created_at',{descending:true});setRows(data||[])}; 
