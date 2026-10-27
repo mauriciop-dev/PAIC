@@ -57,7 +57,7 @@ export async function getPushSubscriptionState(): Promise<PushSubscriptionState>
   return subscription ? 'subscribed' : 'not-subscribed';
 }
 
-export async function subscribeToPush(userId: string) {
+export async function subscribeToPush(userId: string, conjuntoId?: string) {
   if (!supabase || !vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Las notificaciones Push no están configuradas en este entorno.');
   }
@@ -67,7 +67,28 @@ export async function subscribeToPush(userId: string) {
   const subscription = await registration.pushManager.getSubscription()
     || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey) });
   const json = subscription.toJSON();
-  const { error } = await supabase.from('pwa_push_subscriptions').upsert({ user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() }, { onConflict: 'endpoint' });
+  const upsertData: any = { user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() };
+  if (conjuntoId) upsertData.conjunto_id = conjuntoId;
+  const { error } = await supabase.from('pwa_push_subscriptions').upsert(upsertData, { onConflict: 'endpoint' });
+  if (error) throw error;
+  return json;
+}
+
+/**
+ * Auto-suscribe si el usuario ya tiene permiso concedido (llamado tras login)
+ */
+export async function autoSubscribeIfPermitted(userId: string, conjuntoId?: string) {
+  if (!supabase || !vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return null;
+  }
+  if (Notification.permission !== 'granted') return null;
+  const registration = await getServiceWorkerRegistration();
+  const subscription = await registration.pushManager.getSubscription()
+    || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey) });
+  const json = subscription.toJSON();
+  const upsertData: any = { user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() };
+  if (conjuntoId) upsertData.conjunto_id = conjuntoId;
+  const { error } = await supabase.from('pwa_push_subscriptions').upsert(upsertData, { onConflict: 'endpoint' });
   if (error) throw error;
   return json;
 }

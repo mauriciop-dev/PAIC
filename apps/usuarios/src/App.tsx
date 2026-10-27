@@ -3,7 +3,7 @@ import { Button, Card, Icon, Input, Badge, Avatar, useToast, BottomNav, type Nav
 import { analytics } from '@paic/analytics';
 import { consumeResidentInvitation, ensureFreshSession, getMembership, getSession, requestMembership, signInWithGoogle, signOut, supabase, supabaseConfigError, type PwaMembership } from './services/pwaAuth';
 import { loadPwaData, createPqr, uploadPwaAttachment, answerVote, createReservation, createVisitAuthorization, updateVisitorLogStatus, inviteAdditionalUser, type Communication, type AccountStatus, type PwaReservation, type GateEvent, type VisitAuthorization, type Pqr, type PwaDocument, type DirectoryEntry, type PwaVote } from './services/pwaData';
-import { getPushSubscriptionState, isLikelyIos, isPushSupported, isRunningAsInstalledPwa, subscribeToPush, unsubscribeFromPush, type PushSubscriptionState } from './services/pwaPush';
+import { getPushSubscriptionState, isLikelyIos, isPushSupported, isRunningAsInstalledPwa, subscribeToPush, unsubscribeFromPush, autoSubscribeIfPermitted, type PushSubscriptionState } from './services/pwaPush';
 import './App.css';
 
 const primaryItems: NavItem[] = [
@@ -115,7 +115,13 @@ export default function UsuariosApp() {
           membership = activation.membership;
           window.history.replaceState({}, document.title, window.location.pathname);
         }
-        if (active && membership) { setUser({ id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role }); setPwaData(await loadPwaData(membership)); }
+        if (active && membership) { 
+          const userData = { id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role };
+          setUser(userData); 
+          setPwaData(await loadPwaData(membership));
+          // Auto-suscribir a push si ya tiene permiso concedido
+          void autoSubscribeIfPermitted(userData.id, userData.conjuntoId).catch(err => console.warn('[App] Auto-subscribe push failed:', err));
+        }
         if (active && !membership) setAuthError('Tu cuenta aún no tiene una unidad vinculada. Solicita aprobación a la administración.');
       } catch (error) {
         if (active) setAuthError(error instanceof Error ? error.message : 'No fue posible validar la cuenta.');
@@ -533,7 +539,7 @@ function NotificationSettings({ userId, onToast }: { userId: string; onToast: (m
   const activate = async () => {
     try {
       setLoading(true);
-      await subscribeToPush(userId);
+      await subscribeToPush(userId, user?.conjuntoId);
       setState(await getPushSubscriptionState());
       onToast('Notificaciones activadas en este teléfono.', 'success');
     } catch (error) {
