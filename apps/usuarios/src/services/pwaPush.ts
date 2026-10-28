@@ -75,7 +75,7 @@ export async function subscribeToPush(userId: string, conjuntoId?: string) {
 }
 
 /**
- * Auto-suscribe si el usuario ya tiene permiso concedido (llamado tras login)
+ * Auto-suscribe si el usuario ya tiene permiso concedido (o lo pide si está en default)
  */
 export async function autoSubscribeIfPermitted(userId: string, conjuntoId?: string) {
   console.log('[pwaPush] autoSubscribeIfPermitted called:', { userId, conjuntoId, permission: Notification.permission });
@@ -83,10 +83,21 @@ export async function autoSubscribeIfPermitted(userId: string, conjuntoId?: stri
     console.warn('[pwaPush] Missing requirements for push');
     return null;
   }
-  if (Notification.permission !== 'granted') {
+  
+  let permission = Notification.permission;
+  if (permission === 'default') {
+    try {
+      permission = await Notification.requestPermission();
+    } catch (e) {
+      console.warn('[pwaPush] Request permission failed:', e);
+    }
+  }
+
+  if (permission !== 'granted') {
     console.log('[pwaPush] Permission not granted, skipping auto-subscribe');
     return null;
   }
+  
   try {
     const registration = await getServiceWorkerRegistration();
     const subscription = await registration.pushManager.getSubscription()
