@@ -38,7 +38,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
     useEffect(() => {
         // Subscribe to new reservations in real-time
         const reservationSubscription = supabase
-            .channel('new-reservations')
+            .channel(`new-reservations-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -59,7 +59,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new PQRs in real-time
         const pqrSubscription = supabase
-            .channel('new-pqrs')
+            .channel(`new-pqrs-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -80,7 +80,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new documents in real-time
         const documentoSubscription = supabase
-            .channel('new-documentos')
+            .channel(`new-documentos-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -101,7 +101,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new votaciones in real-time
         const votacionSubscription = supabase
-            .channel('new-votaciones')
+            .channel(`new-votaciones-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -122,7 +122,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
         
         // Subscribe to new directorio items in real-time
         const directorioSubscription = supabase
-            .channel('new-directorio')
+            .channel(`new-directorio-${conjuntoInfo.id}`)
             .on(
                 'postgres_changes',
                 { 
@@ -199,7 +199,7 @@ export default function PwaAdminView({ userProfile, conjuntoInfo }: { userProfil
                     <>
                         <AccessInvite conjuntoId={conjuntoInfo.id}/>
                         <PushDiagnostics conjuntoId={conjuntoInfo.id}/>
-                        <RequestsAdmin conjuntoId={conjuntoInfo.id}/>
+                        <RequestsAdmin conjuntoId={conjuntoInfo.id} userId={userProfile.id}/>
                     </>
                 )}
             </div>
@@ -511,7 +511,7 @@ function Reservations({ conjuntoId, userId }: { conjuntoId:string; userId:string
         
         // Subscribe to new reservations in real-time
         const reservationSubscription = supabase
-            .channel('new-reservations')
+            .channel(`reservations-realtime-${conjuntoId}`)
             .on(
                 'postgres_changes',
                 { 
@@ -627,7 +627,7 @@ function Votaciones({ conjuntoId, userId }: { conjuntoId:string; userId:string }
                                 <div className="flex flex-wrap gap-2">
                                     {q.options.map((opt,optIndex)=> (
                                         <div key={optIndex} className="flex items-center gap-1">
-                                            <Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?{...o2,value:e.target.value}:o2)}:q2))} required/>
+                                            <Input label={`Opción ${optIndex+1}`} value={opt} onChange={e=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.map((o2,o2Index)=>o2Index===optIndex?e.target.value:o2)}:q2))} required/>
                                             <Button variant="danger" onClick={()=>setQuestions(questions.map((q2,i2)=>i2===i?{...q2,options:q2.filter((_,index)=>index!==optIndex)}:q2))}>
                                                 Eliminar
                                             </Button>
@@ -737,7 +737,7 @@ function GateAdmin({ conjuntoId }: { conjuntoId:string }) {
     );
 }
 
-function RequestsAdmin({ conjuntoId }: { conjuntoId:string }) { 
+function RequestsAdmin({ conjuntoId, userId }: { conjuntoId:string; userId:string }) { 
     const [rows,setRows]=useState<any[]>([]); 
     const [message,setMessage]=useState(''); 
     const load=async()=>{const {data}=await supabase.from('pwa_access_requests').select('*').eq('conjunto_id',conjuntoId).order('created_at',{descending:true});setRows(data||[])}; 
