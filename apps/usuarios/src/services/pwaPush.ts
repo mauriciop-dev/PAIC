@@ -78,19 +78,31 @@ export async function subscribeToPush(userId: string, conjuntoId?: string) {
  * Auto-suscribe si el usuario ya tiene permiso concedido (llamado tras login)
  */
 export async function autoSubscribeIfPermitted(userId: string, conjuntoId?: string) {
+  console.log('[pwaPush] autoSubscribeIfPermitted called:', { userId, conjuntoId, permission: Notification.permission });
   if (!supabase || !vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[pwaPush] Missing requirements for push');
     return null;
   }
-  if (Notification.permission !== 'granted') return null;
-  const registration = await getServiceWorkerRegistration();
-  const subscription = await registration.pushManager.getSubscription()
-    || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey) });
-  const json = subscription.toJSON();
-  const upsertData: any = { user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() };
-  if (conjuntoId) upsertData.conjunto_id = conjuntoId;
-  const { error } = await supabase.from('pwa_push_subscriptions').upsert(upsertData, { onConflict: 'endpoint' });
-  if (error) throw error;
-  return json;
+  if (Notification.permission !== 'granted') {
+    console.log('[pwaPush] Permission not granted, skipping auto-subscribe');
+    return null;
+  }
+  try {
+    const registration = await getServiceWorkerRegistration();
+    const subscription = await registration.pushManager.getSubscription()
+      || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(vapidPublicKey) });
+    const json = subscription.toJSON();
+    const upsertData: any = { user_id: userId, endpoint: json.endpoint, subscription: json, updated_at: new Date().toISOString() };
+    if (conjuntoId) upsertData.conjunto_id = conjuntoId;
+    console.log('[pwaPush] Upserting subscription with:', { userId, conjuntoId: upsertData.conjunto_id, endpoint: json.endpoint.substring(0, 50) });
+    const { error } = await supabase.from('pwa_push_subscriptions').upsert(upsertData, { onConflict: 'endpoint' });
+    if (error) throw error;
+    console.log('[pwaPush] ✅ Subscription saved successfully');
+    return json;
+  } catch (err) {
+    console.error('[pwaPush] ❌ Auto-subscribe failed:', err);
+    throw err;
+  }
 }
 
 export async function unsubscribeFromPush(userId: string) {

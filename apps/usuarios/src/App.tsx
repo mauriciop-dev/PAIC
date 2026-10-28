@@ -117,9 +117,11 @@ export default function UsuariosApp() {
         }
         if (active && membership) { 
           const userData = { id: session.user.id, membershipId: membership.id, conjuntoId: membership.conjunto_id, name: session.user.user_metadata?.full_name || session.user.email || 'Residente', email: session.user.email || '', apt: membership.apartment, avatar: session.user.user_metadata?.avatar_url, role: membership.role };
+          console.log('[App] Login successful, userData:', { id: userData.id, conjuntoId: userData.conjuntoId, apt: userData.apt });
           setUser(userData); 
           setPwaData(await loadPwaData(membership));
           // Auto-suscribir a push si ya tiene permiso concedido
+          console.log('[App] Calling autoSubscribeIfPermitted with conjuntoId:', userData.conjuntoId);
           void autoSubscribeIfPermitted(userData.id, userData.conjuntoId).catch(err => console.warn('[App] Auto-subscribe push failed:', err));
         }
         if (active && !membership) setAuthError('Tu cuenta aún no tiene una unidad vinculada. Solicita aprobación a la administración.');
